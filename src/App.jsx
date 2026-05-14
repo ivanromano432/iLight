@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { weightsRepo, profileRepo, waterRepo, sleepsRepo, diaryRepo } from './repo.js';
+import { weightsRepo, profileRepo, waterRepo, sleepsRepo, diaryRepo, mealsRepo } from './repo.js';
 
 const Q = { bg1: '#3A2818', bg2: '#1F140C', gold: '#C9A876', goldDim: '#8B7355', cream: '#E8D8B8', ink: '#1F140C' };
 const W = { bg: '#E8E0D2', ink: '#3C3329', tan: '#8C6A4E' };
@@ -390,18 +390,19 @@ export default function App({ user }){
       await sSet(migKey, '1');
     }
 
-    // Pesi, profilo, acqua, sonno, diario da Supabase
-    const [weightsFromDb, profile, waterFromDb, sleepsFromDb, diaryFromDb] = await Promise.all([
+    // Pesi, profilo, acqua, sonno, diario, pasti da Supabase
+    const [weightsFromDb, profile, waterFromDb, sleepsFromDb, diaryFromDb, mealsFromDb] = await Promise.all([
       weightsRepo.load(user.id),
       profileRepo.load(user.id),
       waterRepo.load(user.id),
       sleepsRepo.load(user.id),
       diaryRepo.load(user.id),
+      mealsRepo.load(user.id),
     ]);
     // Resto ancora in localStorage (migrazione progressiva)
-    const [wag,m,wk,wt,su,st,mf,fs] = await Promise.all([
+    const [wag,wk,wt,su,st,mf,fs] = await Promise.all([
       sGet('watergoal'),
-      sGet('meals'),sGet('workouts'),sGet('workouttypes'),sGet('supps'),sGet('supptaken'),
+      sGet('workouts'),sGet('workouttypes'),sGet('supps'),sGet('supptaken'),
       sGet('mindful'),sGet('fasts'),
     ]);
     setWeights(weightsFromDb);
@@ -409,7 +410,7 @@ export default function App({ user }){
     setFoodNotes(diaryFromDb);
     setWaterByDay(waterFromDb);
     const wgn = profile?.water_goal ?? (wag?parseInt(wag):null); setWaterGoal(wgn&&!isNaN(wgn)?wgn:8);
-    setMeals(safeParse(m,[]));
+    setMeals(mealsFromDb);
     setWorkouts(safeParse(wk,[]));
     const wtp = safeParse(wt,null); setWorkoutTypes(wtp&&wtp.length>0?wtp:DEF_TYPES);
     setSupplements(safeParse(su,[]));
@@ -468,7 +469,15 @@ export default function App({ user }){
     await sSet('watergoal', String(g));
     if (user) await profileRepo.update(user.id, { water_goal: g });
   };
-  const updMeals = upd('meals', setMeals);
+  // updMeals: aggiorna state + sync delta su Supabase
+  const updMeals = async (newList) => {
+    const oldList = meals;
+    setMeals(newList);
+    if (user) {
+      const r = await mealsRepo.sync(user.id, oldList, newList);
+      if (r && r.ok === false) console.error('Errore salvataggio pasti:', r.errors);
+    }
+  };
   const updWorkouts = upd('workouts', setWorkouts);
   const updWorkoutTypes = upd('workouttypes', setWorkoutTypes);
   const updSupps = upd('supps', setSupplements);

@@ -89,6 +89,12 @@ export function makeRepo(tableName, columns, orderBy = 'ts') {
 // diary_notes: app usa { id, text, ts } → DB usa stessi nomi
 export const diaryRepo = makeRepo('diary_notes', ['text', 'ts']);
 
+// meals: app e DB usano stesso schema { id, ts, type, description, qty_g, kcal, p, c, g, photo, status }
+// Nota: photo può essere base64 (anche pesanti, ~100-500KB)
+export const mealsRepo = makeRepo('meals',
+  ['ts', 'type', 'description', 'qty_g', 'kcal', 'p', 'c', 'g', 'photo', 'status']
+);
+
 // sleeps: app usa { id, wakeDate, bedtime, waketime, quality, notes }
 // DB usa { id, wake_date, bedtime, waketime, quality, notes }
 const _sleepsCore = makeRepo('sleeps', ['wake_date', 'bedtime', 'waketime', 'quality', 'notes'], 'wake_date');
