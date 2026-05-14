@@ -36,8 +36,16 @@ function fmt(n,d=1){ if(n==null||isNaN(n))return '—'; return Number(n).toFixed
 function fmt0(n){ if(n==null||isNaN(n))return '—'; return Math.round(Number(n)).toString(); }
 function parseNum(s,min,max){ if(s==null||s==='')return null; const n=parseFloat(String(s).replace(',','.')); if(isNaN(n)||n<min||n>max)return null; return Math.round(n*100)/100; }
 function sameDay(a,b){ return a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate(); }
-function dayKey(d){ return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`; }
-function parseDayKey(k){ const [y,m,d]=k.split('-').map(Number); return new Date(y,m,d); }
+function dayKey(d){
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+function parseDayKey(k){
+  const [y,m,d] = k.split('-').map(Number);
+  return new Date(y, m - 1, d); // m da 1-based (ISO) a 0-based (Date constructor)
+}
 function timeOfDay(d){ const h=d.getHours(); if(h<5)return 'notte'; if(h<12)return 'mattina'; if(h<18)return 'pomeriggio'; return 'sera'; }
 function durHours(b,w){ if(!b||!w)return null; const [bh,bm]=b.split(':').map(Number); const [wh,wm]=w.split(':').map(Number); if([bh,bm,wh,wm].some(isNaN))return null; const bM=bh*60+bm; let wM=wh*60+wm; if(wM<=bM)wM+=1440; return (wM-bM)/60; }
 function fmtDur(h){ if(h==null)return '—'; const hh=Math.floor(h); const mm=Math.round((h-hh)*60); return `${hh}h ${String(mm).padStart(2,'0')}`; }
