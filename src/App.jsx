@@ -660,8 +660,11 @@ function PesoPage({ loaded, weights, goal, updWeights, updGoal, meals, updMeals 
   async function del(){ await updWeights(weights.filter(e=>e.id!==editing)); setEditing(null); }
   async function saveGoal(){ const g=parseNum(draftGoal,20,300); if(g==null)return; await updGoal(g); setShowGoal(false); setDraftGoal(''); }
 
+  const [period, setPeriod] = useState(7); // 7, 30, 365 giorni
+
   const sorted = useMemo(()=>[...weights].sort((a,b)=>new Date(a.ts)-new Date(b.ts)), [weights]);
   const dailyData = useMemo(()=>{
+    // Indicizza tutte le pesate per dayKey
     const map={};
     sorted.forEach(e=>{
       const k=dayKey(new Date(e.ts));
@@ -669,19 +672,42 @@ function PesoPage({ loaded, weights, goal, updWeights, updGoal, meals, updMeals 
       map[k].ws.push(e.weight);
       if(e.bodyFat!=null) map[k].bfs.push(e.bodyFat);
     });
-    const out=[]; const today=new Date();
-    for(let i=6;i>=0;i--){
-      const d=new Date(today); d.setDate(d.getDate()-i);
-      const m=map[dayKey(d)];
-      out.push({
-        date:d,
-        avg: m && m.ws.length>0 ? m.ws.reduce((a,b)=>a+b,0)/m.ws.length : null,
-        bfAvg: m && m.bfs.length>0 ? m.bfs.reduce((a,b)=>a+b,0)/m.bfs.length : null,
-        count: m?.ws.length || 0,
-      });
+    const today=new Date();
+    // 7/30 giorni: punto per ogni giorno. 365: aggrega per settimana (52 punti)
+    if (period === 365) {
+      const out=[];
+      for(let w=51;w>=0;w--){
+        const weekEnd=new Date(today); weekEnd.setDate(weekEnd.getDate()-w*7);
+        const weekStart=new Date(weekEnd); weekStart.setDate(weekStart.getDate()-6);
+        let ws=[], bfs=[];
+        for(let i=0;i<7;i++){
+          const d=new Date(weekStart); d.setDate(d.getDate()+i);
+          const m=map[dayKey(d)];
+          if(m){ ws=ws.concat(m.ws); bfs=bfs.concat(m.bfs); }
+        }
+        out.push({
+          date: weekEnd,
+          avg: ws.length>0 ? ws.reduce((a,b)=>a+b,0)/ws.length : null,
+          bfAvg: bfs.length>0 ? bfs.reduce((a,b)=>a+b,0)/bfs.length : null,
+          count: ws.length,
+        });
+      }
+      return out;
+    } else {
+      const out=[];
+      for(let i=period-1;i>=0;i--){
+        const d=new Date(today); d.setDate(d.getDate()-i);
+        const m=map[dayKey(d)];
+        out.push({
+          date:d,
+          avg: m && m.ws.length>0 ? m.ws.reduce((a,b)=>a+b,0)/m.ws.length : null,
+          bfAvg: m && m.bfs.length>0 ? m.bfs.reduce((a,b)=>a+b,0)/m.bfs.length : null,
+          count: m?.ws.length || 0,
+        });
+      }
+      return out;
     }
-    return out;
-  },[sorted]);
+  },[sorted, period]);
 
   const latest = sorted[sorted.length-1] || null;
   const todayEntries = sorted.filter(e=>sameDay(new Date(e.ts),new Date()));
@@ -712,6 +738,44 @@ function PesoPage({ loaded, weights, goal, updWeights, updGoal, meals, updMeals 
   }
   const streak = useMemo(()=>{ let s=0; for(let i=dailyData.length-1;i>=0;i--){ if(dailyData[i].count>0)s++; else break; } return s; },[dailyData]);
   const totalDelta = sorted.length>=2 ? sorted[sorted.length-1].weight-sorted[0].weight : null;
+
+  // Velocità media degli ultimi 30 giorni (kg/settimana). Serve sia per il display sia per l'ETA.
+  // Usa una regressione lineare semplice (slope) per stabilità.
+  const rate = useMemo(()=>{
+    const cutoff = Date.now() - 30*24*60*60*1000;
+    const recent = sorted.filter(e => new Date(e.ts).getTime() >= cutoff);
+    if (recent.length < 3) return null;
+    const t0 = new Date(recent[0].ts).getTime();
+    const xs = recent.map(e => (new Date(e.ts).getTime() - t0) / (24*60*60*1000)); // giorni dal primo
+    const ys = recent.map(e => e.weight);
+    const n = xs.length;
+    const sumX = xs.reduce((a,b)=>a+b,0);
+    const sumY = ys.reduce((a,b)=>a+b,0);
+    const sumXY = xs.reduce((s,x,i)=>s+x*ys[i],0);
+    const sumXX = xs.reduce((s,x)=>s+x*x,0);
+    const denom = n*sumXX - sumX*sumX;
+    if (denom === 0) return null;
+    const slope = (n*sumXY - sumX*sumY) / denom; // kg/giorno
+    const spanDays = xs[xs.length-1] - xs[0];
+    if (spanDays < 7) return null; // serve almeno una settimana di dati
+    return { perDay: slope, perWeek: slope*7 };
+  }, [sorted]);
+
+  // ETA: quando raggiungerai l'obiettivo, basato su rate
+  const eta = useMemo(()=>{
+    if (!goal || !latest || !rate) return null;
+    const distance = latest.weight - goal;
+    if (Math.abs(distance) < 0.3) return { reached: true };
+    // Per raggiungere l'obiettivo, rate deve avere segno opposto al distance
+    // distance > 0 = devo perdere → serve rate negativo
+    // distance < 0 = devo prendere → serve rate positivo
+    if (distance > 0 && rate.perDay >= -0.005) return { stalled: true };
+    if (distance < 0 && rate.perDay <= 0.005) return { stalled: true };
+    const daysToGoal = distance / -rate.perDay;
+    if (daysToGoal <= 0 || daysToGoal > 365*3) return null;
+    const d = new Date(); d.setDate(d.getDate() + Math.round(daysToGoal));
+    return { date: d, days: Math.round(daysToGoal), weeks: Math.round(daysToGoal/7) };
+  }, [goal, latest, rate]);
   const { path, area, points } = buildLineChart(dailyData.map(d=>d.avg), 280, 70);
   const bfChart = buildLineChart(dailyData.map(d=>d.bfAvg), 280, 70);
 
@@ -746,11 +810,25 @@ function PesoPage({ loaded, weights, goal, updWeights, updGoal, meals, updMeals 
             </div>
           )}
           <div style={{marginTop:18,padding:'12px 0 8px',borderTop:`1px solid ${Q.gold}33`,borderBottom:`1px solid ${Q.gold}33`}}>
-            <div style={{display:'flex',justifyContent:'space-between',fontFamily:fCinzel,fontSize:9,letterSpacing:'0.35em',color:Q.goldDim,textTransform:'uppercase',marginBottom:6}}>
-              <span>SETTE GIORNI</span>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+              <div style={{display:'flex',gap:4}}>
+                {[
+                  {v:7, label:'7g'},
+                  {v:30, label:'30g'},
+                  {v:365, label:'1a'},
+                ].map(opt=>(
+                  <button key={opt.v} onClick={()=>setPeriod(opt.v)} style={{
+                    fontFamily:fCinzel,fontSize:9,letterSpacing:'0.3em',
+                    background:period===opt.v?`${Q.gold}1F`:'transparent',
+                    color:period===opt.v?Q.gold:Q.goldDim,
+                    border:`1px solid ${period===opt.v?Q.gold+'55':Q.gold+'22'}`,
+                    padding:'4px 10px',cursor:'pointer',textTransform:'uppercase',
+                  }}>{opt.label}</button>
+                ))}
+              </div>
               <span style={{display:'flex',gap:10,alignItems:'baseline'}}>
-                <span style={{color:Q.gold,fontFamily:fGaramond,fontStyle:'italic',fontSize:13,letterSpacing:0,textTransform:'none'}}>{weekDelta!=null?`${weekDelta<0?'— ':'+ '}${fmt(Math.abs(weekDelta),1)} kg`:'—'}</span>
-                {weekBfDelta!=null && <span style={{color:'#C99A7A',fontFamily:fGaramond,fontStyle:'italic',fontSize:12,letterSpacing:0,textTransform:'none'}}>{`${weekBfDelta<0?'— ':'+ '}${fmt(Math.abs(weekBfDelta),1)}% grasso`}</span>}
+                <span style={{color:Q.gold,fontFamily:fGaramond,fontStyle:'italic',fontSize:13,letterSpacing:0}}>{weekDelta!=null?`${weekDelta<0?'— ':'+ '}${fmt(Math.abs(weekDelta),1)} kg`:'—'}</span>
+                {weekBfDelta!=null && <span style={{color:'#C99A7A',fontFamily:fGaramond,fontStyle:'italic',fontSize:12,letterSpacing:0}}>{`${weekBfDelta<0?'— ':'+ '}${fmt(Math.abs(weekBfDelta),1)}% grasso`}</span>}
               </span>
             </div>
             <svg viewBox="0 0 280 70" width="100%" height={70} style={{display:'block'}}>
@@ -762,7 +840,9 @@ function PesoPage({ loaded, weights, goal, updWeights, updGoal, meals, updMeals 
               {bfChart.points.map((p,i)=><circle key={`bf${i}`} cx={p.x} cy={p.y} r={i===bfChart.points.length-1?2.5:1.5} fill="#C99A7A" opacity="0.85"/>)}
             </svg>
             <div style={{display:'flex',justifyContent:'space-between',marginTop:4,fontFamily:fGaramond,fontStyle:'italic',fontSize:10,color:Q.goldDim,padding:'0 4px'}}>
-              {dailyData.map((d,i)=><span key={i} style={{opacity:i===dailyData.length-1?1:0.6}}>{d.date.toLocaleDateString('it-IT',{weekday:'narrow'}).toLowerCase()}</span>)}
+              {period === 7 && dailyData.map((d,i)=><span key={i} style={{opacity:i===dailyData.length-1?1:0.6}}>{d.date.toLocaleDateString('it-IT',{weekday:'narrow'}).toLowerCase()}</span>)}
+              {period === 30 && [0,7,14,21,29].map(i=>{const d=dailyData[i]; return d?<span key={i} style={{opacity:i===29?1:0.6}}>{d.date.toLocaleDateString('it-IT',{day:'numeric',month:'short'})}</span>:null;})}
+              {period === 365 && [0,13,26,39,51].map(i=>{const d=dailyData[i]; return d?<span key={i} style={{opacity:i===51?1:0.6}}>{d.date.toLocaleDateString('it-IT',{month:'short'})}</span>:null;})}
             </div>
             {bfChart.points.length>0 && (
               <div style={{display:'flex',justifyContent:'center',gap:18,marginTop:8,fontFamily:fGaramond,fontStyle:'italic',fontSize:10,color:Q.goldDim}}>
@@ -773,6 +853,37 @@ function PesoPage({ loaded, weights, goal, updWeights, updGoal, meals, updMeals 
             {quality && (
               <div style={{marginTop:10,textAlign:'center',fontFamily:fGaramond,fontStyle:'italic',fontSize:12,color:quality.color,padding:'6px 10px',background:`${quality.color}11`,border:`1px solid ${quality.color}33`}}>
                 {quality.label}
+              </div>
+            )}
+            {(rate || eta) && (
+              <div style={{marginTop:10,padding:'10px 12px',background:`${Q.gold}0A`,border:`1px solid ${Q.gold}22`,display:'flex',flexDirection:'column',gap:6}}>
+                {rate && (
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline'}}>
+                    <span style={{fontFamily:fCinzel,fontSize:9,letterSpacing:'0.3em',color:Q.goldDim,textTransform:'uppercase'}}>VELOCITÀ MEDIA · 30 GIORNI</span>
+                    <span style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:14,color:rate.perWeek<0?'#A5B889':rate.perWeek>0?'#C99A7A':Q.gold}}>
+                      {rate.perWeek<0?'− ':rate.perWeek>0?'+ ':''}{fmt(Math.abs(rate.perWeek),2)} kg/sett.
+                    </span>
+                  </div>
+                )}
+                {eta && eta.reached && (
+                  <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:13,color:'#A5B889',textAlign:'center',marginTop:rate?4:0}}>
+                    ✦ obiettivo raggiunto
+                  </div>
+                )}
+                {eta && eta.stalled && (
+                  <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:12,color:Q.goldDim,textAlign:'center',marginTop:rate?4:0}}>
+                    al ritmo attuale non raggiungerai l'obiettivo
+                  </div>
+                )}
+                {eta && eta.date && (
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginTop:rate?4:0}}>
+                    <span style={{fontFamily:fCinzel,fontSize:9,letterSpacing:'0.3em',color:Q.goldDim,textTransform:'uppercase'}}>STIMA OBIETTIVO</span>
+                    <span style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:14,color:Q.gold,textAlign:'right'}}>
+                      {eta.date.toLocaleDateString('it-IT',{day:'numeric',month:'short',year:'numeric'})}
+                      <span style={{color:Q.goldDim,fontSize:11,marginLeft:8}}>~{eta.weeks} sett.</span>
+                    </span>
+                  </div>
+                )}
               </div>
             )}
           </div>
