@@ -86,7 +86,33 @@ export function makeRepo(tableName, columns, orderBy = 'ts') {
 
 // === Repository specifici ===
 
-// water_log: l'app usa una mappa { "2026-05-14": 3, "2026-05-13": 5 }
+// sleeps: app usa { id, wakeDate, bedtime, waketime, quality, notes }
+// DB usa { id, wake_date, bedtime, waketime, quality, notes }
+const _sleepsCore = makeRepo('sleeps', ['wake_date', 'bedtime', 'waketime', 'quality', 'notes'], 'wake_date');
+export const sleepsRepo = {
+  async load(userId) {
+    const rows = await _sleepsCore.load(userId);
+    return rows.map(r => ({
+      id: r.id,
+      wakeDate: r.wake_date,
+      bedtime: r.bedtime,
+      waketime: r.waketime,
+      quality: r.quality != null ? Number(r.quality) : null,
+      notes: r.notes || '',
+    }));
+  },
+  async sync(userId, oldList, newList) {
+    const toDb = (item) => ({
+      id: item.id,
+      wake_date: item.wakeDate,
+      bedtime: item.bedtime ?? null,
+      waketime: item.waketime ?? null,
+      quality: item.quality ?? null,
+      notes: item.notes ?? null,
+    });
+    return _sleepsCore.sync(userId, oldList.map(toDb), newList.map(toDb));
+  },
+};
 // DB usa righe (user_id, day_key, glasses) con primary key composta
 export const waterRepo = {
   async load(userId) {
