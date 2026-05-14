@@ -1,12 +1,57 @@
 // Pagina Statistiche dedicata: trend lungo periodo, composizione corporea, pattern settimanali, export CSV.
 // Accessibile dalla pagina Peso tramite bottone "STATISTICHE COMPLETE".
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 
 // Palette: usa la palette Quercus della pagina Peso
 const Q = { bg1: '#3A2818', bg2: '#1F140C', gold: '#C9A876', goldDim: '#8B7355', cream: '#E8D8B8', ink: '#1F140C' };
 const fGaramond = '"Cormorant Garamond", serif';
 const fCinzel = '"Cinzel", serif';
+
+// === Chiamata IA via netlify function (con cache localStorage 24h) ===
+const AI_CACHE_PREFIX = 'quercus_ai_';
+const AI_CACHE_TTL = 24 * 60 * 60 * 1000; // 24h
+
+async function callAI({ cacheKey, systemPrompt, userPrompt, maxTokens = 1200 }) {
+  // Check cache
+  try {
+    const cached = localStorage.getItem(AI_CACHE_PREFIX + cacheKey);
+    if (cached) {
+      const { ts, data } = JSON.parse(cached);
+      if (Date.now() - ts < AI_CACHE_TTL) return { data, cached: true };
+    }
+  } catch (_) { /* ignore */ }
+
+  const res = await fetch('/api/anthropic', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      max_tokens: maxTokens,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userPrompt }],
+    }),
+  });
+  if (!res.ok) throw new Error(`API ${res.status}`);
+  const json = await res.json();
+  const txt = json.content?.[0]?.text || '';
+  // Estrai JSON anche se circondato da prosa o code fences
+  const m = txt.match(/\{[\s\S]*\}/);
+  if (!m) throw new Error('Risposta IA non in formato JSON');
+  const data = JSON.parse(m[0]);
+  try {
+    localStorage.setItem(AI_CACHE_PREFIX + cacheKey, JSON.stringify({ ts: Date.now(), data }));
+  } catch (_) { /* quota piena, va bene */ }
+  return { data, cached: false };
+}
+
+function clearAICache(prefix) {
+  try {
+    Object.keys(localStorage)
+      .filter(k => k.startsWith(AI_CACHE_PREFIX + prefix))
+      .forEach(k => localStorage.removeItem(k));
+  } catch (_) { /* ignore */ }
+}
 
 function fmt(n, d = 1) {
   if (n == null || isNaN(n)) return '—';
@@ -348,6 +393,132 @@ export default function StatistichePage({
     };
   }, [meals, sleeps, water, workouts, fasts, mindful, cutoff]);
 
+  // === Aggregazione settimanale per correlazioni IA ===
+  const weeklyAgg = useMemo(() => {
+    const inCutoff = (ts) => new Date(ts) >= cutoff;
+    const bucket = {};
+    const weekStart = (d) => {
+      const dt = new Date(d);
+      const day = dt.getDay();
+      const diff = day === 0 ? -6 : 1 - day;
+      dt.setDate(dt.getDate() + diff);
+      dt.setHours(0, 0, 0, 0);
+      return dt.toISOString().slice(0, 10);
+    };
+    const ensure = (k) => { if (!bucket[k]) bucket[k] = { ws: [], sleepH: [], waterG: [], mealCnt: 0, workCnt: 0, fastCnt: 0 }; };
+    weights.filter(w => inCutoff(w.ts)).forEach(w => { const k = weekStart(w.ts); ensure(k); bucket[k].ws.push(w.weight); });
+    sleeps.filter(s => inCutoff(s.wakeDate)).forEach(s => {
+      const k = weekStart(s.wakeDate); ensure(k);
+      if (s.bedtime && s.waketime) {
+        const [bh, bm] = s.bedtime.split(':').map(Number);
+        const [wh, wm] = s.waketime.split(':').map(Number);
+        let d = wh * 60 + wm - (bh * 60 + bm);
+        if (d <= 0) d += 24 * 60;
+        bucket[k].sleepH.push(d / 60);
+      }
+    });
+    Object.entries(water || {}).forEach(([day, g]) => { if (!inCutoff(day)) return; const k = weekStart(day); ensure(k); bucket[k].waterG.push(g || 0); });
+    meals.filter(m => inCutoff(m.ts) && m.status === 'eaten').forEach(m => { const k = weekStart(m.ts); ensure(k); bucket[k].mealCnt++; });
+    workouts.filter(w => inCutoff(w.ts)).forEach(w => { const k = weekStart(w.ts); ensure(k); bucket[k].workCnt++; });
+    fasts.filter(f => f.ended_ts && inCutoff(f.started_ts)).forEach(f => { const k = weekStart(f.started_ts); ensure(k); bucket[k].fastCnt++; });
+    return Object.entries(bucket).map(([weekStart, b]) => ({
+      settimana: weekStart,
+      peso_medio: b.ws.length ? +(b.ws.reduce((a, x) => a + x, 0) / b.ws.length).toFixed(2) : null,
+      sonno_medio_ore: b.sleepH.length ? +(b.sleepH.reduce((a, x) => a + x, 0) / b.sleepH.length).toFixed(2) : null,
+      acqua_media_bicchieri: b.waterG.length ? +(b.waterG.reduce((a, x) => a + x, 0) / b.waterG.length).toFixed(1) : null,
+      pasti_registrati: b.mealCnt,
+      allenamenti: b.workCnt,
+      digiuni: b.fastCnt,
+    })).sort((a, b) => a.settimana.localeCompare(b.settimana));
+  }, [weights, sleeps, water, meals, workouts, fasts, cutoff]);
+
+  // === Aggregazione mensile per riassunti ===
+  const monthlyAgg = useMemo(() => {
+    const monthsKey = (ts) => new Date(ts).toISOString().slice(0, 7);
+    const map = {};
+    const init = (k) => { if (!map[k]) map[k] = { ws: [], sleepH: [], waterG: [], mealCnt: 0, workCnt: 0, fastCnt: 0, mindCnt: 0 }; };
+    weights.forEach(w => { const k = monthsKey(w.ts); init(k); map[k].ws.push({ ts: w.ts, v: w.weight }); });
+    sleeps.forEach(s => {
+      if (!s.bedtime || !s.waketime) return;
+      const k = monthsKey(s.wakeDate); init(k);
+      const [bh, bm] = s.bedtime.split(':').map(Number);
+      const [wh, wm] = s.waketime.split(':').map(Number);
+      let d = wh * 60 + wm - (bh * 60 + bm);
+      if (d <= 0) d += 24 * 60;
+      map[k].sleepH.push(d / 60);
+    });
+    Object.entries(water || {}).forEach(([day, g]) => { const k = monthsKey(day); init(k); map[k].waterG.push(g || 0); });
+    meals.forEach(m => { if (m.status !== 'eaten') return; const k = monthsKey(m.ts); init(k); map[k].mealCnt++; });
+    workouts.forEach(w => { const k = monthsKey(w.ts); init(k); map[k].workCnt++; });
+    fasts.forEach(f => { if (!f.ended_ts) return; const k = monthsKey(f.started_ts); init(k); map[k].fastCnt++; });
+    mindful.forEach(m => { const k = monthsKey(m.ts); init(k); map[k].mindCnt++; });
+    return Object.entries(map).map(([month, b]) => {
+      const sortedWs = b.ws.sort((a, b) => new Date(a.ts) - new Date(b.ts));
+      return {
+        mese: month,
+        peso_inizio: sortedWs[0]?.v ?? null,
+        peso_fine: sortedWs[sortedWs.length - 1]?.v ?? null,
+        peso_medio: sortedWs.length ? +(sortedWs.reduce((a, x) => a + x.v, 0) / sortedWs.length).toFixed(2) : null,
+        sonno_medio_ore: b.sleepH.length ? +(b.sleepH.reduce((a, x) => a + x, 0) / b.sleepH.length).toFixed(2) : null,
+        acqua_media_bicchieri: b.waterG.length ? +(b.waterG.reduce((a, x) => a + x, 0) / b.waterG.length).toFixed(1) : null,
+        pasti_registrati: b.mealCnt,
+        allenamenti: b.workCnt,
+        digiuni: b.fastCnt,
+        mindful: b.mindCnt,
+      };
+    }).sort((a, b) => b.mese.localeCompare(a.mese));
+  }, [weights, sleeps, water, meals, workouts, fasts, mindful]);
+
+  // === IA: Correlazioni ===
+  const [insightsLoading, setInsightsLoading] = useState(false);
+  const [insights, setInsights] = useState(null);
+  const [insightsError, setInsightsError] = useState(null);
+  const generateInsights = async (force = false) => {
+    setInsightsError(null); setInsightsLoading(true);
+    try {
+      const cacheKey = `insights_${period}_${weeklyAgg.length}w`;
+      if (force) clearAICache('insights_');
+      const validWeeks = weeklyAgg.filter(w => w.peso_medio != null || w.sonno_medio_ore != null || w.pasti_registrati > 0);
+      if (validWeeks.length < 2) {
+        setInsights({ items: [], note: 'Servono almeno 2 settimane di dati registrati. Continua ad annotare il diario.' });
+        setInsightsLoading(false); return;
+      }
+      const { data, cached } = await callAI({
+        cacheKey,
+        systemPrompt: 'Sei un coach di benessere italiano. Rispondi SEMPRE e SOLO con JSON valido in italiano.',
+        userPrompt: `Analizza i dati settimanali di un utente e identifica 3-5 correlazioni utili per migliorare benessere e perdita di peso sostenibile.\n\nDati settimanali:\n${JSON.stringify(validWeeks, null, 2)}\n\nLinee guida:\n- Cerca pattern tra le variabili (es. sonno vs peso, digiuni vs energia, idratazione vs costanza)\n- 1-2 frasi per insight, tono caldo ma diretto, italiano naturale\n- "tone" può essere: "positive" (cosa va bene), "warning" (attenzione), "neutral" (osservazione)\n- Se i dati sono troppo pochi o non emergono pattern chiari, ritorna meno insights ma onesti\n\nRispondi SOLO con JSON:\n{ "insights": [{ "title": "...", "body": "...", "tone": "positive" }], "note": "opzionale" }`,
+        maxTokens: 1500,
+      });
+      setInsights({ items: data.insights || [], note: data.note, fromCache: cached });
+    } catch (e) { setInsightsError(e.message || String(e)); }
+    finally { setInsightsLoading(false); }
+  };
+
+  // === IA: Riassunto mensile ===
+  const currentMonth = monthlyAgg[0];
+  const [monthlyLoading, setMonthlyLoading] = useState(false);
+  const [monthlySummary, setMonthlySummary] = useState(null);
+  const [monthlyError, setMonthlyError] = useState(null);
+  const generateMonthlySummary = async (force = false) => {
+    setMonthlyError(null); setMonthlyLoading(true);
+    try {
+      if (!currentMonth) { setMonthlySummary(null); setMonthlyLoading(false); return; }
+      const cacheKey = `monthly_${currentMonth.mese}`;
+      if (force) clearAICache(`monthly_${currentMonth.mese}`);
+      const monthLabel = new Date(currentMonth.mese + '-01').toLocaleDateString('it-IT', { month: 'long', year: 'numeric' });
+      const { data } = await callAI({
+        cacheKey,
+        systemPrompt: 'Sei un coach di benessere italiano. Rispondi SEMPRE e SOLO con JSON valido in italiano.',
+        userPrompt: `Scrivi un riassunto del mese di ${monthLabel} per un utente, in italiano naturale, 2-4 frasi, tono caldo ma onesto.\n\nDati del mese:\n${JSON.stringify(currentMonth, null, 2)}\n\nLinee guida:\n- Concentrati su 2-3 osservazioni più rilevanti (cambiamento di peso, costanza, abitudini)\n- Se positive, celebra. Se da migliorare, incoraggia senza biasimare.\n- Non listare i numeri, racconta il senso del mese\n- Italiano naturale, evita "fitness-speak" anglosassone\n\nRispondi SOLO con JSON: { "summary": "..." }`,
+        maxTokens: 600,
+      });
+      setMonthlySummary(data.summary || '');
+    } catch (e) { setMonthlyError(e.message || String(e)); }
+    finally { setMonthlyLoading(false); }
+  };
+
+  const toneColor = (t) => t === 'positive' ? '#A5B889' : t === 'warning' ? '#C99A7A' : Q.gold;
+
   return (
     <div style={{ minHeight: '100vh', background: `radial-gradient(ellipse at top, ${Q.bg1} 0%, ${Q.bg2} 100%)`, color: Q.cream, fontFamily: fGaramond, position: 'relative', overflow: 'hidden' }}>
       <div aria-hidden style={{ position: 'absolute', inset: 14, border: `1px solid ${Q.gold}40`, borderRadius: 20, pointerEvents: 'none', zIndex: 1 }} />
@@ -487,6 +658,115 @@ export default function StatistichePage({
               </div>
             </Section>
           </>
+        )}
+
+        {/* Sezione: CORRELAZIONI (IA) */}
+        <Section title="CORRELAZIONI" sub="pattern tra le tue abitudini · generati con IA">
+          {!insights && !insightsLoading && !insightsError && (
+            <div style={{ textAlign: 'center' }}>
+              <button onClick={() => generateInsights(false)}
+                style={{ background: 'transparent', color: Q.gold, border: `1px solid ${Q.gold}66`, fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.35em', padding: '10px 18px', cursor: 'pointer', textTransform: 'uppercase' }}>
+                ✦ GENERA INSIGHTS
+              </button>
+              <div style={{ marginTop: 10, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 11, color: Q.goldDim }}>
+                L'IA analizza i dati settimanali per trovare correlazioni
+              </div>
+            </div>
+          )}
+          {insightsLoading && (
+            <div style={{ textAlign: 'center', padding: '14px', fontFamily: fGaramond, fontStyle: 'italic', color: Q.goldDim }}>
+              <span style={{ display: 'inline-block', animation: 'pulse 1.4s infinite' }}>✦</span> sto analizzando i tuoi dati…
+            </div>
+          )}
+          {insightsError && (
+            <div style={{ textAlign: 'center', color: '#C99A7A', fontFamily: fGaramond, fontStyle: 'italic', fontSize: 13 }}>
+              errore: {insightsError}
+              <div style={{ marginTop: 10 }}>
+                <button onClick={() => generateInsights(true)} style={{ background: 'transparent', color: Q.gold, border: `1px solid ${Q.gold}66`, fontFamily: fCinzel, fontSize: 9, letterSpacing: '0.3em', padding: '6px 14px', cursor: 'pointer' }}>RIPROVA</button>
+              </div>
+            </div>
+          )}
+          {insights && (
+            <>
+              {insights.items.length === 0 && insights.note && (
+                <div style={{ textAlign: 'center', fontFamily: fGaramond, fontStyle: 'italic', fontSize: 13, color: Q.goldDim, padding: '14px' }}>
+                  {insights.note}
+                </div>
+              )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {insights.items.map((it, i) => (
+                  <div key={i} style={{ padding: '14px 16px', border: `1px solid ${toneColor(it.tone)}44`, background: `${toneColor(it.tone)}0E` }}>
+                    <div style={{ fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.35em', color: toneColor(it.tone), textTransform: 'uppercase', marginBottom: 6 }}>{it.title}</div>
+                    <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 14, color: Q.cream, lineHeight: 1.45 }}>{it.body}</div>
+                  </div>
+                ))}
+              </div>
+              {insights.note && insights.items.length > 0 && (
+                <div style={{ marginTop: 12, textAlign: 'center', fontFamily: fGaramond, fontStyle: 'italic', fontSize: 11, color: Q.goldDim }}>{insights.note}</div>
+              )}
+              <div style={{ textAlign: 'center', marginTop: 14 }}>
+                <button onClick={() => generateInsights(true)} style={{ background: 'transparent', color: Q.goldDim, border: `1px solid ${Q.goldDim}44`, fontFamily: fCinzel, fontSize: 9, letterSpacing: '0.3em', padding: '6px 14px', cursor: 'pointer' }}>
+                  ↻ RIGENERA
+                </button>
+                {insights.fromCache && <span style={{ marginLeft: 10, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 10, color: Q.goldDim }}>(da cache)</span>}
+              </div>
+            </>
+          )}
+        </Section>
+
+        {/* Sezione: RIASSUNTO MENSILE (IA) */}
+        {currentMonth && (
+          <Section title="RIASSUNTO MENSILE" sub={new Date(currentMonth.mese + '-01').toLocaleDateString('it-IT', { month: 'long', year: 'numeric' })}>
+            {/* Numeri base sempre visibili */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 16 }}>
+              {currentMonth.peso_inizio != null && (
+                <StatRow label="peso inizio" value={fmt(currentMonth.peso_inizio)} sub="kg" />
+              )}
+              {currentMonth.peso_fine != null && (
+                <StatRow label="peso fine" value={fmt(currentMonth.peso_fine)} sub="kg"
+                  color={currentMonth.peso_inizio != null && currentMonth.peso_fine < currentMonth.peso_inizio ? '#A5B889' : currentMonth.peso_inizio != null && currentMonth.peso_fine > currentMonth.peso_inizio ? '#C99A7A' : Q.cream} />
+              )}
+              <StatRow label="pasti" value={currentMonth.pasti_registrati} sub="registrati" />
+              <StatRow label="sonno medio" value={currentMonth.sonno_medio_ore != null ? fmt(currentMonth.sonno_medio_ore) : '—'} sub="ore" />
+              <StatRow label="allenamenti" value={currentMonth.allenamenti} sub="sessioni" />
+              <StatRow label="digiuni" value={currentMonth.digiuni} sub="completati" />
+            </div>
+            {/* Narrazione IA */}
+            {!monthlySummary && !monthlyLoading && !monthlyError && (
+              <div style={{ textAlign: 'center' }}>
+                <button onClick={() => generateMonthlySummary(false)}
+                  style={{ background: 'transparent', color: Q.gold, border: `1px solid ${Q.gold}66`, fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.35em', padding: '10px 18px', cursor: 'pointer', textTransform: 'uppercase' }}>
+                  ✦ GENERA RIASSUNTO
+                </button>
+                <div style={{ marginTop: 10, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 11, color: Q.goldDim }}>
+                  L'IA scrive un riassunto narrativo del mese
+                </div>
+              </div>
+            )}
+            {monthlyLoading && (
+              <div style={{ textAlign: 'center', padding: '14px', fontFamily: fGaramond, fontStyle: 'italic', color: Q.goldDim }}>
+                <span style={{ display: 'inline-block' }}>✦</span> sto raccontando il tuo mese…
+              </div>
+            )}
+            {monthlyError && (
+              <div style={{ textAlign: 'center', color: '#C99A7A', fontFamily: fGaramond, fontStyle: 'italic', fontSize: 13 }}>
+                errore: {monthlyError}
+                <div style={{ marginTop: 10 }}>
+                  <button onClick={() => generateMonthlySummary(true)} style={{ background: 'transparent', color: Q.gold, border: `1px solid ${Q.gold}66`, fontFamily: fCinzel, fontSize: 9, letterSpacing: '0.3em', padding: '6px 14px', cursor: 'pointer' }}>RIPROVA</button>
+                </div>
+              </div>
+            )}
+            {monthlySummary && (
+              <>
+                <div style={{ padding: '14px 18px', border: `1px solid ${Q.gold}44`, background: `${Q.gold}0E`, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 15, color: Q.cream, lineHeight: 1.5, textAlign: 'left' }}>
+                  {monthlySummary}
+                </div>
+                <div style={{ textAlign: 'center', marginTop: 12 }}>
+                  <button onClick={() => generateMonthlySummary(true)} style={{ background: 'transparent', color: Q.goldDim, border: `1px solid ${Q.goldDim}44`, fontFamily: fCinzel, fontSize: 9, letterSpacing: '0.3em', padding: '6px 14px', cursor: 'pointer' }}>↻ RIGENERA</button>
+                </div>
+              </>
+            )}
+          </Section>
         )}
 
         {/* Sezione 5: EXPORT */}
