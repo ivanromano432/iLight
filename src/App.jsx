@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   weightsRepo, profileRepo, waterRepo, sleepsRepo, diaryRepo, mealsRepo,
   workoutsRepo, workoutTypesRepo, supplementsRepo, suppTakenRepo, mindfulRepo, fastsRepo,
+  goalsRepo,
 } from './repo.js';
 import StatistichePage from './Statistiche.jsx';
 
@@ -378,6 +379,7 @@ export default function App({ user }){
   const [sleeps, setSleeps] = useState([]);
   const [mindfulSessions, setMindfulSessions] = useState([]);
   const [fasts, setFasts] = useState([]);
+  const [userGoals, setUserGoals] = useState([]);
 
   useEffect(()=>{(async()=>{
     if (!user) return;
@@ -399,6 +401,7 @@ export default function App({ user }){
     const [
       weightsFromDb, profile, waterFromDb, sleepsFromDb, diaryFromDb, mealsFromDb,
       workoutsFromDb, workoutTypesFromDb, suppsFromDb, takenFromDb, mindfulFromDb, fastsFromDb,
+      goalsFromDb,
     ] = await Promise.all([
       weightsRepo.load(user.id),
       profileRepo.load(user.id),
@@ -412,6 +415,7 @@ export default function App({ user }){
       suppTakenRepo.load(user.id),
       mindfulRepo.load(user.id),
       fastsRepo.load(user.id),
+      goalsRepo.load(user.id),
     ]);
     // watergoal: lo lascio anche in localStorage come fallback locale rapido
     const wag = await sGet('watergoal');
@@ -438,6 +442,7 @@ export default function App({ user }){
     setSleeps(sleepsFromDb);
     setMindfulSessions(mindfulFromDb);
     setFasts(fastsFromDb);
+    setUserGoals(goalsFromDb);
     setLoaded(true);
   })();},[user]);
 
@@ -563,6 +568,15 @@ export default function App({ user }){
       if (r && r.ok === false) console.error('Errore salvataggio digiuni:', r.errors);
     }
   };
+  // updGoals: sync su Supabase
+  const updGoals = async (newList) => {
+    const oldList = userGoals;
+    setUserGoals(newList);
+    if (user) {
+      const r = await goalsRepo.sync(user.id, oldList, newList);
+      if (r && r.ok === false) console.error('Errore salvataggio obiettivi:', r.errors);
+    }
+  };
 
   const page = PAGES[pageIdx].id;
   if (showStats) {
@@ -573,6 +587,7 @@ export default function App({ user }){
         supplements={supplements} suppTaken={suppTaken}
         mindful={mindfulSessions} fasts={fasts} diaryNotes={foodNotes}
         goal={goal}
+        userGoals={userGoals} updGoals={updGoals}
         onClose={() => setShowStats(false)}
       />
     );

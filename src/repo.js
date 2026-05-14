@@ -202,6 +202,13 @@ export const fastsRepo = makeRepo(
   'started_ts'
 );
 
+// user_goals: obiettivi multipli (sonno, acqua, proteine, allenamenti, digiuni, mindful, pasti)
+export const goalsRepo = makeRepo(
+  'user_goals',
+  ['goal_type', 'target_value', 'period', 'active'],
+  'created_at'
+);
+
 // sleeps: app usa { id, wakeDate, bedtime, waketime, quality, notes }
 // DB usa { id, wake_date, bedtime, waketime, quality, notes }
 const _sleepsCore = makeRepo('sleeps', ['wake_date', 'bedtime', 'waketime', 'quality', 'notes'], 'wake_date');

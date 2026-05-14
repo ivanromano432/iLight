@@ -218,10 +218,172 @@ function Section({ title, sub, children }) {
 
 const DOW_LABELS = ['lun', 'mar', 'mer', 'gio', 'ven', 'sab', 'dom'];
 
+// === Definizioni tipologie obiettivo ===
+const GOAL_TYPES = {
+  sleep_h: {
+    label: 'Sonno', icon: '☾', unit: 'ore/notte', period: 'per_day',
+    suggestedTarget: 7.5, step: 0.5, min: 4, max: 12,
+    current: ({ sleeps }) => {
+      const cut = new Date(); cut.setDate(cut.getDate() - 7);
+      const r = sleeps.filter(s => new Date(s.wakeDate) >= cut && s.bedtime && s.waketime);
+      if (!r.length) return null;
+      const hs = r.map(s => {
+        const [bh,bm]=s.bedtime.split(':').map(Number);
+        const [wh,wm]=s.waketime.split(':').map(Number);
+        let d=wh*60+wm-(bh*60+bm); if(d<=0)d+=1440; return d/60;
+      });
+      return hs.reduce((a,b)=>a+b,0)/hs.length;
+    },
+  },
+  water_glasses: {
+    label: 'Idratazione', icon: '~', unit: 'bicchieri/giorno', period: 'per_day',
+    suggestedTarget: 8, step: 1, min: 1, max: 20,
+    current: ({ water }) => {
+      const cut = new Date(); cut.setDate(cut.getDate() - 7);
+      const e = Object.entries(water || {}).filter(([d]) => new Date(d) >= cut);
+      if (!e.length) return null;
+      return e.reduce((a,[,g])=>a+(g||0),0)/e.length;
+    },
+  },
+  protein_g: {
+    label: 'Proteine', icon: '◆', unit: 'g/giorno', period: 'per_day',
+    suggestedTarget: 100, step: 5, min: 20, max: 300,
+    current: ({ meals }) => {
+      const cut = new Date(); cut.setDate(cut.getDate() - 7);
+      const r = meals.filter(m => new Date(m.ts) >= cut && m.status === 'eaten' && m.p != null);
+      if (!r.length) return null;
+      const byDay = {};
+      r.forEach(m => { const k = new Date(m.ts).toISOString().slice(0,10); byDay[k] = (byDay[k]||0) + Number(m.p); });
+      const days = Object.keys(byDay);
+      return days.reduce((a,k)=>a+byDay[k],0) / days.length;
+    },
+  },
+  workouts: {
+    label: 'Allenamenti', icon: '✦', unit: 'sessioni/settimana', period: 'per_week',
+    suggestedTarget: 3, step: 1, min: 1, max: 14,
+    current: ({ workouts }) => {
+      const cut = new Date(); cut.setDate(cut.getDate() - 7);
+      return workouts.filter(w => new Date(w.ts) >= cut).length;
+    },
+  },
+  fasts: {
+    label: 'Digiuni', icon: '○', unit: 'completati/settimana', period: 'per_week',
+    suggestedTarget: 2, step: 1, min: 1, max: 7,
+    current: ({ fasts }) => {
+      const cut = new Date(); cut.setDate(cut.getDate() - 7);
+      return fasts.filter(f => f.ended_ts && new Date(f.started_ts) >= cut).length;
+    },
+  },
+  mindful: {
+    label: 'Mindful', icon: '✧', unit: 'sessioni/settimana', period: 'per_week',
+    suggestedTarget: 3, step: 1, min: 1, max: 21,
+    current: ({ mindful }) => {
+      const cut = new Date(); cut.setDate(cut.getDate() - 7);
+      return mindful.filter(m => new Date(m.ts) >= cut).length;
+    },
+  },
+  meals_logged: {
+    label: 'Pasti registrati', icon: '✿', unit: '/giorno', period: 'per_day',
+    suggestedTarget: 3, step: 1, min: 1, max: 10,
+    current: ({ meals }) => {
+      const cut = new Date(); cut.setDate(cut.getDate() - 7);
+      const r = meals.filter(m => new Date(m.ts) >= cut && m.status === 'eaten');
+      if (!r.length) return null;
+      const byDay = {};
+      r.forEach(m => { const k = new Date(m.ts).toISOString().slice(0,10); byDay[k] = (byDay[k]||0)+1; });
+      const days = Math.max(Object.keys(byDay).length, 1);
+      return r.length / days;
+    },
+  },
+};
+
+function newGoalId() {
+  return (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : (Date.now()+Math.random()).toString();
+}
+
+function GoalModal({ existing, alreadyUsed, onClose, onSave, onDelete }) {
+  const editMode = !!existing;
+  const [type, setType] = useState(existing?.goal_type || null);
+  const [target, setTarget] = useState(existing?.target_value != null ? String(existing.target_value).replace('.', ',') : '');
+  useEffect(() => {
+    if (type && !editMode) {
+      const def = GOAL_TYPES[type];
+      if (def && !target) setTarget(String(def.suggestedTarget).replace('.', ','));
+    }
+    // eslint-disable-next-line
+  }, [type]);
+  const def = type ? GOAL_TYPES[type] : null;
+  const targetN = parseFloat((target || '').replace(',', '.'));
+  const valid = type && !isNaN(targetN) && targetN > 0;
+  const availableTypes = Object.entries(GOAL_TYPES).filter(([k]) => editMode || !alreadyUsed.has(k));
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: Q.bg2, border: `1px solid ${Q.gold}66`, padding: 24, maxWidth: 360, width: '100%' }}>
+        <div style={{ fontFamily: fCinzel, fontSize: 11, letterSpacing: '0.45em', color: Q.gold, textTransform: 'uppercase', textAlign: 'center', marginBottom: 18 }}>
+          {editMode ? 'MODIFICA OBIETTIVO' : '+ NUOVO OBIETTIVO'}
+        </div>
+        {!type && (
+          <>
+            {availableTypes.length === 0 ? (
+              <div style={{ textAlign: 'center', fontFamily: fGaramond, fontStyle: 'italic', fontSize: 14, color: Q.goldDim, padding: 12 }}>
+                Hai già aggiunto tutti gli obiettivi disponibili.
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                {availableTypes.map(([k, d]) => (
+                  <button key={k} onClick={() => setType(k)} style={{ background: 'transparent', color: Q.cream, border: `1px solid ${Q.gold}66`, padding: '14px 8px', cursor: 'pointer', fontFamily: fGaramond, fontStyle: 'italic', fontSize: 14, display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
+                    <span style={{ fontSize: 18, color: Q.gold }}>{d.icon}</span>
+                    <span>{d.label}</span>
+                    <span style={{ fontSize: 10, color: Q.goldDim }}>{d.unit}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            <div style={{ textAlign: 'center', marginTop: 18 }}>
+              <button onClick={onClose} style={{ background: 'transparent', color: Q.goldDim, border: `1px solid ${Q.goldDim}66`, fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.3em', padding: '8px 14px', cursor: 'pointer' }}>ANNULLA</button>
+            </div>
+          </>
+        )}
+        {type && def && (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14, paddingBottom: 12, borderBottom: `1px solid ${Q.gold}33` }}>
+              <span style={{ fontSize: 22, color: Q.gold }}>{def.icon}</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.3em', color: Q.gold, textTransform: 'uppercase' }}>{def.label}</div>
+                <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 12, color: Q.goldDim }}>{def.unit}</div>
+              </div>
+              {!editMode && (
+                <button onClick={() => setType(null)} style={{ background: 'transparent', color: Q.goldDim, border: 'none', fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.2em', cursor: 'pointer' }}>cambia</button>
+              )}
+            </div>
+            <div style={{ marginBottom: 18 }}>
+              <div style={{ fontFamily: fCinzel, fontSize: 9, letterSpacing: '0.35em', color: Q.goldDim, textTransform: 'uppercase', marginBottom: 6 }}>OBIETTIVO</div>
+              <input type="text" inputMode="decimal" value={target} onChange={e => setTarget(e.target.value)}
+                placeholder={String(def.suggestedTarget).replace('.', ',')}
+                style={{ width: '100%', background: 'transparent', border: `1px solid ${Q.gold}66`, color: Q.cream, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 22, padding: '10px 12px', textAlign: 'center', outline: 'none' }} />
+              <div style={{ marginTop: 6, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 11, color: Q.goldDim, textAlign: 'center' }}>{def.unit} · suggerito {def.suggestedTarget}</div>
+            </div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 18, flexWrap: 'wrap' }}>
+              {editMode && onDelete && (
+                <button onClick={onDelete} style={{ background: 'transparent', color: '#C99A7A', border: `1px solid #C99A7A66`, fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.3em', padding: '10px 14px', cursor: 'pointer' }}>ELIMINA</button>
+              )}
+              <button onClick={onClose} style={{ background: 'transparent', color: Q.goldDim, border: `1px solid ${Q.goldDim}66`, fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.3em', padding: '10px 14px', cursor: 'pointer' }}>ANNULLA</button>
+              <button disabled={!valid} onClick={() => onSave({ goal_type: type, target_value: targetN, period: def.period })}
+                style={{ background: valid ? Q.gold : '#555', color: valid ? Q.ink : '#999', border: 'none', fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.3em', padding: '10px 18px', cursor: valid ? 'pointer' : 'not-allowed' }}>SALVA</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function StatistichePage({
   weights = [], meals = [], sleeps = [], water = {}, workouts = [], workoutTypes = [],
   supplements = [], suppTaken = {}, mindful = [], fasts = [], diaryNotes = [],
-  goal = null, onClose,
+  goal = null, userGoals = [], updGoals,
+  onClose,
 }) {
   const [period, setPeriod] = useState('30');
 
@@ -519,6 +681,28 @@ export default function StatistichePage({
 
   const toneColor = (t) => t === 'positive' ? '#A5B889' : t === 'warning' ? '#C99A7A' : Q.gold;
 
+  // === Obiettivi multipli ===
+  const [goalModal, setGoalModal] = useState(null); // null | 'new' | goalObject
+  const goalsActive = useMemo(() => userGoals.filter(g => g.active !== false), [userGoals]);
+  const goalsAlreadyUsed = useMemo(() => new Set(goalsActive.map(g => g.goal_type)), [goalsActive]);
+  const dataForGoals = { sleeps, water, meals, workouts, fasts, mindful, weights };
+
+  const saveGoal = async ({ goal_type, target_value, period }) => {
+    if (goalModal === 'new') {
+      const newGoal = { id: newGoalId(), goal_type, target_value, period, active: true };
+      await updGoals([...userGoals, newGoal]);
+    } else if (goalModal && goalModal.id) {
+      await updGoals(userGoals.map(g => g.id === goalModal.id ? { ...g, goal_type, target_value, period } : g));
+    }
+    setGoalModal(null);
+  };
+  const deleteGoal = async () => {
+    if (goalModal && goalModal.id) {
+      await updGoals(userGoals.filter(g => g.id !== goalModal.id));
+    }
+    setGoalModal(null);
+  };
+
   return (
     <div style={{ minHeight: '100vh', background: `radial-gradient(ellipse at top, ${Q.bg1} 0%, ${Q.bg2} 100%)`, color: Q.cream, fontFamily: fGaramond, position: 'relative', overflow: 'hidden' }}>
       <div aria-hidden style={{ position: 'absolute', inset: 14, border: `1px solid ${Q.gold}40`, borderRadius: 20, pointerEvents: 'none', zIndex: 1 }} />
@@ -584,6 +768,54 @@ export default function StatistichePage({
                   {goalEta.msg}
                 </div>
               )}
+            </Section>
+
+            {/* Sezione: OBIETTIVI MULTIPLI */}
+            <Section title="OBIETTIVI" sub="i tuoi traguardi su sonno, idratazione, allenamento…">
+              {goalsActive.length === 0 && (
+                <div style={{ textAlign: 'center', fontFamily: fGaramond, fontStyle: 'italic', fontSize: 13, color: Q.goldDim, padding: '8px 8px 14px' }}>
+                  Nessun obiettivo impostato. Tocca <span style={{ color: Q.gold }}>+ NUOVO</span> per iniziare.
+                </div>
+              )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {goalsActive.map(g => {
+                  const def = GOAL_TYPES[g.goal_type];
+                  if (!def) return null;
+                  const cur = def.current(dataForGoals);
+                  const target = Number(g.target_value);
+                  const pct = cur != null ? Math.min(100, (cur / target) * 100) : 0;
+                  const reached = cur != null && cur >= target;
+                  const near = !reached && pct >= 75;
+                  const barColor = reached ? '#A5B889' : near ? Q.gold : Q.goldDim;
+                  return (
+                    <div key={g.id} onClick={() => setGoalModal(g)}
+                      style={{ padding: '12px 14px', border: `1px solid ${Q.gold}33`, cursor: 'pointer' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                        <span style={{ fontSize: 20, color: Q.gold, minWidth: 22, textAlign: 'center' }}>{def.icon}</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.3em', color: Q.gold, textTransform: 'uppercase' }}>{def.label}</div>
+                          <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 11, color: Q.goldDim }}>{def.unit}</div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <span style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 16, color: reached ? '#A5B889' : Q.cream }}>
+                            {cur != null ? fmt(cur, def.step < 1 ? 1 : 0) : '—'}
+                          </span>
+                          <span style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 12, color: Q.goldDim }}> / {fmt(target, def.step < 1 ? 1 : 0)}</span>
+                        </div>
+                      </div>
+                      <div style={{ height: 5, background: `${Q.goldDim}33`, borderRadius: 2, overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${pct}%`, background: barColor, transition: 'width 0.3s ease' }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div style={{ textAlign: 'center', marginTop: 16 }}>
+                <button onClick={() => setGoalModal('new')}
+                  style={{ background: 'transparent', color: Q.gold, border: `1px solid ${Q.gold}66`, fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.35em', padding: '8px 16px', cursor: 'pointer', textTransform: 'uppercase' }}>
+                  + NUOVO OBIETTIVO
+                </button>
+              </div>
             </Section>
 
             {/* Sezione 2: COMPOSIZIONE CORPOREA */}
@@ -782,6 +1014,15 @@ export default function StatistichePage({
           </div>
         </Section>
       </div>
+      {goalModal && (
+        <GoalModal
+          existing={goalModal === 'new' ? null : goalModal}
+          alreadyUsed={goalsAlreadyUsed}
+          onClose={() => setGoalModal(null)}
+          onSave={saveGoal}
+          onDelete={goalModal !== 'new' ? deleteGoal : null}
+        />
+      )}
     </div>
   );
 }
