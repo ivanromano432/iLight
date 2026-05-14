@@ -5,6 +5,8 @@ import {
   goalsRepo,
 } from './repo.js';
 import StatistichePage from './Statistiche.jsx';
+import SubscriptionPage from './SubscriptionPage.jsx';
+import { supabase } from './supabase.js';
 
 const Q = { bg1: '#3A2818', bg2: '#1F140C', gold: '#C9A876', goldDim: '#8B7355', cream: '#E8D8B8', ink: '#1F140C' };
 const W = { bg: '#E8E0D2', ink: '#3C3329', tan: '#8C6A4E' };
@@ -365,6 +367,8 @@ export default function App({ user }){
   useGoogleFonts();
   const [pageIdx, setPageIdx] = useState(0);
   const [showStats, setShowStats] = useState(false);
+  const [showSub, setShowSub] = useState(false);
+  const [profile, setProfile] = useState(null);
   const [loaded, setLoaded] = useState(false);
   const [weights, setWeights] = useState([]);
   const [goal, setGoal] = useState(null);
@@ -421,6 +425,7 @@ export default function App({ user }){
     const wag = await sGet('watergoal');
     setWeights(weightsFromDb);
     setGoal(profile?.goal_weight != null ? Number(profile.goal_weight) : null);
+    setProfile(profile);
     setFoodNotes(diaryFromDb);
     setWaterByDay(waterFromDb);
     const wgn = profile?.water_goal ?? (wag?parseInt(wag):null); setWaterGoal(wgn&&!isNaN(wgn)?wgn:8);
@@ -579,6 +584,33 @@ export default function App({ user }){
   };
 
   const page = PAGES[pageIdx].id;
+
+  // Gate paywall: se la prova è terminata e l'abbonamento non è attivo, mostra solo la pagina abbonamento
+  const trialExpired = profile?.trial_ends_at && new Date(profile.trial_ends_at) < new Date();
+  const hasActive = profile?.subscription_status === 'active';
+  const needsPaywall = loaded && profile && !hasActive && trialExpired;
+
+  if (needsPaywall && !showSub) {
+    return (
+      <SubscriptionPage
+        user={user}
+        profile={profile}
+        paywallMode={true}
+        onLogout={async () => { await supabase.auth.signOut(); }}
+      />
+    );
+  }
+
+  if (showSub) {
+    return (
+      <SubscriptionPage
+        user={user}
+        profile={profile}
+        onClose={() => setShowSub(false)}
+      />
+    );
+  }
+
   if (showStats) {
     return (
       <StatistichePage
@@ -595,7 +627,7 @@ export default function App({ user }){
   return (
     <div style={{minHeight:'100vh', background:'#000', position:'relative'}}>
       <div style={{paddingBottom:76}}>
-        {page==='peso' && <PesoPage loaded={loaded} weights={weights} goal={goal} updWeights={updWeights} updGoal={updGoal} meals={meals} updMeals={updMeals} openStats={() => setShowStats(true)} />}
+        {page==='peso' && <PesoPage loaded={loaded} weights={weights} goal={goal} updWeights={updWeights} updGoal={updGoal} meals={meals} updMeals={updMeals} openStats={() => setShowStats(true)} profile={profile} openSub={() => setShowSub(true)} />}
         {page==='diario' && <DiarioPage loaded={loaded} notes={foodNotes} water={waterByDay} waterGoal={waterGoal} updNotes={updFoodNotes} updWater={updWater} updWaterGoal={updWaterGoal} meals={meals} updMeals={updMeals} supps={supplements} taken={suppTaken} updSupps={updSupps} updTaken={updTaken} sleeps={sleeps} updSleeps={updSleeps} />}
         {page==='pasti' && <PastiPage loaded={loaded} meals={meals} updMeals={updMeals} notes={foodNotes} weights={weights} goal={goal} />}
         {page==='allena' && <AllenaPage loaded={loaded} workouts={workouts} types={workoutTypes} updWorkouts={updWorkouts} updTypes={updWorkoutTypes} />}
@@ -638,7 +670,7 @@ function buildLineChart(values, chartW, chartH){
   return { path, area, points };
 }
 
-function PesoPage({ loaded, weights, goal, updWeights, updGoal, meals, updMeals, openStats }){
+function PesoPage({ loaded, weights, goal, updWeights, updGoal, meals, updMeals, openStats, profile, openSub }){
   const [editing, setEditing] = useState(null);
   const [showGoal, setShowGoal] = useState(false);
   const [draft, setDraft] = useState({ w:'', bf:'', mu:'', wa:'' });
@@ -928,6 +960,25 @@ function PesoPage({ loaded, weights, goal, updWeights, updGoal, meals, updMeals,
               </button>
             </div>
           )}
+          {/* Badge stato abbonamento */}
+          {profile && openSub && (() => {
+            const trialDays = profile.trial_ends_at ? Math.max(0, Math.ceil((new Date(profile.trial_ends_at) - new Date()) / 86400000)) : 0;
+            const isTrial = profile.subscription_status === 'trial' && trialDays > 0;
+            const isActive = profile.subscription_status === 'active';
+            const isPastDue = profile.subscription_status === 'past_due';
+            let label = '✦ ABBONAMENTO';
+            let color = Q.goldDim;
+            if (isActive) { label = '✦ PREMIUM ATTIVO'; color = '#A5B889'; }
+            else if (isTrial) { label = `✦ PROVA: ${trialDays} ${trialDays === 1 ? 'GIORNO' : 'GIORNI'}`; color = Q.gold; }
+            else if (isPastDue) { label = '✦ PAGAMENTO IN SOSPESO'; color = '#C99A7A'; }
+            return (
+              <div style={{textAlign:'center',marginTop:10}}>
+                <button onClick={openSub} style={{background:'transparent',color,border:`1px solid ${color}55`,fontFamily:fCinzel,fontSize:9,letterSpacing:'0.3em',padding:'6px 14px',cursor:'pointer',textTransform:'uppercase'}}>
+                  {label}
+                </button>
+              </div>
+            );
+          })()}
           {todayEntries.length>0 && (
             <div style={{marginTop:22}}>
               <div style={{fontFamily:fCinzel,fontSize:9,letterSpacing:'0.4em',color:Q.goldDim,textAlign:'center',textTransform:'uppercase',marginBottom:10}}>REGISTRAZIONI DI OGGI</div>
