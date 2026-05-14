@@ -1,10 +1,10 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import './storage-polyfill.js';
-import App from './App.jsx';
+import AuthGate from './AuthGate.jsx';
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <App />
+    <AuthGate />
   </StrictMode>
 );

@@ -41,10 +41,23 @@ function durHours(b,w){ if(!b||!w)return null; const [bh,bm]=b.split(':').map(Nu
 function fmtDur(h){ if(h==null)return '—'; const hh=Math.floor(h); const mm=Math.round((h-hh)*60); return `${hh}h ${String(mm).padStart(2,'0')}`; }
 const newId = () => Date.now().toString() + Math.random().toString(36).slice(2,6);
 function normalizeDesc(s){ return (s||'').toLowerCase().trim().replace(/\s+/g,' ').replace(/[.,;:!?]/g,''); }
+function mealTokens(s){
+  return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9 ]/g,' ').split(/\s+/).filter(w=>w.length>=3 && !['con','dei','del','della','delle','degli','una','uno','gli','che','per','tra','dal','dai','sul','nel','nei','nelle'].includes(w));
+}
+function mealsAreSimilar(a, b){
+  if ((a.type||'pranzo') !== (b.type||'pranzo')) return false;
+  const wa = mealTokens(a.description);
+  const wb = mealTokens(b.description);
+  if (wa.length===0 && wb.length===0) return true;
+  if (wa.length===0 || wb.length===0) return normalizeDesc(a.description) === normalizeDesc(b.description);
+  const sb = new Set(wb);
+  let overlap = 0;
+  for (const w of wa) if (sb.has(w)) overlap++;
+  return overlap / Math.min(wa.length, wb.length) >= 0.6;
+}
 function isDuplicateMeal(newMeal, existingMeals){
-  const nd = normalizeDesc(newMeal.description);
-  if (!nd) return false;
-  return existingMeals.some(em => em.type === newMeal.type && normalizeDesc(em.description) === nd);
+  if (!normalizeDesc(newMeal.description)) return false;
+  return existingMeals.some(em => mealsAreSimilar(newMeal, em));
 }
 
 async function resizeImage(file, max=480, q=0.7){
@@ -56,25 +69,32 @@ async function resizeImage(file, max=480, q=0.7){
 }
 
 async function analyzeDiary(text){
-  const prompt = `Analizza questo testo italiano di diario di una giornata intera. Estrai tutti i dati strutturati. Rispondi SOLO con JSON, niente altro.
+  const prompt = `Analizza questo testo italiano di diario di una giornata intera. Sii ESAUSTIVO: ogni alimento, bevanda, pasto, riferimento al sonno o integratore deve essere estratto. Rispondi SOLO con JSON, niente altro.
 
 Formato:
 {
   "water_glasses": <int bicchieri d'acqua menzionati in tutto il giorno, 0 se nessuno>,
   "sleep": null oppure {"bedtime":"HH:MM","waketime":"HH:MM","quality":<1-5>},
-  "meals": [{"type":"colazione"|"spuntino_m"|"pranzo"|"merenda"|"cena"|"spuntino_s","description":"<breve>","qty_g":<int o null>,"kcal":<int>,"p":<num>,"c":<num>,"g":<num>}],
+  "meals": [{"type":"colazione"|"spuntino_m"|"pranzo"|"merenda"|"cena"|"spuntino_s","description":"<descrizione completa con tutti gli alimenti del pasto>","qty_g":<int o null>,"kcal":<int>,"p":<num>,"c":<num>,"g":<num>}],
   "supplements": [<nomi stringa>]
 }
 
-Note:
-- Solo acqua va in water_glasses (no caffè, tè, etc.). "Un litro" ≈ 4 bicchieri.
-- sleep: cerca "ho dormito X ore", "dalle 23 alle 7", "andato a letto/svegliato". Stima quality da aggettivi: "male"=2, "non bene"=2, "così così"=3, "bene"=4, "benissimo"=5. Se non menzionato, null.
-- Stima macros con porzioni italiane tipiche. Mattina presto=colazione, metà mattina=spuntino_m, 12-15=pranzo, pomeriggio=merenda, sera=cena, dopo cena/notte=spuntino_s.
+Note IMPORTANTI:
+- ACQUA: solo H2O (no caffè, tè, tisane, latte, succhi). "Un litro" ≈ 4 bicchieri. "Mezzo litro" ≈ 2. Se la frase è "2 bicchieri d'acqua" → 2.
+- SONNO: cerca QUALSIASI riferimento al dormire. Devi SEMPRE fornire bedtime e waketime in formato HH:MM, anche se devi stimarli:
+  * "dormito 7 ore" (senza orari) → stima waketime="07:00" e bedtime indietro di 7h = "00:00"
+  * "dormito 8 ore" → waketime="07:00", bedtime="23:00"
+  * "dormito dalle 23 alle 7" → bedtime="23:00", waketime="07:00"
+  * "svegliato alle 6:30" → waketime="06:30", bedtime stimato 7-8h prima
+  * Quality: "male"/"poco"/"male"=2, "così così"=3, default/non specificato/"bene"=4, "benissimo"/"profondo"=5
+  * SOLO se il diario non menziona MAI il dormire/sonno → sleep=null
+- PASTI: estrai OGNI alimento e bevanda con calorie. "Caffè e fetta biscottata" è UN pasto con description="caffè e fetta biscottata", kcal complessivi. Non saltare niente. Caffè, cappuccino, biscotti → tutto va estratto come pasto/spuntino.
+- ORARI: mattina presto (5-10)=colazione, metà mattina (10-12)=spuntino_m, 12-15=pranzo, 15-18=merenda, 18-22=cena, dopo le 22 o notte=spuntino_s.
 
 Testo: "${text}"`;
   try {
-    const res = await fetch("/api/anthropic",{ method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:2000, system:"Sei un estrattore di dati strutturati da diari italiani. Rispondi SEMPRE e SOLO con JSON valido.", messages:[{role:"user",content:prompt}] })});
-    if (!res.ok) throw new Error('API non disponibile');
+    const res = await fetch("/api/anthropic",{ method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:2000, system:"Sei un estrattore di dati strutturati da diari italiani. Sii esaustivo: non saltare alimenti, bevande, riferimenti al sonno. Se viene menzionata una durata di sonno, stima sempre bedtime e waketime. Rispondi SEMPRE e SOLO con JSON valido.", messages:[{role:"user",content:prompt}] })});
+    if (!res.ok) { let detail=''; try { const j=await res.json(); detail = j?.error?.message || (typeof j?.error === 'string' ? j.error : null) || j?.message || JSON.stringify(j); } catch(_) { detail = await res.text().catch(()=>'') } throw new Error('HTTP '+res.status+' '+(detail||'unknown')); }
     const data = await res.json();
     const txt = data.content?.find(c=>c.type==='text')?.text || '';
     const a = txt.indexOf('{'), b = txt.lastIndexOf('}');
@@ -113,8 +133,8 @@ Se i dati sono troppo pochi (< 7 giorni), dillo nel campo "stato" e dai consigli
 Dati dell'utente:
 ${summary}`;
   try {
-    const res = await fetch("/api/anthropic",{ method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:1500, system:"Sei un coach esperto. Rispondi SEMPRE e SOLO con JSON valido in italiano.", messages:[{role:"user",content:prompt}] })});
-    if (!res.ok) throw new Error('API non disponibile');
+    const res = await fetch("/api/anthropic",{ method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:1500, system:"Sei un coach esperto. Rispondi SEMPRE e SOLO con JSON valido in italiano.", messages:[{role:"user",content:prompt}] })});
+    if (!res.ok) { let detail=''; try { const j=await res.json(); detail = j?.error?.message || (typeof j?.error === 'string' ? j.error : null) || j?.message || JSON.stringify(j); } catch(_) { detail = await res.text().catch(()=>'') } throw new Error('HTTP '+res.status+' '+(detail||'unknown')); }
     const data = await res.json();
     const txt = data.content?.find(c=>c.type==='text')?.text || '';
     const a = txt.indexOf('{'), b = txt.lastIndexOf('}');
@@ -199,8 +219,8 @@ Vincoli:
 Abitudini dell'utente:
 ${habitsSummary}${avoidStr}`;
   try {
-    const res = await fetch("/api/anthropic",{ method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:2500, system:"Sei un nutrizionista italiano creativo. Rispondi SEMPRE e SOLO con JSON valido. Proponi sempre pasti vari e diversi tra richieste.", messages:[{role:"user",content:prompt}] })});
-    if (!res.ok) throw new Error('API non disponibile');
+    const res = await fetch("/api/anthropic",{ method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:2500, system:"Sei un nutrizionista italiano creativo. Rispondi SEMPRE e SOLO con JSON valido. Proponi sempre pasti vari e diversi tra richieste.", messages:[{role:"user",content:prompt}] })});
+    if (!res.ok) { let detail=''; try { const j=await res.json(); detail = j?.error?.message || (typeof j?.error === 'string' ? j.error : null) || j?.message || JSON.stringify(j); } catch(_) { detail = await res.text().catch(()=>'') } throw new Error('HTTP '+res.status+' '+(detail||'unknown')); }
     const data = await res.json();
     const txt = data.content?.find(c=>c.type==='text')?.text || '';
     const a = txt.indexOf('{'), b = txt.lastIndexOf('}');
@@ -711,7 +731,7 @@ function DiarioPage({ loaded, notes, water, waterGoal, updNotes, updWater, updWa
           setAnalysisSel({ water:true });
           setAnalysisResult({ water_glasses: local.water_glasses, sleep:null, meals: [], supplements: [], _localOnly: true });
         } else {
-          setAnalysisError('IA non disponibile in questo contesto.');
+          setAnalysisError('IA: '+(r.error||'errore sconosciuto'));
         }
       } else {
         const water_ = Math.max(r.water_glasses, local.water_glasses);
@@ -733,15 +753,27 @@ function DiarioPage({ loaded, notes, water, waterGoal, updNotes, updWater, updWa
 
   async function applyAnalysis(){
     const r=analysisResult; if(!r)return;
-    if(analysisSel.water && r.water_glasses>0){ const cur=water[selectedDay]||0; await updWater({...water,[selectedDay]:Math.min(20,cur+r.water_glasses)}); }
+    // Acqua: usa MAX invece di sommare (evita raddoppio se rilanciato sullo stesso diario)
+    if(analysisSel.water && r.water_glasses>0){ const cur=water[selectedDay]||0; await updWater({...water,[selectedDay]:Math.min(20,Math.max(cur,r.water_glasses))}); }
     if(analysisSel.sleep && r.sleep){
       // Sostituisci se c'è già un sonno per questa data, altrimenti aggiungi
       const existing = sleeps.find(s=>s.wakeDate===selectedDay);
       if(existing) await updSleeps(sleeps.map(s=>s.wakeDate===selectedDay?{...s,...r.sleep}:s));
       else await updSleeps([...sleeps,{id:newId(),wakeDate:selectedDay,bedtime:r.sleep.bedtime,waketime:r.sleep.waketime,quality:r.sleep.quality,notes:''}]);
     }
+    // Pasti: dedup fuzzy (60%+ parole comuni + stesso tipo) contro pasti "eaten" già del giorno
+    const dayDate = parseDayKey(selectedDay);
+    const dayExistingEaten = meals.filter(m=>m.status==='eaten' && sameDay(new Date(m.ts),dayDate));
     const newMeals=[];
-    (r.meals||[]).forEach((m,i)=>{ if(analysisSel[`m${i}`]){ const ts=isToday?new Date():(()=>{const d=parseDayKey(selectedDay); d.setHours(12,0); return d;})(); newMeals.push({id:newId(),ts:ts.toISOString(),type:m.type||'pranzo',description:m.description||'',qty_g:m.qty_g!=null?Number(m.qty_g):null,kcal:m.kcal!=null?Number(m.kcal):null,p:m.p!=null?Number(m.p):null,c:m.c!=null?Number(m.c):null,g:m.g!=null?Number(m.g):null,photo:null,status:'eaten'}); }});
+    (r.meals||[]).forEach((m,i)=>{
+      if(!analysisSel[`m${i}`]) return;
+      // 1. Confronta con pasti già nel diario
+      if(dayExistingEaten.some(em => mealsAreSimilar(m, em))) return;
+      // 2. Confronta con pasti già aggiunti in questo stesso batch
+      if(newMeals.some(nm => mealsAreSimilar(m, nm))) return;
+      const ts=isToday?new Date():(()=>{const d=parseDayKey(selectedDay); d.setHours(12,0); return d;})();
+      newMeals.push({id:newId(),ts:ts.toISOString(),type:m.type||'pranzo',description:m.description||'',qty_g:m.qty_g!=null?Number(m.qty_g):null,kcal:m.kcal!=null?Number(m.kcal):null,p:m.p!=null?Number(m.p):null,c:m.c!=null?Number(m.c):null,g:m.g!=null?Number(m.g):null,photo:null,status:'eaten'});
+    });
     if(newMeals.length>0) await updMeals([...meals,...newMeals]);
     const suppsToAdd=[]; const newTaken={...taken};
     (r.supplements||[]).forEach((name,i)=>{ if(!analysisSel[`s${i}`])return; const existing=supps.find(s=>s.name.toLowerCase().trim()===name.toLowerCase().trim()); let id; if(existing) id=existing.id; else { id=newId(); suppsToAdd.push({id,name:name.trim(),color:SUPP_COLORS[(supps.length+suppsToAdd.length)%SUPP_COLORS.length]}); } const list=newTaken[selectedDay]||[]; if(!list.includes(id)) newTaken[selectedDay]=[...list,id]; });
@@ -912,7 +944,7 @@ function PastiPage({ loaded, meals, updMeals, notes, weights, goal }){
     try {
       const summary = buildEatingHabitsSummary({ meals, weights, goal });
       const r = await suggestMeals(summary, previousSuggested);
-      if (r.error) setSuggestError('IA non disponibile in questo contesto.');
+      if (r.error) setSuggestError('IA: '+(r.error||'errore sconosciuto'));
       else if (!r.meals || r.meals.length === 0) setSuggestError('Nessun suggerimento ricevuto.');
       else {
         setSuggestions(r.meals);
@@ -949,7 +981,7 @@ function PastiPage({ loaded, meals, updMeals, notes, weights, goal }){
     setAnalyzing(true); setAnalysisError(''); setAnalysisResult(null);
     try {
       const r = await analyzeDiary(fullText);
-      if(r.error){ setAnalysisError('IA non disponibile in questo contesto.'); }
+      if(r.error){ setAnalysisError('IA: '+r.error); }
       else {
         // Filtra duplicati con i pasti già registrati per questo giorno
         const dayExisting = meals.filter(m=>sameDay(new Date(m.ts), parseDayKey(selectedDay)));
@@ -1786,7 +1818,7 @@ function SeraPage({ loaded, weights, goal, notes, water, waterGoal, meals, worko
       // Costruisci il riepilogo dei dati
       const summary = buildWeightLossSummary({ weights, goal, meals, workouts, workoutTypes, supps, taken, sleeps, water });
       const r = await analyzeWeightLoss(summary);
-      if (r.error) setAiError('IA non disponibile in questo contesto.');
+      if (r.error) setAiError('IA: '+(r.error||'errore sconosciuto'));
       else setAiResult(r);
     } catch (e) { setAiError('Errore'); }
     finally { setAiAnalyzing(false); }
