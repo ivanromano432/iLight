@@ -420,7 +420,17 @@ export default function App({ user }){
     const wgn = profile?.water_goal ?? (wag?parseInt(wag):null); setWaterGoal(wgn&&!isNaN(wgn)?wgn:8);
     setMeals(mealsFromDb);
     setWorkouts(workoutsFromDb);
-    setWorkoutTypes(workoutTypesFromDb.length > 0 ? workoutTypesFromDb : DEF_TYPES);
+    // Se workout_types vuoto, seed dei default con UUID veri (DEF_TYPES ha id testuali → no UUID)
+    let workoutTypesToUse = workoutTypesFromDb;
+    if (workoutTypesFromDb.length === 0) {
+      workoutTypesToUse = DEF_TYPES.map(t => ({
+        id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : (Date.now()+Math.random()).toString(),
+        name: t.name,
+        unit: t.unit,
+      }));
+      await workoutTypesRepo.sync(user.id, [], workoutTypesToUse);
+    }
+    setWorkoutTypes(workoutTypesToUse);
     setSupplements(suppsFromDb);
     setSuppTaken(takenFromDb);
     setSleeps(sleepsFromDb);
