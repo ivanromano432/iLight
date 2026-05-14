@@ -1,22 +1,22 @@
 // Client Supabase di Quercus.
-// Le credenziali sono iniettate via variabili d'ambiente di Vite (VITE_*).
-// L'anon/publishable key è SICURA da mettere lato client: Supabase usa
-// Row Level Security per impedire l'accesso ai dati altrui.
+//
+// L'URL e la "publishable" key sono SICURE da mettere lato client:
+// Supabase usa Row Level Security per impedire l'accesso ai dati altrui.
+// Sono hardcodate come fallback per robustezza, override possibile via VITE_*.
 
 import { createClient } from '@supabase/supabase-js';
 
-const url = import.meta.env.VITE_SUPABASE_URL;
-const anon = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const FALLBACK_URL = 'https://lssvedghyqshhuvyuspw.supabase.co';
+const FALLBACK_KEY = 'sb_publishable_2RSTLv7es6aCxFA62ehQWg_F69Y8F5_';
 
-if (!url || !anon) {
-  // In dev/preview senza env var, mostra errore subito invece di silenzioso fail
-  console.error('Supabase non configurato. VITE_SUPABASE_URL o VITE_SUPABASE_ANON_KEY mancanti.');
-}
+const url = import.meta.env.VITE_SUPABASE_URL || FALLBACK_URL;
+const anon = import.meta.env.VITE_SUPABASE_ANON_KEY || FALLBACK_KEY;
 
-export const supabase = createClient(url || 'http://placeholder', anon || 'placeholder', {
+export const supabase = createClient(url, anon, {
   auth: {
     persistSession: true,        // salva sessione in localStorage → utente resta loggato
     autoRefreshToken: true,      // rinnova token automaticamente
     detectSessionInUrl: true,    // gestisce ritorni da magic link / conferma email
   },
 });
+
