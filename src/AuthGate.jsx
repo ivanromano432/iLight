@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from './supabase.js';
+import { setCurrentUserId, installSupabaseStorage, wipeMigratedLocalStorage } from './supabase-storage.js';
 import App from './App.jsx';
 import AuthScreen from './AuthScreen.jsx';
 
@@ -18,12 +19,26 @@ export default function AuthGate() {
 
     supabase.auth.getSession().then(({ data }) => {
       if (!mounted) return;
-      setSession(data.session);
+      const s = data.session;
+      if (s) {
+        // Installa storage Supabase prima di mostrare l'App
+        setCurrentUserId(s.user.id);
+        wipeMigratedLocalStorage();   // opzione B: pulisce localStorage delle chiavi cloud
+        installSupabaseStorage();
+      }
+      setSession(s);
       setLoading(false);
     }).catch(() => { if (mounted) setLoading(false); });
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
       if (!mounted) return;
+      if (newSession) {
+        setCurrentUserId(newSession.user.id);
+        wipeMigratedLocalStorage();
+        installSupabaseStorage();
+      } else {
+        setCurrentUserId(null);
+      }
       setSession(newSession);
       setShowMenu(false);
     });

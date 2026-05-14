@@ -39,7 +39,7 @@ function parseDayKey(k){ const [y,m,d]=k.split('-').map(Number); return new Date
 function timeOfDay(d){ const h=d.getHours(); if(h<5)return 'notte'; if(h<12)return 'mattina'; if(h<18)return 'pomeriggio'; return 'sera'; }
 function durHours(b,w){ if(!b||!w)return null; const [bh,bm]=b.split(':').map(Number); const [wh,wm]=w.split(':').map(Number); if([bh,bm,wh,wm].some(isNaN))return null; const bM=bh*60+bm; let wM=wh*60+wm; if(wM<=bM)wM+=1440; return (wM-bM)/60; }
 function fmtDur(h){ if(h==null)return '—'; const hh=Math.floor(h); const mm=Math.round((h-hh)*60); return `${hh}h ${String(mm).padStart(2,'0')}`; }
-const newId = () => Date.now().toString() + Math.random().toString(36).slice(2,6);
+const newId = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : (Date.now().toString() + Math.random().toString(36).slice(2,6));
 function normalizeDesc(s){ return (s||'').toLowerCase().trim().replace(/\s+/g,' ').replace(/[.,;:!?]/g,''); }
 function mealTokens(s){
   return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9 ]/g,' ').split(/\s+/).filter(w=>w.length>=3 && !['con','dei','del','della','delle','degli','una','uno','gli','che','per','tra','dal','dai','sul','nel','nei','nelle'].includes(w));
