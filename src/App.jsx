@@ -663,9 +663,23 @@ function PesoPage({ loaded, weights, goal, updWeights, updGoal, meals, updMeals 
   const sorted = useMemo(()=>[...weights].sort((a,b)=>new Date(a.ts)-new Date(b.ts)), [weights]);
   const dailyData = useMemo(()=>{
     const map={};
-    sorted.forEach(e=>{const k=dayKey(new Date(e.ts)); if(!map[k])map[k]=[]; map[k].push(e.weight);});
+    sorted.forEach(e=>{
+      const k=dayKey(new Date(e.ts));
+      if(!map[k]) map[k]={ ws:[], bfs:[] };
+      map[k].ws.push(e.weight);
+      if(e.bodyFat!=null) map[k].bfs.push(e.bodyFat);
+    });
     const out=[]; const today=new Date();
-    for(let i=6;i>=0;i--){ const d=new Date(today); d.setDate(d.getDate()-i); const arr=map[dayKey(d)]; out.push({date:d, avg:arr?arr.reduce((a,b)=>a+b,0)/arr.length:null, count:arr?.length||0}); }
+    for(let i=6;i>=0;i--){
+      const d=new Date(today); d.setDate(d.getDate()-i);
+      const m=map[dayKey(d)];
+      out.push({
+        date:d,
+        avg: m && m.ws.length>0 ? m.ws.reduce((a,b)=>a+b,0)/m.ws.length : null,
+        bfAvg: m && m.bfs.length>0 ? m.bfs.reduce((a,b)=>a+b,0)/m.bfs.length : null,
+        count: m?.ws.length || 0,
+      });
+    }
     return out;
   },[sorted]);
 
@@ -678,9 +692,28 @@ function PesoPage({ loaded, weights, goal, updWeights, updGoal, meals, updMeals 
   const first7 = dailyData.find(d=>d.avg!=null);
   const last7 = [...dailyData].reverse().find(d=>d.avg!=null);
   const weekDelta = first7&&last7&&first7!==last7 ? last7.avg-first7.avg : null;
+  // Body fat delta sui 7 giorni
+  const firstBf = dailyData.find(d=>d.bfAvg!=null);
+  const lastBf = [...dailyData].reverse().find(d=>d.bfAvg!=null);
+  const weekBfDelta = firstBf && lastBf && firstBf!==lastBf ? lastBf.bfAvg - firstBf.bfAvg : null;
+  // Qualità del trend: il peso che scende è "buono" solo se anche il grasso scende
+  let quality = null;
+  if (weekDelta != null && weekBfDelta != null) {
+    const w = weekDelta, bf = weekBfDelta;
+    if (Math.abs(w)<0.2 && Math.abs(bf)<0.3) quality = { label:'situazione stabile', color:Q.goldDim };
+    else if (w < -0.2 && bf < -0.3) quality = { label:'stai dimagrendo bene · grasso in calo', color:'#A5B889' };
+    else if (w < -0.2 && bf > 0.3) quality = { label:'peso in calo ma grasso in aumento · stai perdendo muscolo', color:'#C99A7A' };
+    else if (w < -0.2) quality = { label:'peso in calo', color:'#A5B889' };
+    else if (w > 0.2 && bf < -0.3) quality = { label:'peso sale ma grasso scende · stai mettendo muscolo', color:'#A5B889' };
+    else if (w > 0.2 && bf > 0.3) quality = { label:'sia peso che grasso in aumento', color:'#C99A7A' };
+    else if (w > 0.2) quality = { label:'peso in aumento', color:'#C99A7A' };
+    else if (bf < -0.3) quality = { label:'grasso in calo · ricomposizione', color:'#A5B889' };
+    else if (bf > 0.3) quality = { label:'grasso in aumento', color:'#C99A7A' };
+  }
   const streak = useMemo(()=>{ let s=0; for(let i=dailyData.length-1;i>=0;i--){ if(dailyData[i].count>0)s++; else break; } return s; },[dailyData]);
   const totalDelta = sorted.length>=2 ? sorted[sorted.length-1].weight-sorted[0].weight : null;
   const { path, area, points } = buildLineChart(dailyData.map(d=>d.avg), 280, 70);
+  const bfChart = buildLineChart(dailyData.map(d=>d.bfAvg), 280, 70);
 
   return (
     <div style={{minHeight:'100vh',background:`radial-gradient(ellipse at top, ${Q.bg1} 0%, ${Q.bg2} 100%)`,color:Q.cream,fontFamily:fGaramond,position:'relative',overflow:'hidden'}}>
@@ -715,17 +748,33 @@ function PesoPage({ loaded, weights, goal, updWeights, updGoal, meals, updMeals 
           <div style={{marginTop:18,padding:'12px 0 8px',borderTop:`1px solid ${Q.gold}33`,borderBottom:`1px solid ${Q.gold}33`}}>
             <div style={{display:'flex',justifyContent:'space-between',fontFamily:fCinzel,fontSize:9,letterSpacing:'0.35em',color:Q.goldDim,textTransform:'uppercase',marginBottom:6}}>
               <span>SETTE GIORNI</span>
-              <span style={{color:Q.gold,fontFamily:fGaramond,fontStyle:'italic',fontSize:13,letterSpacing:0,textTransform:'none'}}>{weekDelta!=null?`${weekDelta<0?'— ':'+ '}${fmt(Math.abs(weekDelta),1)} kg`:'—'}</span>
+              <span style={{display:'flex',gap:10,alignItems:'baseline'}}>
+                <span style={{color:Q.gold,fontFamily:fGaramond,fontStyle:'italic',fontSize:13,letterSpacing:0,textTransform:'none'}}>{weekDelta!=null?`${weekDelta<0?'— ':'+ '}${fmt(Math.abs(weekDelta),1)} kg`:'—'}</span>
+                {weekBfDelta!=null && <span style={{color:'#C99A7A',fontFamily:fGaramond,fontStyle:'italic',fontSize:12,letterSpacing:0,textTransform:'none'}}>{`${weekBfDelta<0?'— ':'+ '}${fmt(Math.abs(weekBfDelta),1)}% grasso`}</span>}
+              </span>
             </div>
             <svg viewBox="0 0 280 70" width="100%" height={70} style={{display:'block'}}>
               <defs><linearGradient id="qa" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor={Q.gold} stopOpacity="0.18"/><stop offset="100%" stopColor={Q.gold} stopOpacity="0"/></linearGradient></defs>
               {points.length>1 && <path d={area} fill="url(#qa)" />}
               {points.length>1 && <path d={path} stroke={Q.gold} strokeWidth="1.2" fill="none" />}
+              {bfChart.points.length>1 && <path d={bfChart.path} stroke="#C99A7A" strokeWidth="1.2" fill="none" strokeDasharray="3,2" opacity="0.85" />}
               {points.map((p,i)=><circle key={i} cx={p.x} cy={p.y} r={i===points.length-1?3.5:2} fill={i===points.length-1?Q.cream:Q.gold}/>)}
+              {bfChart.points.map((p,i)=><circle key={`bf${i}`} cx={p.x} cy={p.y} r={i===bfChart.points.length-1?2.5:1.5} fill="#C99A7A" opacity="0.85"/>)}
             </svg>
             <div style={{display:'flex',justifyContent:'space-between',marginTop:4,fontFamily:fGaramond,fontStyle:'italic',fontSize:10,color:Q.goldDim,padding:'0 4px'}}>
               {dailyData.map((d,i)=><span key={i} style={{opacity:i===dailyData.length-1?1:0.6}}>{d.date.toLocaleDateString('it-IT',{weekday:'narrow'}).toLowerCase()}</span>)}
             </div>
+            {bfChart.points.length>0 && (
+              <div style={{display:'flex',justifyContent:'center',gap:18,marginTop:8,fontFamily:fGaramond,fontStyle:'italic',fontSize:10,color:Q.goldDim}}>
+                <span style={{display:'inline-flex',alignItems:'center',gap:5}}><span style={{display:'inline-block',width:14,height:1.5,background:Q.gold}}/>peso</span>
+                <span style={{display:'inline-flex',alignItems:'center',gap:5}}><span style={{display:'inline-block',width:14,height:1.5,background:'#C99A7A',backgroundImage:'repeating-linear-gradient(90deg,#C99A7A 0 3px,transparent 3px 5px)'}}/>% grasso</span>
+              </div>
+            )}
+            {quality && (
+              <div style={{marginTop:10,textAlign:'center',fontFamily:fGaramond,fontStyle:'italic',fontSize:12,color:quality.color,padding:'6px 10px',background:`${quality.color}11`,border:`1px solid ${quality.color}33`}}>
+                {quality.label}
+              </div>
+            )}
           </div>
           <div style={{display:'flex',justifyContent:'space-around',marginTop:16}}>
             <Stat label="giorni" value={streak} color={Q.gold} dim={Q.goldDim} />
