@@ -86,6 +86,60 @@ export function makeRepo(tableName, columns, orderBy = 'ts') {
 
 // === Repository specifici ===
 
+// water_log: l'app usa una mappa { "2026-05-14": 3, "2026-05-13": 5 }
+// DB usa righe (user_id, day_key, glasses) con primary key composta
+export const waterRepo = {
+  async load(userId) {
+    const { data, error } = await supabase
+      .from('water_log')
+      .select('day_key, glasses')
+      .eq('user_id', userId);
+    if (error) {
+      console.error('[repo:water_log] load error:', error.message);
+      return {};
+    }
+    const map = {};
+    for (const r of data || []) {
+      map[r.day_key] = r.glasses;
+    }
+    return map;
+  },
+
+  async sync(userId, oldMap, newMap) {
+    const errors = [];
+    const promises = [];
+
+    // Upsert dei giorni cambiati o nuovi
+    for (const [day_key, glasses] of Object.entries(newMap)) {
+      if (oldMap[day_key] === glasses) continue;
+      promises.push(
+        supabase.from('water_log').upsert(
+          { user_id: userId, day_key, glasses, updated_at: new Date().toISOString() },
+          { onConflict: 'user_id,day_key' }
+        )
+      );
+    }
+
+    // Delete dei giorni rimossi
+    for (const day_key of Object.keys(oldMap)) {
+      if (!(day_key in newMap)) {
+        promises.push(
+          supabase.from('water_log').delete().eq('user_id', userId).eq('day_key', day_key)
+        );
+      }
+    }
+
+    const results = await Promise.all(promises);
+    for (const r of results) {
+      if (r.error) {
+        errors.push(r.error.message);
+        console.error('[repo:water_log] sync error:', r.error.message);
+      }
+    }
+    return { ok: errors.length === 0, errors };
+  },
+};
+
 // weights: l'app usa { id, ts, weight, bodyFat, muscle, water } (camelCase, water = idratazione %)
 // DB usa { id, ts, weight, body_fat, muscle, body_water } (snake_case, body_water più chiaro)
 const _weightsCore = makeRepo('weights', ['ts', 'weight', 'body_fat', 'muscle', 'body_water']);

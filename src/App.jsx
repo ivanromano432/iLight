@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { weightsRepo, profileRepo } from './repo.js';
+import { weightsRepo, profileRepo, waterRepo } from './repo.js';
 
 const Q = { bg1: '#3A2818', bg2: '#1F140C', gold: '#C9A876', goldDim: '#8B7355', cream: '#E8D8B8', ink: '#1F140C' };
 const W = { bg: '#E8E0D2', ink: '#3C3329', tan: '#8C6A4E' };
@@ -382,21 +382,22 @@ export default function App({ user }){
       await sSet(migKey, '1');
     }
 
-    // Pesi e profilo (goal) da Supabase
-    const [weightsFromDb, profile] = await Promise.all([
+    // Pesi, profilo (goal), acqua da Supabase
+    const [weightsFromDb, profile, waterFromDb] = await Promise.all([
       weightsRepo.load(user.id),
       profileRepo.load(user.id),
+      waterRepo.load(user.id),
     ]);
     // Resto ancora in localStorage (migrazione progressiva)
-    const [fn,wa,wag,m,wk,wt,su,st,sl,mf,fs] = await Promise.all([
-      sGet('foodnotes'),sGet('water'),sGet('watergoal'),
+    const [fn,wag,m,wk,wt,su,st,sl,mf,fs] = await Promise.all([
+      sGet('foodnotes'),sGet('watergoal'),
       sGet('meals'),sGet('workouts'),sGet('workouttypes'),sGet('supps'),sGet('supptaken'),sGet('sleeps'),
       sGet('mindful'),sGet('fasts'),
     ]);
     setWeights(weightsFromDb);
     setGoal(profile?.goal_weight != null ? Number(profile.goal_weight) : null);
     setFoodNotes(safeParse(fn,[]));
-    setWaterByDay(safeParse(wa,{}));
+    setWaterByDay(waterFromDb);
     const wgn = profile?.water_goal ?? (wag?parseInt(wag):null); setWaterGoal(wgn&&!isNaN(wgn)?wgn:8);
     setMeals(safeParse(m,[]));
     setWorkouts(safeParse(wk,[]));
@@ -433,7 +434,17 @@ export default function App({ user }){
 
   const upd = (key, setter) => async n => { setter(n); await sSet(key, typeof n==='string'?n:JSON.stringify(n)); };
   const updFoodNotes = upd('foodnotes', setFoodNotes);
-  const updWater = upd('water', setWaterByDay);
+  // updWater: aggiorna state + sync upsert su Supabase
+  const updWater = async (newMap) => {
+    const oldMap = waterByDay;
+    setWaterByDay(newMap);
+    if (user) {
+      const r = await waterRepo.sync(user.id, oldMap, newMap);
+      if (r && r.ok === false) {
+        console.error('Errore salvataggio acqua:', r.errors);
+      }
+    }
+  };
   const updWaterGoal = async g => {
     setWaterGoal(g);
     await sSet('watergoal', String(g));
