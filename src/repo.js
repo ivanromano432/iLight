@@ -95,6 +95,113 @@ export const mealsRepo = makeRepo('meals',
   ['ts', 'type', 'description', 'qty_g', 'kcal', 'p', 'c', 'g', 'photo', 'status']
 );
 
+// workout_types: app usa { id, name, unit } → DB stessi nomi
+export const workoutTypesRepo = makeRepo('workout_types', ['name', 'unit'], 'name');
+
+// workouts: app usa { id, ts, typeId, qty, notes } → DB { id, ts, type_id, qty, notes }
+const _workoutsCore = makeRepo('workouts', ['ts', 'type_id', 'qty', 'notes']);
+export const workoutsRepo = {
+  async load(userId) {
+    const rows = await _workoutsCore.load(userId);
+    return rows.map(r => ({
+      id: r.id,
+      ts: r.ts,
+      typeId: r.type_id,
+      qty: r.qty != null ? Number(r.qty) : null,
+      notes: r.notes || '',
+    }));
+  },
+  async sync(userId, oldList, newList) {
+    const toDb = (x) => ({
+      id: x.id,
+      ts: x.ts,
+      type_id: x.typeId ?? null,
+      qty: x.qty ?? null,
+      notes: x.notes ?? null,
+    });
+    return _workoutsCore.sync(userId, oldList.map(toDb), newList.map(toDb));
+  },
+};
+
+// supplements: app usa { id, name, color } → DB stessi nomi
+export const supplementsRepo = makeRepo('supplements', ['name', 'color'], 'name');
+
+// supplement_taken: app usa mappa { dayKey: [suppId, ...] }, DB usa righe (user_id, day_key, supplement_id)
+export const suppTakenRepo = {
+  async load(userId) {
+    const { data, error } = await supabase
+      .from('supplement_taken')
+      .select('day_key, supplement_id')
+      .eq('user_id', userId);
+    if (error) {
+      console.error('[repo:supplement_taken] load error:', error.message);
+      return {};
+    }
+    const map = {};
+    for (const r of data || []) {
+      if (!map[r.day_key]) map[r.day_key] = [];
+      map[r.day_key].push(r.supplement_id);
+    }
+    return map;
+  },
+  async sync(userId, oldMap, newMap) {
+    const errors = [];
+    const promises = [];
+    // Costruisco set di pair "day|id" da vecchio e nuovo per diff
+    const toSet = (map) => {
+      const s = new Set();
+      for (const [day, ids] of Object.entries(map || {})) {
+        for (const id of ids) s.add(`${day}|${id}`);
+      }
+      return s;
+    };
+    const oldSet = toSet(oldMap);
+    const newSet = toSet(newMap);
+
+    const toAdd = [];
+    for (const pair of newSet) {
+      if (!oldSet.has(pair)) {
+        const [day_key, supplement_id] = pair.split('|');
+        toAdd.push({ user_id: userId, day_key, supplement_id });
+      }
+    }
+    if (toAdd.length > 0) promises.push(supabase.from('supplement_taken').insert(toAdd));
+
+    for (const pair of oldSet) {
+      if (!newSet.has(pair)) {
+        const [day_key, supplement_id] = pair.split('|');
+        promises.push(
+          supabase.from('supplement_taken')
+            .delete()
+            .eq('user_id', userId)
+            .eq('day_key', day_key)
+            .eq('supplement_id', supplement_id)
+        );
+      }
+    }
+
+    const results = await Promise.all(promises);
+    for (const r of results) {
+      if (r.error) {
+        errors.push(r.error.message);
+        console.error('[repo:supplement_taken] sync error:', r.error.message);
+      }
+    }
+    return { ok: errors.length === 0, errors };
+  },
+};
+
+// mindful: app usa { id, ts, type, duration_min, note } → DB stessi nomi (dopo rename)
+export const mindfulRepo = makeRepo('mindful', ['ts', 'type', 'duration_min', 'note']);
+
+// fasts: app usa { id, started_ts, ended_ts, planned_end_ts, planned_hours, type, label }
+// DB stessi nomi (dopo rename)
+export const fastsRepo = makeRepo(
+  'fasts',
+  ['started_ts', 'ended_ts', 'planned_end_ts', 'planned_hours', 'type', 'label'],
+  'started_ts'
+);
+
 // sleeps: app usa { id, wakeDate, bedtime, waketime, quality, notes }
 // DB usa { id, wake_date, bedtime, waketime, quality, notes }
 const _sleepsCore = makeRepo('sleeps', ['wake_date', 'bedtime', 'waketime', 'quality', 'notes'], 'wake_date');
