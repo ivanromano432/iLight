@@ -86,6 +86,9 @@ export function makeRepo(tableName, columns, orderBy = 'ts') {
 
 // === Repository specifici ===
 
+// diary_notes: app usa { id, text, ts } → DB usa stessi nomi
+export const diaryRepo = makeRepo('diary_notes', ['text', 'ts']);
+
 // sleeps: app usa { id, wakeDate, bedtime, waketime, quality, notes }
 // DB usa { id, wake_date, bedtime, waketime, quality, notes }
 const _sleepsCore = makeRepo('sleeps', ['wake_date', 'bedtime', 'waketime', 'quality', 'notes'], 'wake_date');

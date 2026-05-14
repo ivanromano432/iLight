@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { weightsRepo, profileRepo, waterRepo, sleepsRepo } from './repo.js';
+import { weightsRepo, profileRepo, waterRepo, sleepsRepo, diaryRepo } from './repo.js';
 
 const Q = { bg1: '#3A2818', bg2: '#1F140C', gold: '#C9A876', goldDim: '#8B7355', cream: '#E8D8B8', ink: '#1F140C' };
 const W = { bg: '#E8E0D2', ink: '#3C3329', tan: '#8C6A4E' };
@@ -390,22 +390,23 @@ export default function App({ user }){
       await sSet(migKey, '1');
     }
 
-    // Pesi, profilo, acqua, sonno da Supabase
-    const [weightsFromDb, profile, waterFromDb, sleepsFromDb] = await Promise.all([
+    // Pesi, profilo, acqua, sonno, diario da Supabase
+    const [weightsFromDb, profile, waterFromDb, sleepsFromDb, diaryFromDb] = await Promise.all([
       weightsRepo.load(user.id),
       profileRepo.load(user.id),
       waterRepo.load(user.id),
       sleepsRepo.load(user.id),
+      diaryRepo.load(user.id),
     ]);
     // Resto ancora in localStorage (migrazione progressiva)
-    const [fn,wag,m,wk,wt,su,st,mf,fs] = await Promise.all([
-      sGet('foodnotes'),sGet('watergoal'),
+    const [wag,m,wk,wt,su,st,mf,fs] = await Promise.all([
+      sGet('watergoal'),
       sGet('meals'),sGet('workouts'),sGet('workouttypes'),sGet('supps'),sGet('supptaken'),
       sGet('mindful'),sGet('fasts'),
     ]);
     setWeights(weightsFromDb);
     setGoal(profile?.goal_weight != null ? Number(profile.goal_weight) : null);
-    setFoodNotes(safeParse(fn,[]));
+    setFoodNotes(diaryFromDb);
     setWaterByDay(waterFromDb);
     const wgn = profile?.water_goal ?? (wag?parseInt(wag):null); setWaterGoal(wgn&&!isNaN(wgn)?wgn:8);
     setMeals(safeParse(m,[]));
@@ -442,7 +443,15 @@ export default function App({ user }){
   };
 
   const upd = (key, setter) => async n => { setter(n); await sSet(key, typeof n==='string'?n:JSON.stringify(n)); };
-  const updFoodNotes = upd('foodnotes', setFoodNotes);
+  // updFoodNotes (diary): aggiorna state + sync delta su Supabase
+  const updFoodNotes = async (newList) => {
+    const oldList = foodNotes;
+    setFoodNotes(newList);
+    if (user) {
+      const r = await diaryRepo.sync(user.id, oldList, newList);
+      if (r && r.ok === false) console.error('Errore salvataggio diario:', r.errors);
+    }
+  };
   // updWater: aggiorna state + sync upsert su Supabase
   const updWater = async (newMap) => {
     const oldMap = waterByDay;
