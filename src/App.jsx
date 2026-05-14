@@ -413,7 +413,17 @@ export default function App({ user }){
   const updWeights = async (newList) => {
     const oldList = weights;
     setWeights(newList);
-    if (user) await weightsRepo.sync(user.id, oldList, newList);
+    if (user) {
+      try {
+        const r = await weightsRepo.sync(user.id, oldList, newList);
+        if (r && r.ok === false) {
+          window.alert('Errore salvataggio peso:\n' + (r.errors?.join('\n') || 'sconosciuto'));
+        }
+      } catch (err) {
+        console.error('updWeights threw:', err);
+        window.alert('Errore nel salvataggio del peso: ' + (err?.message || err));
+      }
+    }
   };
   // updGoal: scrive su profiles.goal_weight
   const updGoal = async g => {

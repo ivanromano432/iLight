@@ -72,14 +72,14 @@ export function makeRepo(tableName, columns, orderBy = 'ts') {
       }
 
       const results = await Promise.all(promises);
-      let hadError = false;
+      const errors = [];
       for (const r of results) {
         if (r.error) {
-          hadError = true;
+          errors.push(r.error.message || JSON.stringify(r.error));
           console.error(`[repo:${tableName}] sync error:`, r.error.message, r.error);
         }
       }
-      return { ok: !hadError };
+      return { ok: errors.length === 0, errors };
     },
   };
 }
