@@ -72,18 +72,47 @@ export function makeRepo(tableName, columns, orderBy = 'ts') {
       }
 
       const results = await Promise.all(promises);
+      let hadError = false;
       for (const r of results) {
         if (r.error) {
-          console.error(`[repo:${tableName}] sync error:`, r.error);
-          // Non lanciamo: lo state locale è già aggiornato, l'app continua
+          hadError = true;
+          console.error(`[repo:${tableName}] sync error:`, r.error.message, r.error);
         }
       }
+      return { ok: !hadError };
     },
   };
 }
 
 // === Repository specifici ===
-export const weightsRepo = makeRepo('weights', ['ts', 'kg']);
+
+// weights: l'app usa { id, ts, weight, bodyFat, muscle, water } (camelCase, water = idratazione %)
+// DB usa { id, ts, weight, body_fat, muscle, body_water } (snake_case, body_water più chiaro)
+const _weightsCore = makeRepo('weights', ['ts', 'weight', 'body_fat', 'muscle', 'body_water']);
+export const weightsRepo = {
+  async load(userId) {
+    const rows = await _weightsCore.load(userId);
+    return rows.map(r => ({
+      id: r.id,
+      ts: r.ts,
+      weight: r.weight != null ? Number(r.weight) : null,
+      bodyFat: r.body_fat != null ? Number(r.body_fat) : null,
+      muscle: r.muscle != null ? Number(r.muscle) : null,
+      water: r.body_water != null ? Number(r.body_water) : null,
+    }));
+  },
+  async sync(userId, oldList, newList) {
+    const toDb = (item) => ({
+      id: item.id,
+      ts: item.ts,
+      weight: item.weight ?? null,
+      body_fat: item.bodyFat ?? null,
+      muscle: item.muscle ?? null,
+      body_water: item.water ?? null,
+    });
+    return _weightsCore.sync(userId, oldList.map(toDb), newList.map(toDb));
+  },
+};
 
 // Profilo utente: una sola riga per utente, indicizzata da id (non user_id)
 export const profileRepo = {
