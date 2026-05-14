@@ -71,7 +71,7 @@ export default function AuthGate() {
 
   return (
     <>
-      <App />
+      <App user={session.user} />
 
       {/* Pulsante account (in alto a destra, discreto) */}
       <div style={{ position: 'fixed', top: 12, right: 12, zIndex: 9000 }}>

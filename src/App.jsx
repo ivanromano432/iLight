@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { weightsRepo, profileRepo } from './repo.js';
 
 const Q = { bg1: '#3A2818', bg2: '#1F140C', gold: '#C9A876', goldDim: '#8B7355', cream: '#E8D8B8', ink: '#1F140C' };
 const W = { bg: '#E8E0D2', ink: '#3C3329', tan: '#8C6A4E' };
@@ -28,6 +29,7 @@ function useGoogleFonts() {
 const hasSt = () => typeof window !== 'undefined' && window.storage;
 async function sGet(k){ if(!hasSt())return null; try{const r=await window.storage.get(k); return r?.value??null;}catch(_){return null;} }
 async function sSet(k,v){ if(!hasSt())return false; try{await window.storage.set(k,v); return true;}catch(_){return false;} }
+async function sDel(k){ if(!hasSt())return false; try{await window.storage.delete(k); return true;}catch(_){return false;} }
 function safeParse(s, fb){ if(!s)return fb; try{return JSON.parse(s);}catch(_){return fb;} }
 
 function fmt(n,d=1){ if(n==null||isNaN(n))return '—'; return Number(n).toFixed(d).replace('.',','); }
@@ -346,7 +348,7 @@ const MEAL_TYPES = [
   { id:'spuntino_s', name:'Spuntino serale', order:6, abbr:'SPS' },
 ];
 
-export default function App(){
+export default function App({ user }){
   useGoogleFonts();
   const [pageIdx, setPageIdx] = useState(0);
   const [loaded, setLoaded] = useState(false);
@@ -365,16 +367,37 @@ export default function App(){
   const [fasts, setFasts] = useState([]);
 
   useEffect(()=>{(async()=>{
-    const [w,g,fn,wa,wag,m,wk,wt,su,st,sl,mf,fs] = await Promise.all([
-      sGet('weights'),sGet('goal'),sGet('foodnotes'),sGet('water'),sGet('watergoal'),
+    if (!user) return;
+
+    // Wipe one-time dei dati legacy in localStorage (clean start scelto dall'utente).
+    // Marcato con flag namespaced per utente così non rivipia se cambi account.
+    const migKey = `quercus_migrated_v1_${user.id}`;
+    const alreadyWiped = await sGet(migKey);
+    if (!alreadyWiped) {
+      await Promise.all([
+        sDel('weights'), sDel('goal'), sDel('foodnotes'), sDel('water'),
+        sDel('watergoal'), sDel('meals'), sDel('workouts'), sDel('workouttypes'),
+        sDel('supps'), sDel('supptaken'), sDel('sleeps'), sDel('mindful'), sDel('fasts'),
+      ]);
+      await sSet(migKey, '1');
+    }
+
+    // Pesi e profilo (goal) da Supabase
+    const [weightsFromDb, profile] = await Promise.all([
+      weightsRepo.load(user.id),
+      profileRepo.load(user.id),
+    ]);
+    // Resto ancora in localStorage (migrazione progressiva)
+    const [fn,wa,wag,m,wk,wt,su,st,sl,mf,fs] = await Promise.all([
+      sGet('foodnotes'),sGet('water'),sGet('watergoal'),
       sGet('meals'),sGet('workouts'),sGet('workouttypes'),sGet('supps'),sGet('supptaken'),sGet('sleeps'),
       sGet('mindful'),sGet('fasts'),
     ]);
-    setWeights(safeParse(w,[]));
-    const gn = g?parseFloat(g):null; setGoal(gn!=null&&!isNaN(gn)?gn:null);
+    setWeights(weightsFromDb);
+    setGoal(profile?.goal_weight != null ? Number(profile.goal_weight) : null);
     setFoodNotes(safeParse(fn,[]));
     setWaterByDay(safeParse(wa,{}));
-    const wgn = wag?parseInt(wag):null; setWaterGoal(wgn&&!isNaN(wgn)?wgn:8);
+    const wgn = profile?.water_goal ?? (wag?parseInt(wag):null); setWaterGoal(wgn&&!isNaN(wgn)?wgn:8);
     setMeals(safeParse(m,[]));
     setWorkouts(safeParse(wk,[]));
     const wtp = safeParse(wt,null); setWorkoutTypes(wtp&&wtp.length>0?wtp:DEF_TYPES);
@@ -384,14 +407,28 @@ export default function App(){
     setMindfulSessions(safeParse(mf,[]));
     setFasts(safeParse(fs,[]));
     setLoaded(true);
-  })();},[]);
+  })();},[user]);
+
+  // updWeights: aggiorna state + sync delta su Supabase
+  const updWeights = async (newList) => {
+    const oldList = weights;
+    setWeights(newList);
+    if (user) await weightsRepo.sync(user.id, oldList, newList);
+  };
+  // updGoal: scrive su profiles.goal_weight
+  const updGoal = async g => {
+    setGoal(g);
+    if (user) await profileRepo.update(user.id, { goal_weight: g });
+  };
 
   const upd = (key, setter) => async n => { setter(n); await sSet(key, typeof n==='string'?n:JSON.stringify(n)); };
-  const updWeights = upd('weights', setWeights);
-  const updGoal = async g => { setGoal(g); await sSet('goal', String(g)); };
   const updFoodNotes = upd('foodnotes', setFoodNotes);
   const updWater = upd('water', setWaterByDay);
-  const updWaterGoal = async g => { setWaterGoal(g); await sSet('watergoal', String(g)); };
+  const updWaterGoal = async g => {
+    setWaterGoal(g);
+    await sSet('watergoal', String(g));
+    if (user) await profileRepo.update(user.id, { water_goal: g });
+  };
   const updMeals = upd('meals', setMeals);
   const updWorkouts = upd('workouts', setWorkouts);
   const updWorkoutTypes = upd('workouttypes', setWorkoutTypes);
