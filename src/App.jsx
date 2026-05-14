@@ -3,6 +3,7 @@ import {
   weightsRepo, profileRepo, waterRepo, sleepsRepo, diaryRepo, mealsRepo,
   workoutsRepo, workoutTypesRepo, supplementsRepo, suppTakenRepo, mindfulRepo, fastsRepo,
 } from './repo.js';
+import StatistichePage from './Statistiche.jsx';
 
 const Q = { bg1: '#3A2818', bg2: '#1F140C', gold: '#C9A876', goldDim: '#8B7355', cream: '#E8D8B8', ink: '#1F140C' };
 const W = { bg: '#E8E0D2', ink: '#3C3329', tan: '#8C6A4E' };
@@ -362,6 +363,7 @@ const MEAL_TYPES = [
 export default function App({ user }){
   useGoogleFonts();
   const [pageIdx, setPageIdx] = useState(0);
+  const [showStats, setShowStats] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [weights, setWeights] = useState([]);
   const [goal, setGoal] = useState(null);
@@ -563,10 +565,22 @@ export default function App({ user }){
   };
 
   const page = PAGES[pageIdx].id;
+  if (showStats) {
+    return (
+      <StatistichePage
+        weights={weights} meals={meals} sleeps={sleeps} water={waterByDay}
+        workouts={workouts} workoutTypes={workoutTypes}
+        supplements={supplements} suppTaken={suppTaken}
+        mindful={mindfulSessions} fasts={fasts} diaryNotes={foodNotes}
+        goal={goal}
+        onClose={() => setShowStats(false)}
+      />
+    );
+  }
   return (
     <div style={{minHeight:'100vh', background:'#000', position:'relative'}}>
       <div style={{paddingBottom:76}}>
-        {page==='peso' && <PesoPage loaded={loaded} weights={weights} goal={goal} updWeights={updWeights} updGoal={updGoal} meals={meals} updMeals={updMeals} />}
+        {page==='peso' && <PesoPage loaded={loaded} weights={weights} goal={goal} updWeights={updWeights} updGoal={updGoal} meals={meals} updMeals={updMeals} openStats={() => setShowStats(true)} />}
         {page==='diario' && <DiarioPage loaded={loaded} notes={foodNotes} water={waterByDay} waterGoal={waterGoal} updNotes={updFoodNotes} updWater={updWater} updWaterGoal={updWaterGoal} meals={meals} updMeals={updMeals} supps={supplements} taken={suppTaken} updSupps={updSupps} updTaken={updTaken} sleeps={sleeps} updSleeps={updSleeps} />}
         {page==='pasti' && <PastiPage loaded={loaded} meals={meals} updMeals={updMeals} notes={foodNotes} weights={weights} goal={goal} />}
         {page==='allena' && <AllenaPage loaded={loaded} workouts={workouts} types={workoutTypes} updWorkouts={updWorkouts} updTypes={updWorkoutTypes} />}
@@ -609,7 +623,7 @@ function buildLineChart(values, chartW, chartH){
   return { path, area, points };
 }
 
-function PesoPage({ loaded, weights, goal, updWeights, updGoal, meals, updMeals }){
+function PesoPage({ loaded, weights, goal, updWeights, updGoal, meals, updMeals, openStats }){
   const [editing, setEditing] = useState(null);
   const [showGoal, setShowGoal] = useState(false);
   const [draft, setDraft] = useState({ w:'', bf:'', mu:'', wa:'' });
@@ -892,6 +906,13 @@ function PesoPage({ loaded, weights, goal, updWeights, updGoal, meals, updMeals 
             <Stat label="totale" value={totalDelta!=null?`${totalDelta<0?'−':'+'}${fmt(Math.abs(totalDelta),1)}`:'—'} color={Q.gold} dim={Q.goldDim} />
             <Stat label="obiettivo" value={goal!=null?fmt(goal):'—'} color={Q.gold} dim={Q.goldDim} onTap={()=>{setDraftGoal(goal!=null?String(goal).replace('.',','):''); setShowGoal(true);}} />
           </div>
+          {openStats && weights.length>0 && (
+            <div style={{textAlign:'center',marginTop:18}}>
+              <button onClick={openStats} style={{background:'transparent',color:Q.gold,border:`1px solid ${Q.gold}66`,fontFamily:fCinzel,fontSize:10,letterSpacing:'0.35em',padding:'10px 18px',cursor:'pointer',textTransform:'uppercase'}}>
+                ✦ STATISTICHE COMPLETE
+              </button>
+            </div>
+          )}
           {todayEntries.length>0 && (
             <div style={{marginTop:22}}>
               <div style={{fontFamily:fCinzel,fontSize:9,letterSpacing:'0.4em',color:Q.goldDim,textAlign:'center',textTransform:'uppercase',marginBottom:10}}>REGISTRAZIONI DI OGGI</div>
