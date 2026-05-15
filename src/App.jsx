@@ -6,7 +6,7 @@ import {
 } from './repo.js';
 import StatistichePage from './Statistiche.jsx';
 import SubscriptionPage from './SubscriptionPage.jsx';
-import Onboarding, { hasSeenOnboarding } from './Onboarding.jsx';
+import Onboarding, { hasSeenOnboarding, markOnboardingSeen } from './Onboarding.jsx';
 import GuidaPage from './GuidaPage.jsx';
 import ProfilePage from './ProfilePage.jsx';
 import LayoutPage from './LayoutPage.jsx';
@@ -617,9 +617,16 @@ export default function App({ user, onLogout }){
     setUserGoals(goalsFromDb);
     setLoaded(true);
 
-    // Mostra onboarding al primo accesso (per utente)
-    if (!hasSeenOnboarding(user.id)) {
+    // Mostra onboarding al primo accesso. Controllo sia il flag persistente
+    // su Supabase (profile.onboarded) sia il fallback in localStorage.
+    // Se uno dei due è true, l'utente ha già visto l'onboarding.
+    const isOnboardedServer = !!profile?.onboarded;
+    const isOnboardedLocal = hasSeenOnboarding(user.id);
+    if (!isOnboardedServer && !isOnboardedLocal) {
       setShowOnboarding(true);
+    } else if (isOnboardedServer && !isOnboardedLocal) {
+      // Allinea: scrivi anche in localStorage per il prossimo avvio (evita flash)
+      try { markOnboardingSeen(user.id); } catch (_) {}
     }
   })();},[user]);
 
@@ -782,7 +789,14 @@ export default function App({ user, onLogout }){
   }
 
   if (showOnboarding) {
-    return <Onboarding userId={user?.id} onDone={() => setShowOnboarding(false)} />;
+    return (
+      <Onboarding
+        userId={user?.id}
+        profile={profile}
+        updProfile={updProfile}
+        onDone={() => setShowOnboarding(false)}
+      />
+    );
   }
 
   if (showGuida) {

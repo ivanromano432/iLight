@@ -1,10 +1,11 @@
 // Onboarding al primo accesso: 6 schermate swipeabili che spiegano GoalFit.
-// Salvato in localStorage con flag namespaced per utente.
-// Skippable con "salta" in alto.
+// Il flag "già visto" è salvato sia su Supabase (profiles.onboarded) come fonte autorevole,
+// sia in localStorage come fallback per evitare flash al successivo avvio.
+// Tema dinamico: segue profile.theme.
 
 import { useState, useEffect } from 'react';
+import { getTheme } from './themes.js';
 
-const Q = { bg1: '#3A2818', bg2: '#1F140C', gold: '#C9A876', goldDim: '#8B7355', cream: '#E8D8B8', ink: '#1F140C' };
 const fGaramond = '"Cormorant Garamond", serif';
 const fCinzel = '"Cinzel", serif';
 
@@ -21,19 +22,19 @@ export function markOnboardingSeen(userId) {
 const SLIDES = [
   {
     title: 'Benvenuto in GoalFit',
-    sub: 'il tuo compagno lento per il benessere',
+    sub: 'il tuo diario quotidiano del corpo',
     body: [
-      'GoalFit è ispirata alla quercia. Cresce lenta, ma forte.',
-      'Ti aiuto a perdere peso e stare meglio in 9 mondi tematici — peso, diario, pasti, allenamento, integratori, digiuno, respiro, sonno, sera.',
+      'GoalFit ti aiuta a perdere peso e stare meglio attraverso nove mondi tematici — peso, diario, pasti, allenamento, integratori, digiuno, respiro, sonno, sera.',
       'Niente conteggio ossessivo, niente promesse miracolose. Solo le tue abitudini, osservate con cura.',
     ],
+    showLogo: true,
   },
   {
     title: 'Il diario libero',
-    sub: 'la magia di GoalFit',
+    sub: 'la funzione che cambia tutto',
     body: [
       'Apri la pagina "II diario" e scrivi naturale: "stamattina caffè e cornetto, pranzo pasta col pesto, due bicchieri d\'acqua, dormito 7 ore".',
-      'Tap su "Registra con IA". In pochi secondi, l\'intelligenza artificiale estrae i pasti, i bicchieri d\'acqua e il sonno e li mette nei posti giusti.',
+      'Tap su "Registra con IA". In pochi secondi, l\'intelligenza artificiale estrae i pasti, l\'acqua e il sonno e li mette nei posti giusti.',
       'Niente form da compilare. Scrivi come parli.',
     ],
   },
@@ -67,10 +68,7 @@ const SLIDES = [
     sub: 'sempre in alto a destra',
     body: [
       'Tap sul cerchio con la tua iniziale in alto a destra.',
-      'Da lì accedi a:',
-      '· Guida con spiegazione di tutte le funzioni',
-      '· Stato del tuo abbonamento',
-      '· Logout',
+      'Da lì accedi a profilo, layout dei temi, guida, abbonamento.',
       'I tuoi dati sono al sicuro su cloud: anche se cambi dispositivo, ritrovi tutto.',
     ],
   },
@@ -88,12 +86,18 @@ const SLIDES = [
   },
 ];
 
-export default function Onboarding({ userId, onDone }) {
+export default function Onboarding({ userId, profile, updProfile, onDone }) {
+  const Q = getTheme(profile?.theme);
   const [idx, setIdx] = useState(0);
   const slide = SLIDES[idx];
 
-  const finish = () => {
+  const finish = async () => {
     if (userId) markOnboardingSeen(userId);
+    try {
+      if (updProfile) await updProfile({ onboarded: true });
+    } catch (e) {
+      console.warn('[onboarding] errore salvataggio profile.onboarded', e);
+    }
     onDone();
   };
   const next = () => {
@@ -126,11 +130,12 @@ export default function Onboarding({ userId, onDone }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: `radial-gradient(ellipse at top, ${Q.bg1} 0%, ${Q.bg2} 100%)`, color: Q.cream, fontFamily: fGaramond, overflow: 'hidden' }}>
+      {/* Doppia cornice in stile con il resto dell'app */}
       <div aria-hidden style={{ position: 'absolute', inset: 14, border: `1px solid ${Q.gold}40`, borderRadius: 20, pointerEvents: 'none' }} />
       <div aria-hidden style={{ position: 'absolute', inset: 20, border: `1px solid ${Q.gold}1A`, borderRadius: 16, pointerEvents: 'none' }} />
 
-      {/* Header con skip */}
-      <div style={{ position: 'relative', zIndex: 2, padding: '22px 24px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      {/* Header con contatore e skip */}
+      <div style={{ position: 'relative', zIndex: 2, padding: '22px 28px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.4em', color: Q.goldDim, textTransform: 'uppercase' }}>
           {idx + 1} / {SLIDES.length}
         </div>
@@ -141,45 +146,75 @@ export default function Onboarding({ userId, onDone }) {
         )}
       </div>
 
-      {/* Corpo */}
-      <div style={{ position: 'relative', zIndex: 2, padding: '40px 30px 0', maxWidth: 480, margin: '0 auto', display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 80px)' }}>
+      {/* Corpo scrollabile */}
+      <div style={{
+        position: 'relative', zIndex: 2,
+        padding: '24px 30px 0',
+        maxWidth: 480, margin: '0 auto',
+        height: 'calc(100vh - 60px)',
+        display: 'flex', flexDirection: 'column',
+        overflowY: 'auto', WebkitOverflowScrolling: 'touch',
+      }}>
         <div style={{ flex: 1 }}>
-          <div style={{ textAlign: 'center', marginBottom: 28 }}>
-            <div style={{ fontFamily: fCinzel, fontSize: 26, letterSpacing: '0.18em', color: Q.gold, textTransform: 'uppercase', lineHeight: 1.2 }}>
+
+          {slide.showLogo && (
+            <div style={{ textAlign: 'center', marginBottom: 22 }}>
+              <img src="/icon-512.png" alt="GoalFit" style={{ width: 110, height: 110, display: 'block', margin: '0 auto' }} />
+            </div>
+          )}
+
+          {/* Header sezione */}
+          <div style={{ textAlign: 'center', marginBottom: 26 }}>
+            <div style={{ fontFamily: fCinzel, fontSize: 9, letterSpacing: '0.5em', color: Q.goldDim, textTransform: 'uppercase', marginBottom: 6 }}>
+              ✦ {String(idx + 1).padStart(2, '0')} ✦
+            </div>
+            <div style={{ fontFamily: fCinzel, fontSize: 22, letterSpacing: '0.18em', color: Q.gold, textTransform: 'uppercase', lineHeight: 1.2 }}>
               {slide.title}
             </div>
-            <div style={{ marginTop: 10, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 16, color: Q.goldDim }}>
+            <div style={{ marginTop: 8, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 15, color: Q.goldDim }}>
               {slide.sub}
             </div>
+            <div style={{ width: 60, height: 1, background: `${Q.gold}55`, margin: '14px auto 0' }} />
           </div>
 
+          {/* Corpo testo */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            {slide.body.map((p, i) => (
-              <div key={i} style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 16, color: Q.cream, lineHeight: 1.55, textAlign: p.startsWith('✦') || p.startsWith('·') ? 'left' : 'left' }}>
-                {p}
-              </div>
-            ))}
+            {slide.body.map((p, i) => {
+              const isBullet = p.startsWith('✦') || p.startsWith('·');
+              return (
+                <div key={i} style={{
+                  fontFamily: fGaramond,
+                  fontStyle: 'italic',
+                  fontSize: 16,
+                  color: Q.cream,
+                  lineHeight: 1.55,
+                  paddingLeft: isBullet ? 4 : 0,
+                }}>
+                  {p}
+                </div>
+              );
+            })}
           </div>
         </div>
 
-        {/* Footer: dots + bottoni */}
-        <div style={{ paddingBottom: 32 }}>
-          <div style={{ display: 'flex', justifyContent: 'center', gap: 8, margin: '24px 0' }}>
+        {/* Footer: dots + bottoni navigazione */}
+        <div style={{ paddingTop: 22, paddingBottom: 32 }}>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginBottom: 22 }}>
             {SLIDES.map((_, i) => (
               <button key={i} onClick={() => setIdx(i)} aria-label={`Vai a ${i + 1}`}
-                style={{ width: 8, height: 8, borderRadius: 4, border: 'none', background: i === idx ? Q.gold : `${Q.goldDim}66`, cursor: 'pointer', padding: 0 }} />
+                style={{ width: i === idx ? 22 : 8, height: 8, borderRadius: 4, border: 'none', background: i === idx ? Q.gold : `${Q.goldDim}66`, cursor: 'pointer', padding: 0, transition: 'width 0.2s' }} />
             ))}
           </div>
 
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
             {idx > 0 && (
-              <button onClick={prev} style={{ background: 'transparent', color: Q.goldDim, border: `1px solid ${Q.goldDim}66`, fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.3em', padding: '11px 16px', cursor: 'pointer', textTransform: 'uppercase' }}>
+              <button onClick={prev} style={{ background: 'transparent', color: Q.goldDim, border: `1px solid ${Q.goldDim}66`, fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.3em', padding: '12px 18px', cursor: 'pointer', textTransform: 'uppercase' }}>
                 ← indietro
               </button>
             )}
             <button onClick={next}
-              style={{ background: Q.gold, color: Q.ink, border: 'none', fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.35em', padding: '11px 22px', cursor: 'pointer', textTransform: 'uppercase' }}>
-              {slide.isLast ? 'inizia' : 'avanti →'}
+              style={{ background: Q.gold, color: Q.ink, border: 'none', fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.35em', padding: '12px 26px', cursor: 'pointer', textTransform: 'uppercase', fontWeight: 600 }}>
+              {slide.isLast ? '✦ inizia ✦' : 'avanti →'}
             </button>
           </div>
         </div>

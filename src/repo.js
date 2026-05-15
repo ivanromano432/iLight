@@ -322,7 +322,7 @@ export const profileRepo = {
   async load(userId) {
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, email, goal_weight, water_goal, subscription_status, trial_ends_at, stripe_customer_id, stripe_subscription_id, current_period_end, is_lifetime_free, avatar_data, display_name, theme')
+      .select('id, email, goal_weight, water_goal, subscription_status, trial_ends_at, stripe_customer_id, stripe_subscription_id, current_period_end, is_lifetime_free, avatar_data, display_name, theme, onboarded')
       .eq('id', userId)
       .single();
     if (error) {
