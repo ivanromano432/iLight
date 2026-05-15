@@ -9,6 +9,7 @@ import SubscriptionPage from './SubscriptionPage.jsx';
 import Onboarding, { hasSeenOnboarding } from './Onboarding.jsx';
 import GuidaPage from './GuidaPage.jsx';
 import ProfilePage from './ProfilePage.jsx';
+import LayoutPage from './LayoutPage.jsx';
 import { getTheme } from './themes.js';
 import { supabase } from './supabase.js';
 
@@ -441,6 +442,7 @@ export default function App({ user, onLogout }){
   const [showSub, setShowSub] = useState(false);
   const [showGuida, setShowGuida] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const [showLayout, setShowLayout] = useState(false);
   const [showAccountMenu, setShowAccountMenu] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [profile, setProfile] = useState(null);
@@ -701,6 +703,10 @@ export default function App({ user, onLogout }){
     return <ProfilePage user={user} profile={profile} updProfile={updProfile} onClose={() => setShowProfile(false)} />;
   }
 
+  if (showLayout) {
+    return <LayoutPage profile={profile} updProfile={updProfile} onClose={() => setShowLayout(false)} />;
+  }
+
   // Calcolo stato abbonamento per il menu avatar
   const subState = (() => {
     if (!profile) return { label: 'caricamento…', color: '#8C6A4E', tone: 'neutral', ctaLabel: '◆ abbonamento', ctaPrimary: false };
@@ -744,6 +750,10 @@ export default function App({ user, onLogout }){
               <button onClick={() => { setShowAccountMenu(false); setShowProfile(true); }}
                 style={{ background: 'transparent', color: '#3C3329', border: '1px solid rgba(60,51,41,0.25)', fontFamily: "'Cardo',serif", fontStyle: 'italic', fontSize: 14, padding: '8px 12px', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
                 ☉ profilo
+              </button>
+              <button onClick={() => { setShowAccountMenu(false); setShowLayout(true); }}
+                style={{ background: 'transparent', color: '#3C3329', border: '1px solid rgba(60,51,41,0.25)', fontFamily: "'Cardo',serif", fontStyle: 'italic', fontSize: 14, padding: '8px 12px', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
+                ✦ layout
               </button>
               <button onClick={() => { setShowAccountMenu(false); setShowGuida(true); }}
                 style={{ background: 'transparent', color: '#3C3329', border: '1px solid rgba(60,51,41,0.25)', fontFamily: "'Cardo',serif", fontStyle: 'italic', fontSize: 14, padding: '8px 12px', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
