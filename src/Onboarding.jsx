@@ -136,11 +136,11 @@ export default function Onboarding({ userId, profile, updProfile, onDone }) {
 
       {/* Header con contatore e skip */}
       <div style={{ position: 'relative', zIndex: 2, padding: '22px 28px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.4em', color: Q.goldDim, textTransform: 'uppercase' }}>
+        <div style={{ fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.4em', color: Q.gold, opacity: 0.75, textTransform: 'uppercase' }}>
           {idx + 1} / {SLIDES.length}
         </div>
         {!slide.isLast && (
-          <button onClick={finish} style={{ background: 'transparent', color: Q.goldDim, border: 'none', fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.35em', cursor: 'pointer', textTransform: 'uppercase' }}>
+          <button onClick={finish} style={{ background: 'transparent', color: Q.gold, opacity: 0.8, border: 'none', fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.35em', cursor: 'pointer', textTransform: 'uppercase' }}>
             salta
           </button>
         )}
@@ -165,32 +165,44 @@ export default function Onboarding({ userId, profile, updProfile, onDone }) {
 
           {/* Header sezione */}
           <div style={{ textAlign: 'center', marginBottom: 26 }}>
-            <div style={{ fontFamily: fCinzel, fontSize: 9, letterSpacing: '0.5em', color: Q.goldDim, textTransform: 'uppercase', marginBottom: 6 }}>
+            <div style={{ fontFamily: fCinzel, fontSize: 9, letterSpacing: '0.5em', color: Q.gold, opacity: 0.7, textTransform: 'uppercase', marginBottom: 6 }}>
               ✦ {String(idx + 1).padStart(2, '0')} ✦
             </div>
             <div style={{ fontFamily: fCinzel, fontSize: 22, letterSpacing: '0.18em', color: Q.gold, textTransform: 'uppercase', lineHeight: 1.2 }}>
               {slide.title}
             </div>
-            <div style={{ marginTop: 8, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 15, color: Q.goldDim }}>
+            <div style={{ marginTop: 8, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 15, color: Q.cream, opacity: 0.75 }}>
               {slide.sub}
             </div>
-            <div style={{ width: 60, height: 1, background: `${Q.gold}55`, margin: '14px auto 0' }} />
+            <div style={{ width: 60, height: 1, background: Q.gold, opacity: 0.5, margin: '14px auto 0' }} />
           </div>
 
           {/* Corpo testo */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             {slide.body.map((p, i) => {
-              const isBullet = p.startsWith('✦') || p.startsWith('·');
+              const isStarBullet = p.startsWith('✦');
+              const isDotBullet = p.startsWith('·');
+              const isBullet = isStarBullet || isDotBullet;
+              // Trasformo "· testo" in "✦ testo" per coerenza con il pattern dell'app
+              const text = isDotBullet ? p.replace(/^·\s*/, '✦ ') : p;
               return (
                 <div key={i} style={{
                   fontFamily: fGaramond,
                   fontStyle: 'italic',
                   fontSize: 16,
                   color: Q.cream,
+                  opacity: isBullet ? 0.92 : 0.85,
                   lineHeight: 1.55,
-                  paddingLeft: isBullet ? 4 : 0,
+                  paddingLeft: isBullet ? 8 : 0,
+                  display: 'flex',
+                  gap: isBullet ? 0 : 0,
                 }}>
-                  {p}
+                  {isBullet ? (
+                    <>
+                      <span style={{ color: Q.gold, marginRight: 8, fontStyle: 'normal', opacity: 0.85 }}>✦</span>
+                      <span>{text.replace(/^✦\s*/, '')}</span>
+                    </>
+                  ) : text}
                 </div>
               );
             })}
@@ -208,7 +220,7 @@ export default function Onboarding({ userId, profile, updProfile, onDone }) {
 
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
             {idx > 0 && (
-              <button onClick={prev} style={{ background: 'transparent', color: Q.goldDim, border: `1px solid ${Q.goldDim}66`, fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.3em', padding: '12px 18px', cursor: 'pointer', textTransform: 'uppercase' }}>
+              <button onClick={prev} style={{ background: 'transparent', color: Q.gold, opacity: 0.85, border: `1px solid ${Q.gold}66`, fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.3em', padding: '12px 18px', cursor: 'pointer', textTransform: 'uppercase' }}>
                 ← indietro
               </button>
             )}
