@@ -160,10 +160,26 @@ export const THEMES = {
     border: '#C9A876',
     danger: DANGER,
   },
+
+  // 10. BERSAGLIO — turchese + lime, i colori del logo GoalFit
+  bersaglio: {
+    id: 'bersaglio',
+    name: 'Bersaglio',
+    desc: 'turchese e lime, i colori del logo',
+    isDark: false,
+    swatch: ['#F2F8F9', '#2BA8B5', '#9CC73A'],
+    bg: '#F2F8F9', bg1: '#F2F8F9', bg2: '#D8EAEC',
+    ink: '#1B4549', dark: '#1B4549',
+    cream: '#1B4549', pale: '#1B4549', body: '#1B4549',
+    gold: '#2BA8B5', sage: '#2BA8B5', silver: '#2BA8B5', accent: '#2BA8B5', amber: '#9CC73A', active: '#2BA8B5',
+    goldDim: '#87BFC5', light: '#87BFC5', dim: '#87BFC5', tan: '#5D8E94',
+    border: '#1B4549',
+    danger: DANGER,
+  },
 };
 
 export const THEME_ORDER = [
-  'giardino', 'refettorio', 'biblioteca', 'alba', 'cuoio',
+  'giardino', 'bersaglio', 'refettorio', 'biblioteca', 'alba', 'cuoio',
   'sera_viola', 'notte_blu', 'bosco_pastello', 'notturno_ambra',
 ];
 
