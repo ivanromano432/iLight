@@ -8,6 +8,7 @@ import StatistichePage from './Statistiche.jsx';
 import SubscriptionPage from './SubscriptionPage.jsx';
 import Onboarding, { hasSeenOnboarding, markOnboardingSeen } from './Onboarding.jsx';
 import ProfileSetup from './ProfileSetup.jsx';
+import AppleHealthImport from './AppleHealthImport.jsx';
 import GuidaPage from './GuidaPage.jsx';
 import ProfilePage from './ProfilePage.jsx';
 import LayoutPage from './LayoutPage.jsx';
@@ -514,6 +515,7 @@ export default function App({ user, onLogout }){
   const [showAccountMenu, setShowAccountMenu] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showProfileSetup, setShowProfileSetup] = useState(false);
+  const [showAppleHealth, setShowAppleHealth] = useState(false);
   const [profile, setProfile] = useState(null);
   const [loaded, setLoaded] = useState(false);
   const [weights, setWeights] = useState([]);
@@ -822,6 +824,19 @@ export default function App({ user, onLogout }){
     );
   }
 
+  if (showAppleHealth) {
+    return (
+      <AppleHealthImport
+        profile={profile}
+        existingWeights={weights}
+        onImport={async (newWeights) => {
+          await updWeights([...(weights || []), ...newWeights]);
+        }}
+        onClose={() => setShowAppleHealth(false)}
+      />
+    );
+  }
+
   if (showGuida) {
     return <GuidaPage profile={profile} onClose={() => setShowGuida(false)} />;
   }
@@ -944,7 +959,7 @@ export default function App({ user, onLogout }){
       <div style={{paddingBottom:76}}>
         {(() => { const __theme = getTheme(profile?.theme); return (<>
         {page==='oggi' && <OggiPage theme={__theme} loaded={loaded} profile={profile} weights={weights} goal={goal} meals={meals} notes={foodNotes} water={waterByDay} waterGoal={waterGoal} workouts={workouts} sleeps={sleeps} fasts={fasts} supps={supplements} taken={suppTaken} updWater={updWater} setPage={setPageIdx} />}
-        {page==='peso' && <PesoPage theme={__theme} loaded={loaded} weights={weights} goal={goal} updWeights={updWeights} updGoal={updGoal} meals={meals} updMeals={updMeals} openStats={() => setShowStats(true)} profile={profile} openSub={() => setShowSub(true)} />}
+        {page==='peso' && <PesoPage theme={__theme} loaded={loaded} weights={weights} goal={goal} updWeights={updWeights} updGoal={updGoal} meals={meals} updMeals={updMeals} openStats={() => setShowStats(true)} profile={profile} openSub={() => setShowSub(true)} openAppleHealth={() => setShowAppleHealth(true)} />}
         {page==='diario' && <DiarioPage theme={__theme} loaded={loaded} notes={foodNotes} water={waterByDay} waterGoal={waterGoal} updNotes={updFoodNotes} updWater={updWater} updWaterGoal={updWaterGoal} meals={meals} updMeals={updMeals} supps={supplements} taken={suppTaken} updSupps={updSupps} updTaken={updTaken} sleeps={sleeps} updSleeps={updSleeps} />}
         {page==='pasti' && <PastiPage user={user} theme={__theme} loaded={loaded} meals={meals} updMeals={updMeals} notes={foodNotes} weights={weights} goal={goal} />}
         {page==='allena' && <AllenaPage theme={__theme} loaded={loaded} workouts={workouts} types={workoutTypes} updWorkouts={updWorkouts} updTypes={updWorkoutTypes} />}
@@ -1230,7 +1245,7 @@ function OggiPage({ theme, loaded, profile, weights, goal, meals, notes, water, 
     </div>
   );
 }
-function PesoPage({ theme, loaded, weights, goal, updWeights, updGoal, meals, updMeals, openStats, profile, openSub }){
+function PesoPage({ theme, loaded, weights, goal, updWeights, updGoal, meals, updMeals, openStats, profile, openSub, openAppleHealth }){
   // Tema dinamico: shadowing del Q globale del modulo per usare il tema attivo
   const Q = theme || { bg1: '#3A2818', bg2: '#1F140C', gold: '#C9A876', goldDim: '#8B7355', cream: '#E8D8B8', ink: '#1F140C' };
   const [editing, setEditing] = useState(null);
@@ -1527,6 +1542,13 @@ function PesoPage({ theme, loaded, weights, goal, updWeights, updGoal, meals, up
             <div style={{textAlign:'center',marginTop:18}}>
               <button onClick={openStats} style={{background:'transparent',color:Q.gold,border:`1px solid ${Q.gold}66`,fontFamily:fCinzel,fontSize:10,letterSpacing:'0.35em',padding:'10px 18px',cursor:'pointer',textTransform:'uppercase'}}>
                 ✦ STATISTICHE COMPLETE
+              </button>
+            </div>
+          )}
+          {openAppleHealth && (
+            <div style={{textAlign:'center',marginTop:10}}>
+              <button onClick={openAppleHealth} style={{background:'transparent',color:Q.goldDim,border:`1px solid ${Q.gold}33`,fontFamily:fCinzel,fontSize:9,letterSpacing:'0.3em',padding:'8px 16px',cursor:'pointer',textTransform:'uppercase'}}>
+                ☆ importa da apple health
               </button>
             </div>
           )}
