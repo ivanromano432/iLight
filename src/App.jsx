@@ -476,6 +476,7 @@ function buildWeightLossSummary({ weights, goal, meals, workouts, workoutTypes, 
 }
 
 const PAGES = [
+  { id:'oggi', label:'oggi', roman:'✦' },
   { id:'peso', label:'peso', roman:'I' },
   { id:'diario', label:'diario', roman:'II' },
   { id:'pasti', label:'pasti', roman:'III' },
@@ -942,6 +943,7 @@ export default function App({ user, onLogout }){
     <div style={{minHeight:'100vh', background:'#000', position:'relative'}}>
       <div style={{paddingBottom:76}}>
         {(() => { const __theme = getTheme(profile?.theme); return (<>
+        {page==='oggi' && <OggiPage theme={__theme} loaded={loaded} profile={profile} weights={weights} goal={goal} meals={meals} notes={foodNotes} water={waterByDay} waterGoal={waterGoal} workouts={workouts} sleeps={sleeps} fasts={fasts} supps={supplements} taken={suppTaken} updWater={updWater} setPage={setPageIdx} />}
         {page==='peso' && <PesoPage theme={__theme} loaded={loaded} weights={weights} goal={goal} updWeights={updWeights} updGoal={updGoal} meals={meals} updMeals={updMeals} openStats={() => setShowStats(true)} profile={profile} openSub={() => setShowSub(true)} />}
         {page==='diario' && <DiarioPage theme={__theme} loaded={loaded} notes={foodNotes} water={waterByDay} waterGoal={waterGoal} updNotes={updFoodNotes} updWater={updWater} updWaterGoal={updWaterGoal} meals={meals} updMeals={updMeals} supps={supplements} taken={suppTaken} updSupps={updSupps} updTaken={updTaken} sleeps={sleeps} updSleeps={updSleeps} />}
         {page==='pasti' && <PastiPage user={user} theme={__theme} loaded={loaded} meals={meals} updMeals={updMeals} notes={foodNotes} weights={weights} goal={goal} />}
@@ -989,6 +991,245 @@ function buildLineChart(values, chartW, chartH){
   return { path, area, points };
 }
 
+function OggiPage({ theme, loaded, profile, weights, goal, meals, notes, water, waterGoal, workouts, sleeps, fasts, supps, taken, updWater, setPage }){
+  const Q = theme || { bg1: '#3A2818', bg2: '#1F140C', gold: '#C9A876', goldDim: '#8B7355', cream: '#E8D8B8', ink: '#1F140C' };
+  const now = new Date();
+  const todayKey = dayKey(now);
+  const h = now.getHours();
+
+  // Saluto dinamico
+  const greet = h < 6 ? 'Buonanotte' : h < 12 ? 'Buongiorno' : h < 18 ? 'Buon pomeriggio' : h < 22 ? 'Buonasera' : 'Buonanotte';
+  const firstName = (profile?.display_name || '').split(' ')[0] || '';
+
+  // Data formattata
+  const dataOggi = now.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' });
+
+  // Dati di oggi
+  const todayWeights = (weights || []).filter(w => sameDay(new Date(w.ts), now));
+  const lastWeight = todayWeights[todayWeights.length - 1];
+  const todayMeals = (meals || []).filter(m => sameDay(new Date(m.ts), now) && m.status !== 'planned');
+  const todayKcal = todayMeals.reduce((a, m) => a + (m.kcal || 0), 0);
+  const todayNotes = (notes || []).filter(n => sameDay(new Date(n.ts), now));
+  const todayWater = water?.[todayKey] || 0;
+  const todayWorkouts = (workouts || []).filter(w => sameDay(new Date(w.ts), now));
+  const lastNight = (sleeps || []).find(s => s.wakeDate === todayKey);
+  const activeFast = (fasts || []).find(f => !f.end_ts);
+  const todayTaken = (taken?.[todayKey] || []).length;
+  const totalSupps = (supps || []).length;
+
+  // BMI / progresso peso
+  const heightM = profile?.height_cm ? profile.height_cm / 100 : null;
+  const bmi = lastWeight && heightM ? lastWeight.weight / (heightM * heightM) : null;
+  const goalDistance = (lastWeight && goal) ? (lastWeight.weight - goal) : null;
+
+  // Card style
+  const card = (extra = {}) => ({
+    padding: '14px 16px',
+    background: `${Q.gold}0D`,
+    border: `1px solid ${Q.gold}33`,
+    borderRadius: 2,
+    ...extra,
+  });
+  const cardTitle = {
+    fontFamily: fCinzel,
+    fontSize: 9,
+    letterSpacing: '0.4em',
+    color: Q.gold,
+    textTransform: 'uppercase',
+    opacity: 0.9,
+  };
+  const cardValue = {
+    fontFamily: fGaramond,
+    fontStyle: 'italic',
+    fontSize: 22,
+    color: Q.gold,
+    marginTop: 2,
+  };
+  const cardSub = {
+    fontFamily: fGaramond,
+    fontStyle: 'italic',
+    fontSize: 13,
+    color: Q.cream,
+    opacity: 0.7,
+    marginTop: 2,
+  };
+  const miniBtn = {
+    background: 'transparent',
+    color: Q.gold,
+    border: `1px solid ${Q.gold}66`,
+    fontFamily: fCinzel,
+    fontSize: 9,
+    letterSpacing: '0.25em',
+    padding: '6px 12px',
+    cursor: 'pointer',
+    textTransform: 'uppercase',
+    borderRadius: 0,
+  };
+
+  // Vai a una pagina by id
+  function go(pageId) {
+    const idx = PAGES.findIndex(p => p.id === pageId);
+    if (idx >= 0) setPage(idx);
+  }
+
+  return (
+    <div style={{ minHeight: '100vh', background: `radial-gradient(ellipse at top, ${Q.bg1} 0%, ${Q.bg2} 100%)`, color: Q.cream, fontFamily: fGaramond, position: 'relative', overflow: 'hidden' }}>
+      <div aria-hidden style={{ position: 'absolute', inset: 14, border: `1px solid ${Q.gold}40`, borderRadius: 20, pointerEvents: 'none', zIndex: 1 }} />
+      <div aria-hidden style={{ position: 'absolute', inset: 20, border: `1px solid ${Q.gold}1A`, borderRadius: 16, pointerEvents: 'none', zIndex: 1 }} />
+      <div style={{ position: 'relative', zIndex: 2, padding: '32px 24px 28px', maxWidth: 480, margin: '0 auto' }}>
+
+        {/* Saluto */}
+        <div style={{ textAlign: 'center', marginBottom: 28 }}>
+          <div style={{ fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.45em', color: Q.gold, opacity: 0.7, textTransform: 'uppercase', marginBottom: 8 }}>
+            ✦ OGGI ✦
+          </div>
+          <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 28, color: Q.gold, lineHeight: 1.2 }}>
+            {greet}{firstName ? `, ${firstName}` : ''}
+          </div>
+          <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 13, color: Q.cream, opacity: 0.65, marginTop: 4 }}>
+            {dataOggi}
+          </div>
+        </div>
+
+        {!loaded && <Loading color={Q.goldDim || Q.gold} />}
+
+        {loaded && (<>
+
+          {/* Peso */}
+          <div style={card({ marginBottom: 10 })}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div style={{ flex: 1 }}>
+                <div style={cardTitle}>I · peso</div>
+                {lastWeight ? (
+                  <>
+                    <div style={cardValue}>{fmt(lastWeight.weight)} <span style={{ fontSize: 11, color: Q.goldDim || Q.gold, opacity: 0.7, fontFamily: fCinzel, letterSpacing: '0.2em', fontStyle: 'normal' }}>KG</span></div>
+                    <div style={cardSub}>
+                      {bmi ? `BMI ${bmi.toFixed(1)}` : ''}
+                      {bmi && goalDistance != null ? ' · ' : ''}
+                      {goalDistance != null ? (goalDistance > 0 ? `${fmt(goalDistance)} kg dall'obiettivo` : 'sei al peso obiettivo ✓') : ''}
+                    </div>
+                  </>
+                ) : (
+                  <div style={cardSub}>non hai ancora pesato oggi</div>
+                )}
+              </div>
+              <button onClick={() => go('peso')} style={miniBtn}>{lastWeight ? 'vedi' : '+ pesa'}</button>
+            </div>
+          </div>
+
+          {/* Pasti */}
+          <div style={card({ marginBottom: 10 })}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div style={{ flex: 1 }}>
+                <div style={cardTitle}>III · pasti</div>
+                <div style={cardValue}>{todayMeals.length} <span style={{ fontSize: 11, color: Q.goldDim || Q.gold, opacity: 0.7, fontFamily: fCinzel, letterSpacing: '0.2em', fontStyle: 'normal' }}>{todayMeals.length === 1 ? 'PASTO' : 'PASTI'}</span></div>
+                <div style={cardSub}>
+                  {todayKcal > 0 ? `${fmt0(todayKcal)} kcal totali` : 'nessun pasto registrato oggi'}
+                </div>
+              </div>
+              <button onClick={() => go('pasti')} style={miniBtn}>+ pasto</button>
+            </div>
+          </div>
+
+          {/* Diario */}
+          <div style={card({ marginBottom: 10 })}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div style={{ flex: 1 }}>
+                <div style={cardTitle}>II · diario</div>
+                <div style={cardValue}>{todayNotes.length} <span style={{ fontSize: 11, color: Q.goldDim || Q.gold, opacity: 0.7, fontFamily: fCinzel, letterSpacing: '0.2em', fontStyle: 'normal' }}>{todayNotes.length === 1 ? 'VOCE' : 'VOCI'}</span></div>
+                <div style={cardSub}>
+                  {todayNotes.length === 0 ? 'scrivi come va la giornata, l\'IA fa il resto' : `${todayWater > 0 || lastNight ? 'già usato per estrarre dati' : 'tocca per analizzare'}`}
+                </div>
+              </div>
+              <button onClick={() => go('diario')} style={miniBtn}>+ scrivi</button>
+            </div>
+          </div>
+
+          {/* Acqua + Sonno + Allenamento (riga compatta a 3 colonne) */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 10 }}>
+            <button onClick={async () => { await updWater({ ...water, [todayKey]: Math.min(20, todayWater + 1) }); }}
+              style={{ ...card({}), textAlign: 'left', cursor: 'pointer', borderRadius: 2 }}>
+              <div style={cardTitle}>acqua</div>
+              <div style={{ ...cardValue, fontSize: 18 }}>{todayWater}<span style={{ fontSize: 11, color: Q.goldDim || Q.gold, opacity: 0.7, fontFamily: fGaramond, fontStyle: 'italic' }}>/{waterGoal}</span></div>
+              <div style={{ ...cardSub, fontSize: 11 }}>tap per +1</div>
+            </button>
+            <div style={card({})}>
+              <div style={cardTitle}>sonno</div>
+              <div style={{ ...cardValue, fontSize: 18 }}>{lastNight ? fmtDur(durHours(lastNight.bedtime, lastNight.waketime)) : '—'}</div>
+              <div style={{ ...cardSub, fontSize: 11 }}>{lastNight ? `qualità ${lastNight.quality}/5` : 'notte non registrata'}</div>
+            </div>
+            <div style={card({})}>
+              <div style={cardTitle}>corpo</div>
+              <div style={{ ...cardValue, fontSize: 18 }}>{todayWorkouts.length}</div>
+              <div style={{ ...cardSub, fontSize: 11 }}>{todayWorkouts.length > 0 ? 'sessioni oggi' : 'niente ancora'}</div>
+            </div>
+          </div>
+
+          {/* Digiuno attivo (solo se c'è) */}
+          {activeFast && (() => {
+            const startTs = new Date(activeFast.start_ts);
+            const elapsedH = (now.getTime() - startTs.getTime()) / 3600000;
+            const targetH = activeFast.target_h || null;
+            const pct = targetH ? Math.min(100, (elapsedH / targetH) * 100) : null;
+            return (
+              <div style={card({ marginBottom: 10, background: `${Q.gold}1A` })}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={cardTitle}>IV · digiuno in corso</div>
+                    <div style={cardValue}>{elapsedH.toFixed(1)}h{targetH ? ` / ${targetH}h` : ''}</div>
+                    {pct != null && <div style={cardSub}>{pct.toFixed(0)}% completato</div>}
+                  </div>
+                  <button onClick={() => go('digiuno')} style={miniBtn}>vedi</button>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Integratori (solo se ne ha definiti) */}
+          {totalSupps > 0 && (
+            <div style={card({ marginBottom: 10 })}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div style={{ flex: 1 }}>
+                  <div style={cardTitle}>VI · rituale</div>
+                  <div style={cardValue}>{todayTaken} / {totalSupps}</div>
+                  <div style={cardSub}>integratori di oggi</div>
+                </div>
+                <button onClick={() => go('integra')} style={miniBtn}>aggiorna</button>
+              </div>
+            </div>
+          )}
+
+          {/* Riepilogo sera (link veloce) */}
+          <div style={{ marginTop: 22, textAlign: 'center' }}>
+            <button onClick={() => go('sera')} style={{ ...miniBtn, padding: '10px 20px', fontSize: 10 }}>
+              ✦ riepilogo della giornata
+            </button>
+          </div>
+
+          {/* Frase motivazionale */}
+          <div style={{ marginTop: 26, textAlign: 'center', fontFamily: fGaramond, fontStyle: 'italic', fontSize: 13, color: Q.cream, opacity: 0.55, lineHeight: 1.5, padding: '0 16px' }}>
+            {(() => {
+              if (todayMeals.length === 0 && !lastWeight && todayNotes.length === 0) {
+                return 'Una piccola pesata, una nota o un bicchiere d\'acqua: basta poco per cominciare.';
+              }
+              if (goalDistance != null && Math.abs(goalDistance) < 1) {
+                return 'Sei a un soffio dall\'obiettivo. Costanza, non fretta.';
+              }
+              if (todayNotes.length >= 3) {
+                return 'Stai scrivendo molto, è una buona giornata.';
+              }
+              if (todayWater >= waterGoal) {
+                return 'Acqua a posto. Il corpo te ne sarà grato.';
+              }
+              return 'Una cosa per volta. Niente conteggi ossessivi, solo cura.';
+            })()}
+          </div>
+
+        </>)}
+      </div>
+    </div>
+  );
+}
 function PesoPage({ theme, loaded, weights, goal, updWeights, updGoal, meals, updMeals, openStats, profile, openSub }){
   // Tema dinamico: shadowing del Q globale del modulo per usare il tema attivo
   const Q = theme || { bg1: '#3A2818', bg2: '#1F140C', gold: '#C9A876', goldDim: '#8B7355', cream: '#E8D8B8', ink: '#1F140C' };
