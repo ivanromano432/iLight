@@ -89,10 +89,10 @@ export function makeRepo(tableName, columns, orderBy = 'ts') {
 // diary_notes: app usa { id, text, ts } → DB usa stessi nomi
 export const diaryRepo = makeRepo('diary_notes', ['text', 'ts']);
 
-// meals: app e DB usano stesso schema { id, ts, type, description, qty_g, kcal, p, c, g, photo, status }
-// Nota: photo può essere base64 (anche pesanti, ~100-500KB)
+// meals: app e DB usano stesso schema { id, ts, type, description, qty_g, kcal, p, c, g, photo, photo_url, status }
+// Nota: photo (base64) sta venendo gradualmente sostituito da photo_url (URL Supabase Storage)
 export const mealsRepo = makeRepo('meals',
-  ['ts', 'type', 'description', 'qty_g', 'kcal', 'p', 'c', 'g', 'photo', 'status']
+  ['ts', 'type', 'description', 'qty_g', 'kcal', 'p', 'c', 'g', 'photo', 'photo_url', 'status']
 );
 
 // workout_types: app usa { id, name, unit } → DB stessi nomi

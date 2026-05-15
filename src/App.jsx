@@ -10,6 +10,7 @@ import Onboarding, { hasSeenOnboarding } from './Onboarding.jsx';
 import GuidaPage from './GuidaPage.jsx';
 import ProfilePage from './ProfilePage.jsx';
 import LayoutPage from './LayoutPage.jsx';
+import { uploadMealPhoto as uploadMealPhotoToStorage, deleteMealPhoto as deleteMealPhotoFromStorage } from './photoStorage.js';
 import { getTheme } from './themes.js';
 import { supabase } from './supabase.js';
 
@@ -508,6 +509,30 @@ export default function App({ user, onLogout }){
     const wgn = profile?.water_goal ?? (wag?parseInt(wag):null); setWaterGoal(wgn&&!isNaN(wgn)?wgn:8);
     setMeals(mealsFromDb);
     setWorkouts(workoutsFromDb);
+    // Migrazione lazy: foto base64 nel DB → Supabase Storage (in background, non blocca UI)
+    (async () => {
+      const toMigrate = mealsFromDb.filter(m => m.photo && !m.photo_url);
+      if (toMigrate.length === 0) return;
+      console.log(`[migrazione foto] ${toMigrate.length} pasti da migrare a Storage`);
+      const updated = [...mealsFromDb];
+      let migratedCount = 0;
+      for (const meal of toMigrate) {
+        try {
+          const url = await uploadMealPhotoToStorage(user.id, meal.id, meal.photo);
+          const idx = updated.findIndex(m => m.id === meal.id);
+          if (idx >= 0) updated[idx] = { ...updated[idx], photo_url: url, photo: null };
+          // Persist immediatamente: UPDATE photo_url e clear photo per questo pasto
+          await mealsRepo.sync(user.id, [meal], [{...meal, photo_url: url, photo: null}]);
+          migratedCount++;
+        } catch (err) {
+          console.warn('[migrazione foto] fallita per meal', meal.id, err);
+        }
+      }
+      if (migratedCount > 0) {
+        console.log(`[migrazione foto] migrate ${migratedCount}/${toMigrate.length}`);
+        setMeals(updated);
+      }
+    })();
     // Se workout_types vuoto, seed dei default con UUID veri (DEF_TYPES ha id testuali → no UUID)
     let workoutTypesToUse = workoutTypesFromDb;
     if (workoutTypesFromDb.length === 0) {
@@ -817,7 +842,7 @@ export default function App({ user, onLogout }){
         {(() => { const __theme = getTheme(profile?.theme); return (<>
         {page==='peso' && <PesoPage theme={__theme} loaded={loaded} weights={weights} goal={goal} updWeights={updWeights} updGoal={updGoal} meals={meals} updMeals={updMeals} openStats={() => setShowStats(true)} profile={profile} openSub={() => setShowSub(true)} />}
         {page==='diario' && <DiarioPage theme={__theme} loaded={loaded} notes={foodNotes} water={waterByDay} waterGoal={waterGoal} updNotes={updFoodNotes} updWater={updWater} updWaterGoal={updWaterGoal} meals={meals} updMeals={updMeals} supps={supplements} taken={suppTaken} updSupps={updSupps} updTaken={updTaken} sleeps={sleeps} updSleeps={updSleeps} />}
-        {page==='pasti' && <PastiPage theme={__theme} loaded={loaded} meals={meals} updMeals={updMeals} notes={foodNotes} weights={weights} goal={goal} />}
+        {page==='pasti' && <PastiPage user={user} theme={__theme} loaded={loaded} meals={meals} updMeals={updMeals} notes={foodNotes} weights={weights} goal={goal} />}
         {page==='allena' && <AllenaPage theme={__theme} loaded={loaded} workouts={workouts} types={workoutTypes} updWorkouts={updWorkouts} updTypes={updWorkoutTypes} />}
         {page==='integra' && <IntegraPage theme={__theme} loaded={loaded} supps={supplements} taken={suppTaken} updSupps={updSupps} updTaken={updTaken} />}
         {page==='digiuno' && <DigiunoPage theme={__theme} loaded={loaded} fasts={fasts} updFasts={updFasts} />}
@@ -876,7 +901,7 @@ function PesoPage({ theme, loaded, weights, goal, updWeights, updGoal, meals, up
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const photoFileRef = useRef(null);
 
-  const mealsWithPhotos = useMemo(()=>(meals||[]).filter(m=>m.photo).sort((a,b)=>new Date(b.ts)-new Date(a.ts)),[meals]);
+  const mealsWithPhotos = useMemo(()=>(meals||[]).filter(m=>m.photo||m.photo_url).sort((a,b)=>new Date(b.ts)-new Date(a.ts)),[meals]);
 
   async function uploadMealPhoto(e){
     const file = e.target.files?.[0]; if(!file) return;
@@ -892,7 +917,15 @@ function PesoPage({ theme, loaded, weights, goal, updWeights, updGoal, meals, up
       else if (h < 17) type = 'merenda';
       else if (h < 21) type = 'cena';
       else type = 'spuntino_s';
-      await updMeals([...(meals||[]),{id:newId(),ts:now.toISOString(),type,description:'',qty_g:null,kcal:null,p:null,c:null,g:null,photo:b64,status:'eaten'}]);
+      const mealId = newId();
+      // Upload su Supabase Storage, salva solo URL nel DB (no base64)
+      let photoUrl = null;
+      const userId = profile?.id;
+      if (userId) {
+        try { photoUrl = await uploadMealPhotoToStorage(userId, mealId, b64); }
+        catch (err) { console.warn('[meal photo] upload Storage fallito, fallback base64', err); }
+      }
+      await updMeals([...(meals||[]),{id:mealId,ts:now.toISOString(),type,description:'',qty_g:null,kcal:null,p:null,c:null,g:null,photo:photoUrl?null:b64,photo_url:photoUrl,status:'eaten'}]);
     } catch(_){}
     finally { setUploadingPhoto(false); }
     e.target.value = '';
@@ -1195,37 +1228,88 @@ function PesoPage({ theme, loaded, weights, goal, updWeights, updGoal, meals, up
             <button onClick={openNew} style={btnSolid(Q.gold,Q.ink)}>+ REGISTRA PESO</button>
           </div>
 
-          {/* Diario fotografico dei pasti */}
+          {/* Diario fotografico dei pasti — raggruppato per data, ultimi 30 giorni */}
           <div style={{marginTop:28,paddingTop:18,borderTop:`1px solid ${Q.gold}33`}}>
             <div style={{textAlign:'center',marginBottom:14}}>
               <div style={{fontFamily:fCinzel,fontSize:10,letterSpacing:'0.4em',color:Q.gold,textTransform:'uppercase',marginBottom:4}}>✦ DIARIO FOTOGRAFICO</div>
               <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:12,color:Q.goldDim}}>{mealsWithPhotos.length>0?'i pasti che hai immortalato · tocca per ingrandire':'aggiungi foto dei tuoi pasti, anche senza dettagli'}</div>
             </div>
             <input ref={photoFileRef} type="file" accept="image/*" onChange={uploadMealPhoto} style={{display:'none'}} />
-            <div style={{display:'grid',gridTemplateColumns:'repeat(4, 1fr)',gap:6}}>
-              {/* Tile "+ aggiungi foto" */}
+
+            {/* Tile aggiungi foto sempre visibile in alto */}
+            <div style={{display:'grid',gridTemplateColumns:'repeat(4, 1fr)',gap:6,marginBottom:18}}>
               <button onClick={()=>photoFileRef.current?.click()} disabled={uploadingPhoto} style={{aspectRatio:'1',padding:0,border:`1px dashed ${Q.gold}66`,background:`${Q.gold}0D`,cursor:uploadingPhoto?'default':'pointer',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',color:Q.gold,fontFamily:fGaramond,fontStyle:'italic',fontSize:11,borderRadius:2,opacity:uploadingPhoto?0.5:1}}>
                 {uploadingPhoto ? '⋯' : (<><span style={{fontSize:24,lineHeight:1,marginBottom:2}}>+</span><span style={{fontSize:9,letterSpacing:'0.15em',textTransform:'uppercase',fontFamily:fCinzel,fontStyle:'normal'}}>foto</span></>)}
               </button>
-              {(showAllPhotos ? mealsWithPhotos : mealsWithPhotos.slice(0,15)).map(m=>(
-                <button key={m.id} onClick={()=>setPhotoView(m)} style={{aspectRatio:'1',padding:0,border:`1px solid ${Q.gold}33`,background:'transparent',cursor:'pointer',position:'relative',overflow:'hidden',borderRadius:2}}>
-                  <img src={m.photo} alt="" style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}} />
-                </button>
-              ))}
             </div>
-            {mealsWithPhotos.length > 15 && !showAllPhotos && (
-              <div style={{textAlign:'center',marginTop:10}}>
-                <button onClick={()=>setShowAllPhotos(true)} style={{background:'transparent',border:'none',color:Q.goldDim,fontFamily:fGaramond,fontStyle:'italic',fontSize:13,cursor:'pointer'}}>vedi altre {mealsWithPhotos.length-15} ›</button>
-              </div>
-            )}
-            {showAllPhotos && mealsWithPhotos.length > 15 && (
-              <div style={{textAlign:'center',marginTop:10}}>
-                <button onClick={()=>setShowAllPhotos(false)} style={{background:'transparent',border:'none',color:Q.goldDim,fontFamily:fGaramond,fontStyle:'italic',fontSize:13,cursor:'pointer'}}>mostra meno ‹</button>
-              </div>
-            )}
-            {mealsWithPhotos.length === 0 && (
-              <div style={{textAlign:'center',marginTop:10,fontFamily:fGaramond,fontStyle:'italic',fontSize:12,color:Q.goldDim,opacity:0.7}}>Le foto del Refettorio compariranno anche qui</div>
-            )}
+
+            {(() => {
+              if (mealsWithPhotos.length === 0) return (
+                <div style={{textAlign:'center',marginTop:10,fontFamily:fGaramond,fontStyle:'italic',fontSize:12,color:Q.goldDim,opacity:0.7}}>Le foto del Refettorio compariranno qui</div>
+              );
+              const now = new Date();
+              const todayKey = dayKey(now);
+              const yesterday = new Date(now); yesterday.setDate(yesterday.getDate()-1);
+              const yesterdayKey = dayKey(yesterday);
+              const weekAgo = now.getTime() - 7*86400000;
+              const monthAgo = now.getTime() - 30*86400000;
+
+              const groups = { today: [], yesterday: [], thisWeek: [], thisMonth: [], older: [] };
+              for (const m of mealsWithPhotos) {
+                const ts = new Date(m.ts).getTime();
+                const dk = dayKey(new Date(m.ts));
+                if (dk === todayKey) groups.today.push(m);
+                else if (dk === yesterdayKey) groups.yesterday.push(m);
+                else if (ts > weekAgo) groups.thisWeek.push(m);
+                else if (ts > monthAgo) groups.thisMonth.push(m);
+                else groups.older.push(m);
+              }
+
+              const recentGroups = [
+                { key:'today', label:'OGGI', items: groups.today },
+                { key:'yesterday', label:'IERI', items: groups.yesterday },
+                { key:'thisWeek', label:'QUESTA SETTIMANA', items: groups.thisWeek },
+                { key:'thisMonth', label:'QUESTO MESE', items: groups.thisMonth },
+              ].filter(g => g.items.length > 0);
+
+              const renderGrid = (items) => (
+                <div style={{display:'grid',gridTemplateColumns:'repeat(4, 1fr)',gap:6}}>
+                  {items.map(m=>(
+                    <button key={m.id} onClick={()=>setPhotoView(m)} style={{aspectRatio:'1',padding:0,border:`1px solid ${Q.gold}33`,background:'transparent',cursor:'pointer',position:'relative',overflow:'hidden',borderRadius:2}}>
+                      <img src={m.photo_url || m.photo} alt="" style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}} loading="lazy" />
+                    </button>
+                  ))}
+                </div>
+              );
+
+              return (<>
+                {recentGroups.map(g => (
+                  <div key={g.key} style={{marginBottom:18}}>
+                    <div style={{fontFamily:fCinzel,fontSize:9,letterSpacing:'0.4em',color:Q.goldDim,textTransform:'uppercase',marginBottom:8}}>{g.label} · <span style={{color:Q.gold}}>{g.items.length}</span></div>
+                    {renderGrid(g.items)}
+                  </div>
+                ))}
+                {groups.older.length > 0 && (
+                  <div style={{marginTop:8}}>
+                    {!showAllPhotos ? (
+                      <div style={{textAlign:'center',padding:'10px 0'}}>
+                        <button onClick={()=>setShowAllPhotos(true)} style={{background:'transparent',border:`1px solid ${Q.gold}55`,color:Q.gold,fontFamily:fCinzel,fontSize:9,letterSpacing:'0.3em',padding:'8px 16px',cursor:'pointer',textTransform:'uppercase'}}>
+                          ✦ MOSTRA PIÙ VECCHIE ({groups.older.length})
+                        </button>
+                      </div>
+                    ) : (
+                      <div>
+                        <div style={{fontFamily:fCinzel,fontSize:9,letterSpacing:'0.4em',color:Q.goldDim,textTransform:'uppercase',marginBottom:8}}>PIÙ VECCHIE · <span style={{color:Q.gold}}>{groups.older.length}</span></div>
+                        {renderGrid(groups.older)}
+                        <div style={{textAlign:'center',marginTop:10}}>
+                          <button onClick={()=>setShowAllPhotos(false)} style={{background:'transparent',border:'none',color:Q.goldDim,fontFamily:fGaramond,fontStyle:'italic',fontSize:12,cursor:'pointer'}}>nascondi più vecchie ‹</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>);
+            })()}
           </div>
         </>)}
       </div>
@@ -1234,7 +1318,7 @@ function PesoPage({ theme, loaded, weights, goal, updWeights, updGoal, meals, up
       {photoView && (
         <div onClick={()=>setPhotoView(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.92)',zIndex:210,display:'flex',alignItems:'center',justifyContent:'center',padding:20,cursor:'pointer'}}>
           <div onClick={e=>e.stopPropagation()} style={{maxWidth:420,width:'100%',cursor:'default'}}>
-            <img src={photoView.photo} alt="" style={{width:'100%',maxHeight:'62vh',objectFit:'contain',borderRadius:4,border:`1px solid ${Q.gold}44`}} />
+            <img src={photoView.photo_url || photoView.photo} alt="" style={{width:'100%',maxHeight:'62vh',objectFit:'contain',borderRadius:4,border:`1px solid ${Q.gold}44`}} />
             <div style={{marginTop:14,textAlign:'center'}}>
               <div style={{fontFamily:fCinzel,fontSize:9,letterSpacing:'0.4em',color:Q.gold,textTransform:'uppercase'}}>
                 {MEAL_TYPES.find(t=>t.id===photoView.type)?.name || photoView.type} · {new Date(photoView.ts).toLocaleDateString('it-IT',{day:'numeric',month:'short'})} · {new Date(photoView.ts).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})}
@@ -1534,7 +1618,7 @@ function ToggleRow({ children, checked, onToggle, ink }){
   );
 }
 
-function PastiPage({ theme, loaded, meals, updMeals, notes, weights, goal }){
+function PastiPage({ user, theme, loaded, meals, updMeals, notes, weights, goal }){
   // Tema dinamico: shadowing del J globale del modulo
   const J = theme || { bg: '#E5E3D5', dark: '#2D3A2E', sage: '#5C6B4E', light: '#8FA288' };
   const [selectedDay, setSelectedDay] = useState(dayKey(new Date()));
@@ -1641,16 +1725,56 @@ function PastiPage({ theme, loaded, meals, updMeals, notes, weights, goal }){
   const plannedTotalKcal = useMemo(()=>plannedMeals.reduce((a,m)=>a+(m.kcal||0),0),[plannedMeals]);
 
   async function saveMeal(meal){
+    // Gestione foto: se c'è una nuova foto base64, uploadla su Storage
+    let finalMeal = { ...meal };
+    const mealId = editing === 'new' ? newId() : editing;
+
+    if (meal.photo && user?.id) {
+      // Nuova foto base64 → upload su Storage
+      try {
+        const url = await uploadMealPhotoToStorage(user.id, mealId, meal.photo);
+        finalMeal.photo_url = url;
+        finalMeal.photo = null; // non salvare base64 nel DB
+        delete finalMeal.photo_legacy;
+      } catch (err) {
+        console.warn('[saveMeal] upload Storage fallito, fallback base64', err);
+        // Lascia photo come base64 nel DB come fallback
+      }
+    } else if (meal.photo_legacy && user?.id) {
+      // Migrazione: il pasto esistente aveva una foto base64, proviamo a migrare
+      try {
+        const url = await uploadMealPhotoToStorage(user.id, mealId, meal.photo_legacy);
+        finalMeal.photo_url = url;
+        finalMeal.photo = null;
+        delete finalMeal.photo_legacy;
+      } catch (_) {
+        finalMeal.photo = meal.photo_legacy;
+        delete finalMeal.photo_legacy;
+      }
+    } else {
+      // Nessuna nuova foto: rispetta photo_url esistente, e cancella base64 legacy
+      delete finalMeal.photo_legacy;
+      if (!finalMeal.photo_url) finalMeal.photo = null;
+    }
+
     if(editing==='new'){
       const ts = selectedDay===dayKey(new Date()) ? new Date() : (()=>{const d=parseDayKey(selectedDay); d.setHours(12,0); return d;})();
       const defaultStatus = activeTab==='menu' ? 'planned' : 'eaten';
-      await updMeals([...meals,{id:newId(),ts:ts.toISOString(),status:defaultStatus,...meal}]);
+      await updMeals([...meals,{id:mealId,ts:ts.toISOString(),status:defaultStatus,...finalMeal}]);
     } else {
-      await updMeals(meals.map(m=>m.id===editing?{...m,...meal}:m));
+      await updMeals(meals.map(m=>m.id===editing?{...m,...finalMeal}:m));
     }
     setEditing(null);
   }
-  async function delMeal(){ await updMeals(meals.filter(m=>m.id!==editing)); setEditing(null); }
+  async function delMeal(){
+    // Cancella anche la foto da Storage se c'era
+    const meal = meals.find(m=>m.id===editing);
+    if (meal && (meal.photo_url || meal.photo) && user?.id) {
+      try { await deleteMealPhotoFromStorage(user.id, meal.id); } catch (_) {}
+    }
+    await updMeals(meals.filter(m=>m.id!==editing));
+    setEditing(null);
+  }
 
   const dateLabel = parseDayKey(selectedDay).toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long'});
   const editingMeal = editing && editing!=='new' ? meals.find(m=>m.id===editing) : null;
@@ -1704,7 +1828,7 @@ function PastiPage({ theme, loaded, meals, updMeals, notes, weights, goal }){
                       <div style={{padding:'10px 4px',fontFamily:fGaramond,fontStyle:'italic',fontSize:13,color:J.sage,opacity:0.55}}>—</div>
                     ) : mealsOfType.sort((a,b)=>new Date(a.ts)-new Date(b.ts)).map(m=>{const t=new Date(m.ts); return (
                       <button key={m.id} onClick={()=>setEditing(m.id)} style={{display:'flex',gap:12,alignItems:'flex-start',padding:'10px 0',borderBottom:`1px solid ${J.sage}22`,background:'transparent',border:'none',borderRadius:0,width:'100%',cursor:'pointer',textAlign:'left'}}>
-                        {m.photo ? <img src={m.photo} alt="" style={{width:52,height:52,objectFit:'cover',borderRadius:'50%',flexShrink:0,border:`2px solid ${J.sage}`}} /> : <div style={{width:52,height:52,borderRadius:'50%',background:`linear-gradient(135deg, ${J.light}, ${J.sage})`,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',color:J.bg,fontFamily:fMarcellus,fontSize:9,letterSpacing:'0.25em'}}>{type.abbr}</div>}
+                        {(m.photo_url||m.photo) ? <img src={m.photo_url||m.photo} alt="" loading="lazy" style={{width:52,height:52,objectFit:'cover',borderRadius:'50%',flexShrink:0,border:`2px solid ${J.sage}`}} /> : <div style={{width:52,height:52,borderRadius:'50%',background:`linear-gradient(135deg, ${J.light}, ${J.sage})`,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',color:J.bg,fontFamily:fMarcellus,fontSize:9,letterSpacing:'0.25em'}}>{type.abbr}</div>}
                         <div style={{flex:1,minWidth:0}}>
                           <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:15,color:J.dark,lineHeight:1.25}}>{m.description||'(senza descrizione)'}</div>
                           <div style={{fontFamily:fMarcellus,fontSize:9,letterSpacing:'0.2em',color:J.sage,marginTop:4,textTransform:'uppercase'}}>{t.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})}{m.qty_g?` · ${fmt0(m.qty_g)}g`:''} · {fmt0(m.kcal)} kcal · P {fmt0(m.p)} · C {fmt0(m.c)} · G {fmt0(m.g)}</div>
@@ -1861,21 +1985,59 @@ function MealModal({ existing, onClose, onSave, onDelete, J }){
   const [p, setP] = useState(existing?.p!=null ? String(existing.p) : '');
   const [c, setC] = useState(existing?.c!=null ? String(existing.c) : '');
   const [g, setG] = useState(existing?.g!=null ? String(existing.g) : '');
-  const [photo, setPhoto] = useState(existing?.photo || null);
+  // photo (base64) = nuova foto appena scelta; photoUrl = url Storage esistente
+  // se l'utente carica nuova foto, photo viene riempito e photoUrl ignorato
+  const [photo, setPhoto] = useState(null);
+  const [photoUrl, setPhotoUrl] = useState(existing?.photo_url || null);
+  const [legacyPhoto, setLegacyPhoto] = useState(existing?.photo_url ? null : (existing?.photo || null));
   const [busy, setBusy] = useState(false);
   const [estimating, setEstimating] = useState(false);
   const [estimateError, setEstimateError] = useState('');
   const [estimateNote, setEstimateNote] = useState('');
   const fileRef = useRef(null);
 
-  async function pickPhoto(e){ const file=e.target.files?.[0]; if(!file)return; setBusy(true); try{const b64=await resizeImage(file,480,0.7); setPhoto(b64);}catch(_){} finally{setBusy(false);} e.target.value=''; }
-  function save(){ onSave({ type, description:description.trim(), qty_g:parseNum(qty,1,5000), kcal:parseNum(kcal,0,10000), p:parseNum(p,0,1000), c:parseNum(c,0,1000), g:parseNum(g,0,1000), photo:photo||null }); }
+  // L'immagine da mostrare a schermo
+  const displayPhoto = photo || photoUrl || legacyPhoto;
+
+  async function pickPhoto(e){
+    const file=e.target.files?.[0]; if(!file)return;
+    setBusy(true);
+    try{
+      const b64=await resizeImage(file,480,0.7);
+      setPhoto(b64);
+      // L'utente sta sostituendo la foto: invalidiamo le precedenti
+      setPhotoUrl(null);
+      setLegacyPhoto(null);
+    } catch(_) {}
+    finally{setBusy(false);}
+    e.target.value='';
+  }
+
+  function removePhoto(){
+    setPhoto(null); setPhotoUrl(null); setLegacyPhoto(null);
+  }
+
+  function save(){
+    // Passa al parent: nuova foto base64 (se caricata), oppure URL esistente, oppure null
+    onSave({
+      type,
+      description:description.trim(),
+      qty_g:parseNum(qty,1,5000),
+      kcal:parseNum(kcal,0,10000),
+      p:parseNum(p,0,1000),
+      c:parseNum(c,0,1000),
+      g:parseNum(g,0,1000),
+      photo: photo || null,                  // base64 nuovo (da caricare)
+      photo_url: photo ? null : photoUrl,    // url esistente da preservare
+      photo_legacy: photo || photoUrl ? null : legacyPhoto,  // base64 legacy da migrare
+    });
+  }
 
   async function estimateNutrition(){
     setEstimateError(''); setEstimateNote(''); setEstimating(true);
     try {
       const qtyNum = qty ? parseNum(qty,1,5000) : null;
-      const r = await estimateMealNutrition({ description: description.trim(), qty_g: qtyNum, photo });
+      const r = await estimateMealNutrition({ description: description.trim(), qty_g: qtyNum, photo: photo || legacyPhoto });
       if (r.error) { setEstimateError(r.error); return; }
       if (r.kcal != null) setKcal(String(r.kcal));
       if (r.p != null) setP(String(r.p));
@@ -1887,21 +2049,21 @@ function MealModal({ existing, onClose, onSave, onDelete, J }){
     }
   }
 
-  const canEstimate = !estimating && (description.trim().length > 0 || !!photo);
+  const canEstimate = !estimating && (description.trim().length > 0 || !!displayPhoto);
 
   return (
     <SimpleModal onClose={onClose} bg={J.bg} border={J.dark} wide>
       <h2 style={{fontFamily:fMarcellus,fontSize:16,letterSpacing:'0.3em',color:J.dark,textAlign:'center',margin:0}}>{existing?'MODIFICA PASTO':'NUOVO PASTO'}</h2>
       <div style={{marginTop:16,textAlign:'center'}}>
         <input ref={fileRef} type="file" accept="image/*" onChange={pickPhoto} style={{display:'none'}} />
-        {photo ? (
+        {displayPhoto ? (
           <button onClick={()=>fileRef.current?.click()} style={{background:'transparent',border:'none',cursor:'pointer',padding:0}}>
-            <img src={photo} alt="" style={{width:100,height:100,objectFit:'cover',borderRadius:'50%',border:`2px solid ${J.sage}`}} />
+            <img src={displayPhoto} alt="" loading="lazy" style={{width:100,height:100,objectFit:'cover',borderRadius:'50%',border:`2px solid ${J.sage}`}} />
           </button>
         ) : (
           <button onClick={()=>fileRef.current?.click()} disabled={busy} style={{width:100,height:100,borderRadius:'50%',background:`${J.sage}1F`,border:`2px dashed ${J.sage}`,cursor:'pointer',fontFamily:fGaramond,fontStyle:'italic',fontSize:13,color:J.sage}}>{busy?'…':'+ foto'}</button>
         )}
-        {photo && <div><button onClick={()=>setPhoto(null)} style={{background:'transparent',border:'none',color:J.sage,fontFamily:fGaramond,fontStyle:'italic',fontSize:12,cursor:'pointer',marginTop:4}}>rimuovi foto</button></div>}
+        {displayPhoto && <div><button onClick={removePhoto} style={{background:'transparent',border:'none',color:J.sage,fontFamily:fGaramond,fontStyle:'italic',fontSize:12,cursor:'pointer',marginTop:4}}>rimuovi foto</button></div>}
       </div>
       <div style={{marginTop:18}}>
         <FieldLabel>tipo di pasto</FieldLabel>
