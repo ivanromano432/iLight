@@ -7,6 +7,7 @@ import {
 import StatistichePage from './Statistiche.jsx';
 import SubscriptionPage from './SubscriptionPage.jsx';
 import Onboarding, { hasSeenOnboarding, markOnboardingSeen } from './Onboarding.jsx';
+import ProfileSetup from './ProfileSetup.jsx';
 import GuidaPage from './GuidaPage.jsx';
 import ProfilePage from './ProfilePage.jsx';
 import LayoutPage from './LayoutPage.jsx';
@@ -511,6 +512,7 @@ export default function App({ user, onLogout }){
   const [showLayout, setShowLayout] = useState(false);
   const [showAccountMenu, setShowAccountMenu] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showProfileSetup, setShowProfileSetup] = useState(false);
   const [profile, setProfile] = useState(null);
   const [loaded, setLoaded] = useState(false);
   const [weights, setWeights] = useState([]);
@@ -619,14 +621,19 @@ export default function App({ user, onLogout }){
 
     // Mostra onboarding al primo accesso. Controllo sia il flag persistente
     // su Supabase (profile.onboarded) sia il fallback in localStorage.
-    // Se uno dei due è true, l'utente ha già visto l'onboarding.
+    // Dopo l'onboarding, se setup_completed=false, mostra ProfileSetup.
     const isOnboardedServer = !!profile?.onboarded;
     const isOnboardedLocal = hasSeenOnboarding(user.id);
+    const setupDone = !!profile?.setup_completed;
     if (!isOnboardedServer && !isOnboardedLocal) {
       setShowOnboarding(true);
-    } else if (isOnboardedServer && !isOnboardedLocal) {
-      // Allinea: scrivi anche in localStorage per il prossimo avvio (evita flash)
-      try { markOnboardingSeen(user.id); } catch (_) {}
+    } else {
+      if (isOnboardedServer && !isOnboardedLocal) {
+        try { markOnboardingSeen(user.id); } catch (_) {}
+      }
+      if (!setupDone) {
+        setShowProfileSetup(true);
+      }
     }
   })();},[user]);
 
@@ -794,7 +801,22 @@ export default function App({ user, onLogout }){
         userId={user?.id}
         profile={profile}
         updProfile={updProfile}
-        onDone={() => setShowOnboarding(false)}
+        onDone={() => {
+          setShowOnboarding(false);
+          // Dopo l'onboarding, se non è completato il setup, mostra il form
+          if (!profile?.setup_completed) setShowProfileSetup(true);
+        }}
+      />
+    );
+  }
+
+  if (showProfileSetup) {
+    return (
+      <ProfileSetup
+        profile={profile}
+        updProfile={updProfile}
+        onCreateWeight={async (w) => { await updWeights([...(weights||[]), w]); }}
+        onDone={() => setShowProfileSetup(false)}
       />
     );
   }
