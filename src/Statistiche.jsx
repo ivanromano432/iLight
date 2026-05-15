@@ -738,6 +738,116 @@ export default function StatistichePage({
 
         {stats && (
           <>
+            {/* Calendario del mese: a colpo d'occhio quali giorni hai registrato qualcosa */}
+            <Section title="CALENDARIO" sub="i giorni con almeno un dato registrato">
+              {(() => {
+                const today = new Date();
+                const monthLabel = today.toLocaleDateString('it-IT', { month: 'long', year: 'numeric' });
+                const year = today.getFullYear();
+                const month = today.getMonth();
+                const firstDay = new Date(year, month, 1);
+                const lastDay = new Date(year, month + 1, 0);
+                const daysInMonth = lastDay.getDate();
+                // Lunedi = 0, domenica = 6 (ISO settimana europea)
+                const firstDayOfWeek = (firstDay.getDay() + 6) % 7;
+
+                // Per ogni giorno del mese, calcola un "punteggio" di completezza
+                const dayDataMap = {};
+                const sameDayLocal = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+
+                for (let d = 1; d <= daysInMonth; d++) {
+                  const day = new Date(year, month, d);
+                  const dayKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                  const dayKeyAppFmt = `${year}-${month}-${d}`; // come il dayKey() dell'app
+
+                  const hasWeight = (weights || []).some(w => sameDayLocal(new Date(w.ts), day));
+                  const hasMeal = (meals || []).some(m => sameDayLocal(new Date(m.ts), day) && m.status !== 'planned');
+                  const hasNote = (diaryNotes || []).some(n => sameDayLocal(new Date(n.ts), day));
+                  const hasSleep = (sleeps || []).some(s => s.wakeDate === dayKeyAppFmt);
+                  const hasWorkout = (workouts || []).some(w => sameDayLocal(new Date(w.ts), day));
+                  const hasWater = (water?.[dayKeyAppFmt] || 0) > 0;
+                  const score = [hasWeight, hasMeal, hasNote, hasSleep, hasWorkout, hasWater].filter(Boolean).length;
+                  const isToday = sameDayLocal(today, day);
+                  const isFuture = day > today;
+                  dayDataMap[d] = { score, isToday, isFuture };
+                }
+
+                const totalActive = Object.values(dayDataMap).filter(d => d.score > 0 && !d.isFuture).length;
+                const totalPast = Object.values(dayDataMap).filter(d => !d.isFuture).length;
+
+                // Grid 7 colonne (lun-dom)
+                const cells = [];
+                // Padding iniziale per allineare il 1° del mese al giorno della settimana
+                for (let i = 0; i < firstDayOfWeek; i++) cells.push(null);
+                for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+                const dayLabels = ['L', 'M', 'M', 'G', 'V', 'S', 'D'];
+
+                const cellSize = 36;
+                return (
+                  <div>
+                    <div style={{ textAlign: 'center', fontFamily: fGaramond, fontStyle: 'italic', fontSize: 14, color: Q.gold || Q.cream, opacity: 0.85, marginBottom: 14, textTransform: 'capitalize' }}>
+                      {monthLabel}
+                    </div>
+
+                    {/* Header giorni settimana */}
+                    <div style={{ display: 'grid', gridTemplateColumns: `repeat(7, 1fr)`, gap: 4, marginBottom: 6 }}>
+                      {dayLabels.map((l, i) => (
+                        <div key={i} style={{ fontFamily: fCinzel, fontSize: 9, letterSpacing: '0.2em', color: Q.cream, opacity: 0.45, textAlign: 'center', textTransform: 'uppercase' }}>
+                          {l}
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Griglia giorni */}
+                    <div style={{ display: 'grid', gridTemplateColumns: `repeat(7, 1fr)`, gap: 4 }}>
+                      {cells.map((d, i) => {
+                        if (d == null) return <div key={`pad-${i}`} style={{ height: cellSize }} />;
+                        const info = dayDataMap[d];
+                        // Intensità dello score: 0..6 attività -> opacity tra 0.12 e 1.0
+                        const intensity = info.isFuture ? 0 : Math.min(1, info.score / 4);
+                        const bg = info.isFuture
+                          ? 'transparent'
+                          : info.score === 0
+                            ? `${Q.cream || '#E8D8B8'}11`
+                            : `${Q.gold || '#C9A876'}${Math.round(intensity * 255).toString(16).padStart(2, '0').toUpperCase()}`;
+                        return (
+                          <div key={d} style={{
+                            height: cellSize,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            background: bg,
+                            border: info.isToday ? `2px solid ${Q.gold || '#C9A876'}` : `1px solid ${Q.cream || '#E8D8B8'}15`,
+                            borderRadius: 2,
+                            fontFamily: fGaramond,
+                            fontStyle: info.isFuture ? 'italic' : 'normal',
+                            fontSize: 12,
+                            color: info.score >= 2 ? Q.ink || '#1F140C' : (info.isFuture ? Q.cream + '55' : Q.cream),
+                            opacity: info.isFuture ? 0.3 : 1,
+                            fontWeight: info.isToday ? 700 : 400,
+                          }}>
+                            {d}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Legenda */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 12, color: Q.cream, opacity: 0.7 }}>
+                      <span>{totalActive}/{totalPast} giorni con dati</span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ display: 'inline-block', width: 14, height: 14, background: `${Q.gold || '#C9A876'}33`, borderRadius: 2 }} />
+                        <span style={{ display: 'inline-block', width: 14, height: 14, background: `${Q.gold || '#C9A876'}88`, borderRadius: 2 }} />
+                        <span style={{ display: 'inline-block', width: 14, height: 14, background: `${Q.gold || '#C9A876'}FF`, borderRadius: 2 }} />
+                        <span style={{ fontSize: 10, letterSpacing: '0.15em', textTransform: 'uppercase', fontFamily: fCinzel, fontStyle: 'normal', opacity: 0.8 }}>poco → molto</span>
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
+            </Section>
+
             {/* Sezione 1: TREND PESO */}
             <Section title="TREND PESO" sub={periodObj?.label.toLowerCase() === 'sempre' ? 'da quando hai iniziato' : `ultimi ${periodObj.days} giorni`}>
               <div style={{ display: 'flex', justifyContent: 'space-around', marginBottom: 16 }}>
