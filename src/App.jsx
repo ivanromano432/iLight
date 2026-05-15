@@ -3090,15 +3090,15 @@ function SeraPage({ theme, loaded, weights, goal, notes, water, waterGoal, meals
 
         {loaded && (<>
           <div style={{marginTop:26,textAlign:'left'}}>
-            <Row label="sonno notte scorsa" value={lastNightDur!=null?fmtDur(lastNightDur):'—'} />
-            <Row label="peso · mattina" value={morning?fmt(morning.weight):'—'} unit="kg" />
-            <Row label="peso · sera" value={evening&&evening!==morning?fmt(evening.weight):'—'} unit="kg" />
-            <Row label="pasti registrati" value={todayMeals.length} />
-            <Row label="calorie" value={totalKcal>0?fmt0(totalKcal):'—'} unit="kcal" />
-            <Row label="voci diario" value={todayNotes.length} />
-            <Row label="acqua" value={todayWater} unit={`/ ${waterGoal}`} />
-            <Row label="allenamenti" value={todayWorkouts.length} />
-            <Row label="integratori" value={supps.length>0?`${suppsTakenToday} / ${supps.length}`:'—'} />
+            <Row theme={N} label="sonno notte scorsa" value={lastNightDur!=null?fmtDur(lastNightDur):'—'} />
+            <Row theme={N} label="peso · mattina" value={morning?fmt(morning.weight):'—'} unit="kg" />
+            <Row theme={N} label="peso · sera" value={evening&&evening!==morning?fmt(evening.weight):'—'} unit="kg" />
+            <Row theme={N} label="pasti registrati" value={todayMeals.length} />
+            <Row theme={N} label="calorie" value={totalKcal>0?fmt0(totalKcal):'—'} unit="kcal" />
+            <Row theme={N} label="voci diario" value={todayNotes.length} />
+            <Row theme={N} label="acqua" value={todayWater} unit={`/ ${waterGoal}`} />
+            <Row theme={N} label="allenamenti" value={todayWorkouts.length} />
+            <Row theme={N} label="integratori" value={supps.length>0?`${suppsTakenToday} / ${supps.length}`:'—'} />
           </div>
           <div style={{marginTop:22,padding:14,background:`${N.gold}0F`,border:`1px solid ${N.gold}33`,borderRadius:2,textAlign:'left'}}>
             <div style={{fontFamily:fFraunces,fontSize:9,letterSpacing:'0.4em',color:N.gold,textTransform:'uppercase'}}>⟡ riflessione</div>
@@ -3640,11 +3640,12 @@ function Totale({ label, value, unit, dark, sage, font, big }){
     </div>
   );
 }
-function Row({ label, value, unit }){
+function Row({ label, value, unit, theme }){
+  const T = theme || N;
   return (
-    <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',padding:'10px 0',borderBottom:`1px solid ${N.gold}1F`}}>
-      <span style={{fontFamily:fFraunces,fontStyle:'italic',fontSize:13,color:N.dim}}>{label}</span>
-      <span style={{fontFamily:fFraunces,fontWeight:300,fontSize:20,color:N.cream}}>{value}{unit && <span style={{fontSize:11,color:N.dim,marginLeft:4}}>{unit}</span>}</span>
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',padding:'10px 0',borderBottom:`1px solid ${T.gold}1F`}}>
+      <span style={{fontFamily:fFraunces,fontStyle:'italic',fontSize:13,color:T.dim||T.goldDim}}>{label}</span>
+      <span style={{fontFamily:fFraunces,fontWeight:400,fontSize:20,color:T.gold}}>{value}{unit && <span style={{fontSize:11,color:T.dim||T.goldDim,marginLeft:4,fontWeight:300}}>{unit}</span>}</span>
     </div>
   );
 }
