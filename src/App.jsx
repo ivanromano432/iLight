@@ -9,6 +9,7 @@ import SubscriptionPage from './SubscriptionPage.jsx';
 import Onboarding, { hasSeenOnboarding } from './Onboarding.jsx';
 import GuidaPage from './GuidaPage.jsx';
 import ProfilePage from './ProfilePage.jsx';
+import { getTheme } from './themes.js';
 import { supabase } from './supabase.js';
 
 const Q = { bg1: '#3A2818', bg2: '#1F140C', gold: '#C9A876', goldDim: '#8B7355', cream: '#E8D8B8', ink: '#1F140C' };
@@ -736,9 +737,11 @@ export default function App({ user, onLogout }){
   return (
     <div style={{minHeight:'100vh', background:'#000', position:'relative'}}>
       <div style={{paddingBottom:76}}>
-        {page==='peso' && <PesoPage loaded={loaded} weights={weights} goal={goal} updWeights={updWeights} updGoal={updGoal} meals={meals} updMeals={updMeals} openStats={() => setShowStats(true)} profile={profile} openSub={() => setShowSub(true)} />}
-        {page==='diario' && <DiarioPage loaded={loaded} notes={foodNotes} water={waterByDay} waterGoal={waterGoal} updNotes={updFoodNotes} updWater={updWater} updWaterGoal={updWaterGoal} meals={meals} updMeals={updMeals} supps={supplements} taken={suppTaken} updSupps={updSupps} updTaken={updTaken} sleeps={sleeps} updSleeps={updSleeps} />}
-        {page==='pasti' && <PastiPage loaded={loaded} meals={meals} updMeals={updMeals} notes={foodNotes} weights={weights} goal={goal} />}
+        {(() => { const __theme = getTheme(profile?.theme); return (<>
+        {page==='peso' && <PesoPage theme={__theme} loaded={loaded} weights={weights} goal={goal} updWeights={updWeights} updGoal={updGoal} meals={meals} updMeals={updMeals} openStats={() => setShowStats(true)} profile={profile} openSub={() => setShowSub(true)} />}
+        {page==='diario' && <DiarioPage theme={__theme} loaded={loaded} notes={foodNotes} water={waterByDay} waterGoal={waterGoal} updNotes={updFoodNotes} updWater={updWater} updWaterGoal={updWaterGoal} meals={meals} updMeals={updMeals} supps={supplements} taken={suppTaken} updSupps={updSupps} updTaken={updTaken} sleeps={sleeps} updSleeps={updSleeps} />}
+        {page==='pasti' && <PastiPage theme={__theme} loaded={loaded} meals={meals} updMeals={updMeals} notes={foodNotes} weights={weights} goal={goal} />}
+        </>); })()}
         {page==='allena' && <AllenaPage loaded={loaded} workouts={workouts} types={workoutTypes} updWorkouts={updWorkouts} updTypes={updWorkoutTypes} />}
         {page==='integra' && <IntegraPage loaded={loaded} supps={supplements} taken={suppTaken} updSupps={updSupps} updTaken={updTaken} />}
         {page==='digiuno' && <DigiunoPage loaded={loaded} fasts={fasts} updFasts={updFasts} />}
@@ -780,7 +783,9 @@ function buildLineChart(values, chartW, chartH){
   return { path, area, points };
 }
 
-function PesoPage({ loaded, weights, goal, updWeights, updGoal, meals, updMeals, openStats, profile, openSub }){
+function PesoPage({ theme, loaded, weights, goal, updWeights, updGoal, meals, updMeals, openStats, profile, openSub }){
+  // Tema dinamico: shadowing del Q globale del modulo per usare il tema attivo
+  const Q = theme || { bg1: '#3A2818', bg2: '#1F140C', gold: '#C9A876', goldDim: '#8B7355', cream: '#E8D8B8', ink: '#1F140C' };
   const [editing, setEditing] = useState(null);
   const [showGoal, setShowGoal] = useState(false);
   const [draft, setDraft] = useState({ w:'', bf:'', mu:'', wa:'' });
@@ -975,9 +980,9 @@ function PesoPage({ loaded, weights, goal, updWeights, updGoal, meals, updMeals,
           </div>
           {latest && (latest.bodyFat!=null||latest.muscle!=null||latest.water!=null) && (
             <div style={{display:'flex',justifyContent:'space-around',marginTop:14,padding:'10px 0',borderTop:`1px solid ${Q.gold}22`,borderBottom:`1px solid ${Q.gold}22`}}>
-              {latest.bodyFat!=null && <BodyStat label="grasso" value={`${fmt(latest.bodyFat,1)}%`} />}
-              {latest.muscle!=null && <BodyStat label="muscolo" value={`${fmt(latest.muscle,1)}%`} />}
-              {latest.water!=null && <BodyStat label="acqua" value={`${fmt(latest.water,1)}%`} />}
+              {latest.bodyFat!=null && <BodyStat label="grasso" value={`${fmt(latest.bodyFat,1)}%`} Q={Q} />}
+              {latest.muscle!=null && <BodyStat label="muscolo" value={`${fmt(latest.muscle,1)}%`} Q={Q} />}
+              {latest.water!=null && <BodyStat label="acqua" value={`${fmt(latest.water,1)}%`} Q={Q} />}
             </div>
           )}
           <div style={{marginTop:18,padding:'12px 0 8px',borderTop:`1px solid ${Q.gold}33`,borderBottom:`1px solid ${Q.gold}33`}}>
@@ -1169,8 +1174,8 @@ function PesoPage({ loaded, weights, goal, updWeights, updGoal, meals, updMeals,
         </div>
       )}
       {editing && (
-        <ModalQ onClose={()=>setEditing(null)} title={editing==='new'?'REGISTRA PESO':'MODIFICA PESO'} subtitle={editing==='new'?new Date().toLocaleString('it-IT',{weekday:'long',day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'}):'aggiorna o elimina'}>
-          <InputBig value={draft.w} onChange={v=>{setDraft({...draft,w:v}); setError('');}} onEnter={save} placeholder="74,2" unit="CHILOGRAMMI" />
+        <ModalQ Q={Q} onClose={()=>setEditing(null)} title={editing==='new'?'REGISTRA PESO':'MODIFICA PESO'} subtitle={editing==='new'?new Date().toLocaleString('it-IT',{weekday:'long',day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'}):'aggiorna o elimina'}>
+          <InputBig value={draft.w} onChange={v=>{setDraft({...draft,w:v}); setError('');}} onEnter={save} placeholder="74,2" unit="CHILOGRAMMI" Q={Q} />
           {error && <div style={{color:'#C99A7A',fontStyle:'italic',fontSize:13,marginTop:10,textAlign:'center'}}>{error}</div>}
           <button onClick={()=>setExpanded(!expanded)} style={{marginTop:18,background:'transparent',border:'none',color:Q.goldDim,fontFamily:fGaramond,fontStyle:'italic',fontSize:13,cursor:'pointer',width:'100%',textAlign:'center'}}>
             {expanded?'— composizione corporea —':'+ composizione corporea (RENPHO)'}
@@ -1178,27 +1183,27 @@ function PesoPage({ loaded, weights, goal, updWeights, updGoal, meals, updMeals,
           {expanded && (
             <div style={{marginTop:10,padding:'12px 0',borderTop:`1px solid ${Q.gold}22`,borderBottom:`1px solid ${Q.gold}22`}}>
               <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10}}>
-                <DarkField label="% grasso" value={draft.bf} onChange={v=>setDraft({...draft,bf:v})} placeholder="22,5" />
-                <DarkField label="% muscolo" value={draft.mu} onChange={v=>setDraft({...draft,mu:v})} placeholder="38,1" />
-                <DarkField label="% acqua" value={draft.wa} onChange={v=>setDraft({...draft,wa:v})} placeholder="56,3" />
+                <DarkField label="% grasso" value={draft.bf} onChange={v=>setDraft({...draft,bf:v})} placeholder="22,5" Q={Q} />
+                <DarkField label="% muscolo" value={draft.mu} onChange={v=>setDraft({...draft,mu:v})} placeholder="38,1" Q={Q} />
+                <DarkField label="% acqua" value={draft.wa} onChange={v=>setDraft({...draft,wa:v})} placeholder="56,3" Q={Q} />
               </div>
               <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:11,color:Q.goldDim,marginTop:8,textAlign:'center'}}>opzionali — copia dalla bilancia</div>
             </div>
           )}
-          <EditButtons onCancel={()=>setEditing(null)} onSave={save} onDelete={editing!=='new'?del:null} />
+          <EditButtons onCancel={()=>setEditing(null)} onSave={save} onDelete={editing!=='new'?del:null} Q={Q} />
         </ModalQ>
       )}
       {showGoal && (
-        <ModalQ onClose={()=>setShowGoal(false)} title="OBIETTIVO" subtitle="il peso che desideri raggiungere">
-          <InputBig value={draftGoal} onChange={setDraftGoal} onEnter={saveGoal} placeholder="68,0" unit="CHILOGRAMMI" />
-          <EditButtons onCancel={()=>setShowGoal(false)} onSave={saveGoal} />
+        <ModalQ Q={Q} onClose={()=>setShowGoal(false)} title="OBIETTIVO" subtitle="il peso che desideri raggiungere">
+          <InputBig value={draftGoal} onChange={setDraftGoal} onEnter={saveGoal} placeholder="68,0" unit="CHILOGRAMMI" Q={Q} />
+          <EditButtons onCancel={()=>setShowGoal(false)} onSave={saveGoal} Q={Q} />
         </ModalQ>
       )}
     </div>
   );
 }
 
-function BodyStat({ label, value }){
+function BodyStat({ label, value, Q }){
   return (
     <div style={{textAlign:'center'}}>
       <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:16,color:Q.cream}}>{value}</div>
@@ -1206,7 +1211,7 @@ function BodyStat({ label, value }){
     </div>
   );
 }
-function DarkField({ label, value, onChange, placeholder }){
+function DarkField({ label, value, onChange, placeholder, Q }){
   return (
     <div>
       <div style={{fontFamily:fCinzel,fontSize:8,letterSpacing:'0.3em',color:Q.goldDim,textTransform:'uppercase',marginBottom:4}}>{label}</div>
@@ -1215,7 +1220,9 @@ function DarkField({ label, value, onChange, placeholder }){
   );
 }
 
-function DiarioPage({ loaded, notes, water, waterGoal, updNotes, updWater, updWaterGoal, meals, updMeals, supps, taken, updSupps, updTaken, sleeps, updSleeps }){
+function DiarioPage({ theme, loaded, notes, water, waterGoal, updNotes, updWater, updWaterGoal, meals, updMeals, supps, taken, updSupps, updTaken, sleeps, updSleeps }){
+  // Tema dinamico: shadowing del W globale del modulo
+  const W = theme || { bg: '#E8E0D2', ink: '#3C3329', tan: '#8C6A4E' };
   const [selectedDay, setSelectedDay] = useState(dayKey(new Date()));
   const [input, setInput] = useState('');
   const [editing, setEditing] = useState(null);
@@ -1447,7 +1454,9 @@ function ToggleRow({ children, checked, onToggle, ink }){
   );
 }
 
-function PastiPage({ loaded, meals, updMeals, notes, weights, goal }){
+function PastiPage({ theme, loaded, meals, updMeals, notes, weights, goal }){
+  // Tema dinamico: shadowing del J globale del modulo
+  const J = theme || { bg: '#E5E3D5', dark: '#2D3A2E', sage: '#5C6B4E', light: '#8FA288' };
   const [selectedDay, setSelectedDay] = useState(dayKey(new Date()));
   const [editing, setEditing] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
@@ -1736,7 +1745,7 @@ function PastiPage({ loaded, meals, updMeals, notes, weights, goal }){
           )}
         </>)}
       </div>
-      {editing && <MealModal existing={editingMeal} onClose={()=>setEditing(null)} onSave={saveMeal} onDelete={editing!=='new'?delMeal:null} />}
+      {editing && <MealModal J={J} existing={editingMeal} onClose={()=>setEditing(null)} onSave={saveMeal} onDelete={editing!=='new'?delMeal:null} />}
 
 
       {analysisResult && (
@@ -1763,7 +1772,7 @@ function PastiPage({ loaded, meals, updMeals, notes, weights, goal }){
   );
 }
 
-function MealModal({ existing, onClose, onSave, onDelete }){
+function MealModal({ existing, onClose, onSave, onDelete, J }){
   const [type, setType] = useState(existing?.type || 'colazione');
   const [description, setDescription] = useState(existing?.description || '');
   const [qty, setQty] = useState(existing?.qty_g!=null ? String(existing.qty_g) : '');
@@ -2952,7 +2961,7 @@ function SimpleModal({ children, onClose, bg, border, wide }){
   );
 }
 
-function ModalQ({ children, onClose, title, subtitle }){
+function ModalQ({ children, onClose, title, subtitle, Q }){
   return (
     <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(10,6,2,0.78)',backdropFilter:'blur(4px)',WebkitBackdropFilter:'blur(4px)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
       <div onClick={e=>e.stopPropagation()} style={{background:`linear-gradient(180deg, ${Q.bg1} 0%, ${Q.bg2} 100%)`,border:`1px solid ${Q.gold}55`,maxWidth:380,width:'100%',padding:'28px 24px',position:'relative',borderRadius:4,maxHeight:'90vh',overflowY:'auto'}}>
@@ -2968,7 +2977,7 @@ function ModalQ({ children, onClose, title, subtitle }){
   );
 }
 
-function InputBig({ value, onChange, onEnter, placeholder, unit }){
+function InputBig({ value, onChange, onEnter, placeholder, unit, Q }){
   return (
     <div style={{marginTop:24,textAlign:'center'}}>
       <input type="text" inputMode="decimal" value={value} onChange={e=>onChange(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')onEnter();}} autoFocus placeholder={placeholder} style={{width:'100%',background:'transparent',border:'none',borderBottom:`1px solid ${Q.gold}66`,color:Q.cream,fontFamily:fGaramond,fontStyle:'italic',fontSize:54,textAlign:'center',padding:'4px 0 8px',outline:'none'}} />
@@ -2977,7 +2986,7 @@ function InputBig({ value, onChange, onEnter, placeholder, unit }){
   );
 }
 
-function EditButtons({ onCancel, onSave, onDelete }){
+function EditButtons({ onCancel, onSave, onDelete, Q }){
   return (
     <div style={{display:'flex',gap:10,marginTop:32,justifyContent:'space-between',alignItems:'center'}}>
       {onDelete ? <button onClick={onDelete} style={{background:'transparent',color:'#C99A7A',border:`1px solid #C99A7A66`,fontFamily:fCinzel,fontSize:10,letterSpacing:'0.3em',padding:'12px 16px',cursor:'pointer',borderRadius:0}}>ELIMINA</button> : <span />}

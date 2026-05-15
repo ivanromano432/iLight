@@ -3,6 +3,7 @@
 // Salvataggio diretto su profiles.avatar_data (base64) e profiles.display_name.
 
 import { useState, useRef } from 'react';
+import { THEMES, THEME_ORDER, DEFAULT_THEME } from './themes.js';
 
 const Q = { bg1: '#3A2818', bg2: '#1F140C', gold: '#C9A876', goldDim: '#8B7355', cream: '#E8D8B8', ink: '#1F140C' };
 const fGaramond = '"Cormorant Garamond", serif';
@@ -35,6 +36,7 @@ function resizeAndCropImage(file, size = 200) {
 export default function ProfilePage({ user, profile, updProfile, onClose }) {
   const [name, setName] = useState(profile?.display_name || '');
   const [avatar, setAvatar] = useState(profile?.avatar_data || null);
+  const [themeId, setThemeId] = useState(profile?.theme || DEFAULT_THEME);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [savedAt, setSavedAt] = useState(0);
@@ -42,7 +44,9 @@ export default function ProfilePage({ user, profile, updProfile, onClose }) {
 
   const email = user?.email || '';
   const fallbackInitial = ((name?.[0]) || email[0] || '?').toUpperCase();
-  const dirty = (name || '') !== (profile?.display_name || '') || (avatar || null) !== (profile?.avatar_data || null);
+  const dirty = (name || '') !== (profile?.display_name || '') ||
+                (avatar || null) !== (profile?.avatar_data || null) ||
+                (themeId || DEFAULT_THEME) !== (profile?.theme || DEFAULT_THEME);
 
   const handleFile = async (e) => {
     const f = e.target.files?.[0];
@@ -76,6 +80,7 @@ export default function ProfilePage({ user, profile, updProfile, onClose }) {
       await updProfile({
         display_name: name.trim() || null,
         avatar_data: avatar || null,
+        theme: themeId || DEFAULT_THEME,
       });
       setSavedAt(Date.now());
     } catch (err) {
@@ -147,6 +152,51 @@ export default function ProfilePage({ user, profile, updProfile, onClose }) {
           <div style={{ fontFamily: fCinzel, fontSize: 9, letterSpacing: '0.3em', color: Q.goldDim, textTransform: 'uppercase', marginBottom: 4 }}>EMAIL ACCOUNT</div>
           <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 15, color: Q.cream, wordBreak: 'break-all' }}>{email}</div>
           <div style={{ marginTop: 6, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 11, color: Q.goldDim }}>l'email non si può cambiare per ora</div>
+        </div>
+
+        {/* Selettore tema */}
+        <div style={{ marginTop: 30 }}>
+          <div style={{ fontFamily: fCinzel, fontSize: 9, letterSpacing: '0.35em', color: Q.goldDim, textTransform: 'uppercase', marginBottom: 8, textAlign: 'center' }}>TEMA VISIVO</div>
+          <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 12, color: Q.goldDim, textAlign: 'center', marginBottom: 14 }}>
+            scegli lo stile cromatico di tutta l'app
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            {THEME_ORDER.map(id => {
+              const t = THEMES[id];
+              const selected = themeId === id;
+              return (
+                <button key={id} onClick={() => setThemeId(id)}
+                  style={{
+                    background: selected ? `${Q.gold}1A` : 'transparent',
+                    border: `1px solid ${selected ? Q.gold : Q.gold + '44'}`,
+                    padding: '10px 10px',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 6,
+                  }}>
+                  {/* Swatch a 3 colori */}
+                  <div style={{ display: 'flex', gap: 4, height: 18 }}>
+                    {t.swatch.map((c, i) => (
+                      <div key={i} style={{ flex: 1, background: c, borderRadius: 2, border: `1px solid ${Q.gold}22` }} />
+                    ))}
+                  </div>
+                  <div>
+                    <div style={{ fontFamily: fCinzel, fontSize: 9, letterSpacing: '0.25em', color: selected ? Q.gold : Q.cream, textTransform: 'uppercase' }}>
+                      {selected ? '✓ ' : ''}{t.name}
+                    </div>
+                    <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 11, color: Q.goldDim, marginTop: 2 }}>
+                      {t.desc}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          <div style={{ marginTop: 10, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 11, color: Q.goldDim, textAlign: 'center' }}>
+            in questo primo aggiornamento il tema cambia solo le pagine I peso, II diario e III pasti. Altre pagine seguono nel prossimo deploy.
+          </div>
         </div>
 
         {/* Errore */}
