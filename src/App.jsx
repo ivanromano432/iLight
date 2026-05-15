@@ -741,21 +741,23 @@ export default function App({ user, onLogout }){
         {page==='peso' && <PesoPage theme={__theme} loaded={loaded} weights={weights} goal={goal} updWeights={updWeights} updGoal={updGoal} meals={meals} updMeals={updMeals} openStats={() => setShowStats(true)} profile={profile} openSub={() => setShowSub(true)} />}
         {page==='diario' && <DiarioPage theme={__theme} loaded={loaded} notes={foodNotes} water={waterByDay} waterGoal={waterGoal} updNotes={updFoodNotes} updWater={updWater} updWaterGoal={updWaterGoal} meals={meals} updMeals={updMeals} supps={supplements} taken={suppTaken} updSupps={updSupps} updTaken={updTaken} sleeps={sleeps} updSleeps={updSleeps} />}
         {page==='pasti' && <PastiPage theme={__theme} loaded={loaded} meals={meals} updMeals={updMeals} notes={foodNotes} weights={weights} goal={goal} />}
+        {page==='allena' && <AllenaPage theme={__theme} loaded={loaded} workouts={workouts} types={workoutTypes} updWorkouts={updWorkouts} updTypes={updWorkoutTypes} />}
+        {page==='integra' && <IntegraPage theme={__theme} loaded={loaded} supps={supplements} taken={suppTaken} updSupps={updSupps} updTaken={updTaken} />}
+        {page==='digiuno' && <DigiunoPage theme={__theme} loaded={loaded} fasts={fasts} updFasts={updFasts} />}
+        {page==='respiro' && <RespiroPage theme={__theme} loaded={loaded} sessions={mindfulSessions} updSessions={updMindful} />}
+        {page==='sonno' && <SonnoPage theme={__theme} loaded={loaded} sleeps={sleeps} updSleeps={updSleeps} />}
+        {page==='sera' && <SeraPage theme={__theme} loaded={loaded} weights={weights} goal={goal} notes={foodNotes} water={waterByDay} waterGoal={waterGoal} meals={meals} workouts={workouts} workoutTypes={workoutTypes} supps={supplements} taken={suppTaken} sleeps={sleeps} />}
         </>); })()}
-        {page==='allena' && <AllenaPage loaded={loaded} workouts={workouts} types={workoutTypes} updWorkouts={updWorkouts} updTypes={updWorkoutTypes} />}
-        {page==='integra' && <IntegraPage loaded={loaded} supps={supplements} taken={suppTaken} updSupps={updSupps} updTaken={updTaken} />}
-        {page==='digiuno' && <DigiunoPage loaded={loaded} fasts={fasts} updFasts={updFasts} />}
-        {page==='respiro' && <RespiroPage loaded={loaded} sessions={mindfulSessions} updSessions={updMindful} />}
-        {page==='sonno' && <SonnoPage loaded={loaded} sleeps={sleeps} updSleeps={updSleeps} />}
-        {page==='sera' && <SeraPage loaded={loaded} weights={weights} goal={goal} notes={foodNotes} water={waterByDay} waterGoal={waterGoal} meals={meals} workouts={workouts} workoutTypes={workoutTypes} supps={supplements} taken={suppTaken} sleeps={sleeps} />}
       </div>
-      <BottomNav currentIdx={pageIdx} onChange={setPageIdx} />
+      <BottomNav theme={getTheme(profile?.theme)} currentIdx={pageIdx} onChange={setPageIdx} />
       {renderAccountMenu()}
     </div>
   );
 }
 
-function BottomNav({ currentIdx, onChange }){
+function BottomNav({ theme, currentIdx, onChange }){
+  // Tema dinamico: bottom nav usa colori del tema attivo
+  const NAV = theme ? { bg: theme.bg2, border: theme.border, dim: theme.dim, gold: theme.gold, cream: theme.cream } : { bg: '#1A1108', border: '#3A2818', dim: '#6B5D45', gold: '#C9A876', cream: '#E8D8B8' };
   return (
     <div style={{position:'fixed',left:0,right:0,bottom:0,background:NAV.bg,borderTop:`1px solid ${NAV.border}`,display:'flex',justifyContent:'space-around',alignItems:'center',paddingTop:10,paddingBottom:14,zIndex:50}}>
       {PAGES.map((p,i)=>{const active=i===currentIdx; return (
@@ -1831,7 +1833,8 @@ function MealModal({ existing, onClose, onSave, onDelete, J }){
   );
 }
 
-function AllenaPage({ loaded, workouts, types, updWorkouts, updTypes }){
+function AllenaPage({ theme, loaded, workouts, types, updWorkouts, updTypes }){
+  const T = theme || { bg: '#F2EBDC', ink: '#1F1A12', dim: '#6B5D45' };
   const [detailTypeId, setDetailTypeId] = useState(null);
   const [editingType, setEditingType] = useState(null);
 
@@ -2026,7 +2029,8 @@ function TypeModal({ existing, onClose, onSave, onDelete }){
   );
 }
 
-function IntegraPage({ loaded, supps, taken, updSupps, updTaken }){
+function IntegraPage({ theme, loaded, supps, taken, updSupps, updTaken }){
+  const A = theme || { bg1: '#F4F0E6', bg2: '#E8E2D2', ink: '#1F2724', sage: '#4A5C4D' };
   const [editingSupp, setEditingSupp] = useState(null);
   const [editingDay, setEditingDay] = useState(null);
   const [name, setName] = useState('');
@@ -2181,7 +2185,8 @@ function ContinuityRow({ supp, days, taken, consistency, onOpen }){
   );
 }
 
-function SonnoPage({ loaded, sleeps, updSleeps }){
+function SonnoPage({ theme, loaded, sleeps, updSleeps }){
+  const M = theme || { bg1: '#EAE6D2', bg2: '#D8D4C0', ink: '#3A4339', accent: '#7A8E78', dim: '#9CA194', cream: '#F4F1E5' };
   const [editing, setEditing] = useState(null);
   const sorted = useMemo(()=>[...sleeps].sort((a,b)=>a.wakeDate.localeCompare(b.wakeDate)),[sleeps]);
   const today = new Date(); const todayK = dayKey(today);
@@ -2323,7 +2328,8 @@ function SleepModal({ existing, todayK, onClose, onSave, onDelete }){
   );
 }
 
-function SeraPage({ loaded, weights, goal, notes, water, waterGoal, meals, workouts, workoutTypes, supps, taken, sleeps }){
+function SeraPage({ theme, loaded, weights, goal, notes, water, waterGoal, meals, workouts, workoutTypes, supps, taken, sleeps }){
+  const D = theme || { bg1: '#1F2228', bg2: '#0E1115', cream: '#E8E4D5', accent: '#C9A876', amber: '#D4A23E', dim: '#6B6478', active: '#A8826E', danger: '#C99A7A' };
   const [aiAnalyzing, setAiAnalyzing] = useState(false);
   const [aiResult, setAiResult] = useState(null);
   const [aiError, setAiError] = useState('');
@@ -2486,7 +2492,8 @@ const FAST_PHASES = [
   { h:72, label:'profonda', note:'massimo beneficio metabolico' },
 ];
 
-function DigiunoPage({ loaded, fasts, updFasts }){
+function DigiunoPage({ theme, loaded, fasts, updFasts }){
+  const S = theme || { bg1: '#1E1A2E', bg2: '#0F0D1A', silver: '#B8B0C9', pale: '#F2E8D0', gold: '#C9A876', dim: '#6B6478' };
   const [now, setNow] = useState(Date.now());
   const [pickerOpen, setPickerOpen] = useState(false);
   const [category, setCategory] = useState('intermittent');
@@ -2718,7 +2725,8 @@ const MINDFUL_TYPES = [
   { id:'gratitudine', label:'gratitudine', sym:'✦' },
 ];
 
-function RespiroPage({ loaded, sessions, updSessions }){
+function RespiroPage({ theme, loaded, sessions, updSessions }){
+  const N = theme || { bg1: '#2C3340', bg2: '#14171F', cream: '#F2E8D0', dim: '#8A8270', gold: '#C9A876', body: '#DDD3C2' };
   const [breathingOpen, setBreathingOpen] = useState(false);
   const [logging, setLogging] = useState(null); // type id while in form
   const [draftMin, setDraftMin] = useState('');
