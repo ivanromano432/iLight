@@ -87,8 +87,8 @@ export default function AuthScreen() {
       <div style={{ maxWidth: 380, width: '100%', textAlign: 'center' }}>
 
         {/* Logo */}
-        <img src="/icon-512.png" alt="GoalFit" style={{ width: 128, height: 128, display: 'block', margin: '0 auto 16px', borderRadius: 22, boxShadow: '0 4px 14px rgba(43,168,181,0.18)' }} />
-        <div style={{ fontFamily: '"Cinzel", serif', fontSize: 14, letterSpacing: '0.35em', color: '#2BA8B5', textTransform: 'uppercase', margin: '4px 0 4px' }}>
+        <img src="/icon-512.png" alt="GoalFit" style={{ width: 144, height: 144, display: 'block', margin: '0 auto 14px' }} />
+        <div style={{ fontFamily: '"Cinzel", serif', fontSize: 14, letterSpacing: '0.35em', color: '#2BA8B5', textTransform: 'uppercase', margin: '0 0 4px' }}>
           <span style={{ color: '#9CC73A' }}>GOAL</span>FIT
         </div>
         <div style={{
@@ -99,7 +99,7 @@ export default function AuthScreen() {
           transform: 'rotate(-1deg)',
           display: 'inline-block',
         }}>
-          il diario lento del tuo corpo ✿
+          il diario del tuo corpo ✿
         </div>
 
         {/* Linea decorativa */}

@@ -90,7 +90,7 @@ export default function SubscriptionPage({ user, profile, onClose, paywallMode =
 
         {/* Hero / stato corrente */}
         <div style={{ textAlign: 'center', marginTop: 32 }}>
-          <img src="/icon-512.png" alt="GoalFit" style={{ width: 96, height: 96, borderRadius: 18, display: 'block', margin: '0 auto 14px', boxShadow: `0 4px 12px ${Q.gold}33` }} />
+          <img src="/icon-512.png" alt="GoalFit" style={{ width: 96, height: 96, display: 'block', margin: '0 auto 12px' }} />
           <div style={{ fontFamily: fCinzel, fontSize: 22, letterSpacing: '0.3em', color: Q.gold, textTransform: 'uppercase' }}>GOALFIT</div>
           <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 14, color: Q.goldDim, marginTop: 6 }}>Premium</div>
         </div>
