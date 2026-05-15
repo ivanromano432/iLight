@@ -129,19 +129,19 @@ export const THEMES = {
     danger: DANGER,
   },
 
-  // 8. BOSCO PASTELLO — verde-grigio chiaro + sage (originale pagina Sonno)
+  // 8. BOSCO PASTELLO — verde-acqua freddo + menta polverosa (più freddo di Giardino)
   bosco_pastello: {
     id: 'bosco_pastello',
     name: 'Bosco pastello',
-    desc: 'verde-grigio chiaro',
+    desc: 'verde freddo, nebbia',
     isDark: false,
-    swatch: ['#EAE6D2', '#7A8E78', '#3A4339'],
-    bg: '#EAE6D2', bg1: '#EAE6D2', bg2: '#D8D4C0',
-    ink: '#3A4339', dark: '#3A4339',
-    cream: '#3A4339', pale: '#3A4339', body: '#3A4339',
-    gold: '#7A8E78', sage: '#7A8E78', silver: '#7A8E78', accent: '#7A8E78', amber: '#7A8E78', active: '#7A8E78',
-    goldDim: '#9CA194', light: '#9CA194', dim: '#9CA194', tan: '#7A8E78',
-    border: '#3A4339',
+    swatch: ['#DDE5E0', '#6E9788', '#2F3D3A'],
+    bg: '#DDE5E0', bg1: '#DDE5E0', bg2: '#BFCDC4',
+    ink: '#2F3D3A', dark: '#2F3D3A',
+    cream: '#2F3D3A', pale: '#2F3D3A', body: '#2F3D3A',
+    gold: '#6E9788', sage: '#6E9788', silver: '#6E9788', accent: '#6E9788', amber: '#6E9788', active: '#6E9788',
+    goldDim: '#9DB5AC', light: '#9DB5AC', dim: '#9DB5AC', tan: '#88A599',
+    border: '#2F3D3A',
     danger: DANGER,
   },
 
