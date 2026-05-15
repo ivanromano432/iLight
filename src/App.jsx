@@ -8,6 +8,7 @@ import StatistichePage from './Statistiche.jsx';
 import SubscriptionPage from './SubscriptionPage.jsx';
 import Onboarding, { hasSeenOnboarding } from './Onboarding.jsx';
 import GuidaPage from './GuidaPage.jsx';
+import ProfilePage from './ProfilePage.jsx';
 import { supabase } from './supabase.js';
 
 const Q = { bg1: '#3A2818', bg2: '#1F140C', gold: '#C9A876', goldDim: '#8B7355', cream: '#E8D8B8', ink: '#1F140C' };
@@ -371,6 +372,7 @@ export default function App({ user, onLogout }){
   const [showStats, setShowStats] = useState(false);
   const [showSub, setShowSub] = useState(false);
   const [showGuida, setShowGuida] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
   const [showAccountMenu, setShowAccountMenu] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [profile, setProfile] = useState(null);
@@ -592,6 +594,12 @@ export default function App({ user, onLogout }){
       if (r && r.ok === false) console.error('Errore salvataggio obiettivi:', r.errors);
     }
   };
+  // updProfile: salva campi del profilo (display_name, avatar_data, ecc.) e aggiorna lo state
+  const updProfile = async (fields) => {
+    if (!user) return;
+    await profileRepo.update(user.id, fields);
+    setProfile(prev => ({ ...prev, ...fields }));
+  };
 
   const page = PAGES[pageIdx].id;
 
@@ -621,21 +629,31 @@ export default function App({ user, onLogout }){
     return <GuidaPage onClose={() => setShowGuida(false)} />;
   }
 
+  if (showProfile) {
+    return <ProfilePage user={user} profile={profile} updProfile={updProfile} onClose={() => setShowProfile(false)} />;
+  }
+
   // Avatar + menu account (rendering subito sotto, in fixed)
   const accountEmail = user?.email || '';
-  const accountInitial = (accountEmail[0] || '?').toUpperCase();
+  const displayName = profile?.display_name || '';
+  const accountInitial = ((displayName?.[0]) || accountEmail[0] || '?').toUpperCase();
+  const avatarSrc = profile?.avatar_data || null;
   const renderAccountMenu = () => (
     <>
       <div style={{ position: 'fixed', top: 12, right: 12, zIndex: 9000 }}>
         <button onClick={() => setShowAccountMenu(!showAccountMenu)} aria-label="account"
-          style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(232,224,210,0.85)', border: '1px solid rgba(60,51,41,0.2)', color: '#3C3329', fontFamily: "'Cardo',serif", fontSize: 16, fontStyle: 'italic', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', boxShadow: '0 2px 6px rgba(0,0,0,0.08)' }}>
-          {accountInitial}
+          style={{ width: 36, height: 36, borderRadius: '50%', background: avatarSrc ? 'transparent' : 'rgba(232,224,210,0.85)', border: '1px solid rgba(60,51,41,0.2)', color: '#3C3329', fontFamily: "'Cardo',serif", fontSize: 16, fontStyle: 'italic', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', boxShadow: '0 2px 6px rgba(0,0,0,0.08)', overflow: 'hidden', padding: 0 }}>
+          {avatarSrc ? <img src={avatarSrc} alt="profilo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : accountInitial}
         </button>
         {showAccountMenu && (
           <div style={{ position: 'absolute', top: 44, right: 0, background: '#E8E0D2', border: '1px solid rgba(60,51,41,0.2)', padding: '14px 16px', minWidth: 220, fontFamily: "'Cardo',serif", color: '#3C3329', boxShadow: '0 4px 16px rgba(0,0,0,0.12)' }}>
             <div style={{ fontSize: 12, fontStyle: 'italic', color: '#8C6A4E', marginBottom: 4 }}>connesso come</div>
-            <div style={{ fontSize: 14, marginBottom: 12, wordBreak: 'break-all' }}>{accountEmail}</div>
+            <div style={{ fontSize: 14, marginBottom: 12, wordBreak: 'break-all' }}>{displayName || accountEmail}</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <button onClick={() => { setShowAccountMenu(false); setShowProfile(true); }}
+                style={{ background: 'transparent', color: '#3C3329', border: '1px solid rgba(60,51,41,0.25)', fontFamily: "'Cardo',serif", fontStyle: 'italic', fontSize: 14, padding: '8px 12px', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
+                ☉ profilo
+              </button>
               <button onClick={() => { setShowAccountMenu(false); setShowGuida(true); }}
                 style={{ background: 'transparent', color: '#3C3329', border: '1px solid rgba(60,51,41,0.25)', fontFamily: "'Cardo',serif", fontStyle: 'italic', fontSize: 14, padding: '8px 12px', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
                 ✦ guida
