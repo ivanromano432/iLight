@@ -2,7 +2,7 @@
 // La foto viene ridimensionata e cropp-ata a 200x200 client-side per essere leggera.
 // Salvataggio diretto su profiles.avatar_data (base64) e profiles.display_name.
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { THEMES, THEME_ORDER, DEFAULT_THEME } from './themes.js';
 
 const Q = { bg1: '#3A2818', bg2: '#1F140C', gold: '#C9A876', goldDim: '#8B7355', cream: '#E8D8B8', ink: '#1F140C' };
@@ -42,6 +42,15 @@ export default function ProfilePage({ user, profile, updProfile, onClose }) {
   const [savedAt, setSavedAt] = useState(0);
   const fileInputRef = useRef(null);
 
+  // Se il profile cambia dopo il mount (es. perché ancora in caricamento al primo render
+  // o aggiornato da altra azione), risincronizza lo state locale.
+  // Senza questo, salvare il tema senza aver visto la foto la sovrascriveva con null.
+  useEffect(() => {
+    if (profile?.display_name !== undefined) setName(profile.display_name || '');
+    if (profile?.avatar_data !== undefined) setAvatar(profile.avatar_data || null);
+    if (profile?.theme !== undefined) setThemeId(profile.theme || DEFAULT_THEME);
+  }, [profile?.display_name, profile?.avatar_data, profile?.theme]);
+
   const email = user?.email || '';
   const fallbackInitial = ((name?.[0]) || email[0] || '?').toUpperCase();
   const dirty = (name || '') !== (profile?.display_name || '') ||
@@ -77,11 +86,24 @@ export default function ProfilePage({ user, profile, updProfile, onClose }) {
     if (!updProfile) return;
     setSaving(true); setError(null);
     try {
-      await updProfile({
-        display_name: name.trim() || null,
-        avatar_data: avatar || null,
-        theme: themeId || DEFAULT_THEME,
-      });
+      // Manda SOLO i campi davvero cambiati rispetto al profilo corrente.
+      // Evita di sovrascrivere accidentalmente avatar_data o display_name con null.
+      const fields = {};
+      const newName = name.trim() || null;
+      const currentName = profile?.display_name || null;
+      if (newName !== currentName) fields.display_name = newName;
+
+      const newAvatar = avatar || null;
+      const currentAvatar = profile?.avatar_data || null;
+      if (newAvatar !== currentAvatar) fields.avatar_data = newAvatar;
+
+      const newTheme = themeId || DEFAULT_THEME;
+      const currentTheme = profile?.theme || DEFAULT_THEME;
+      if (newTheme !== currentTheme) fields.theme = newTheme;
+
+      if (Object.keys(fields).length > 0) {
+        await updProfile(fields);
+      }
       setSavedAt(Date.now());
     } catch (err) {
       setError(err.message || String(err));
