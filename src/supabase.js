@@ -1,4 +1,4 @@
-// Client Supabase di Quercus.
+// Client Supabase di GoalFit.
 //
 // L'URL e la "publishable" key sono SICURE da mettere lato client:
 // Supabase usa Row Level Security per impedire l'accesso ai dati altrui.

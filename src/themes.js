@@ -1,4 +1,4 @@
-// Temi visivi di Quercus. Ogni tema è un oggetto piatto con tutte le chiavi che
+// Temi visivi di GoalFit. Ogni tema è un oggetto piatto con tutte le chiavi che
 // le pagine usano nei loro `const Q = {...}`, `const W = {...}`, ecc.
 // In questo modo posso fare `const Q = theme` (o W, J, ecc.) in ogni pagina e
 // il codice esistente legge da Q.bg1, W.tan, J.sage continua a funzionare.

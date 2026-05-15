@@ -114,14 +114,14 @@ function exportAllCSV({ weights, meals, sleeps, water, workouts, workoutTypes, s
   (supplements || []).forEach(s => { suppNameById[s.id] = s.name; });
 
   const sections = [
-    ['quercus_pesi', weights.map(w => ({
+    ['goalfit_pesi', weights.map(w => ({
       data: new Date(w.ts).toLocaleString('it-IT'),
       peso_kg: w.weight,
       grasso_pct: w.bodyFat ?? '',
       muscolo_pct: w.muscle ?? '',
       acqua_pct: w.water ?? '',
     })), ['data', 'peso_kg', 'grasso_pct', 'muscolo_pct', 'acqua_pct']],
-    ['quercus_pasti', meals.map(m => ({
+    ['goalfit_pasti', meals.map(m => ({
       data: new Date(m.ts).toLocaleString('it-IT'),
       tipo: m.type,
       descrizione: m.description,
@@ -132,32 +132,32 @@ function exportAllCSV({ weights, meals, sleeps, water, workouts, workoutTypes, s
       grassi: m.g ?? '',
       stato: m.status,
     })), ['data', 'tipo', 'descrizione', 'grammi', 'kcal', 'proteine', 'carboidrati', 'grassi', 'stato']],
-    ['quercus_sonno', sleeps.map(s => ({
+    ['goalfit_sonno', sleeps.map(s => ({
       data_risveglio: s.wakeDate,
       a_letto: s.bedtime,
       sveglia: s.waketime,
       qualita: s.quality ?? '',
       note: s.notes ?? '',
     })), ['data_risveglio', 'a_letto', 'sveglia', 'qualita', 'note']],
-    ['quercus_acqua', Object.entries(water || {}).map(([day, glasses]) => ({
+    ['goalfit_acqua', Object.entries(water || {}).map(([day, glasses]) => ({
       giorno: day, bicchieri: glasses,
     })), ['giorno', 'bicchieri']],
-    ['quercus_allenamenti', workouts.map(w => ({
+    ['goalfit_allenamenti', workouts.map(w => ({
       data: new Date(w.ts).toLocaleString('it-IT'),
       tipo: typeNameById[w.typeId] || w.typeId,
       quantita: w.qty ?? '',
       note: w.notes ?? '',
     })), ['data', 'tipo', 'quantita', 'note']],
-    ['quercus_integratori_presi', Object.entries(suppTaken || {}).flatMap(([day, ids]) =>
+    ['goalfit_integratori_presi', Object.entries(suppTaken || {}).flatMap(([day, ids]) =>
       (ids || []).map(id => ({ giorno: day, integratore: suppNameById[id] || id }))
     ), ['giorno', 'integratore']],
-    ['quercus_mindful', mindful.map(m => ({
+    ['goalfit_mindful', mindful.map(m => ({
       data: new Date(m.ts).toLocaleString('it-IT'),
       tipo: m.type ?? '',
       durata_min: m.duration_min ?? '',
       note: m.note ?? '',
     })), ['data', 'tipo', 'durata_min', 'note']],
-    ['quercus_digiuni', fasts.map(f => ({
+    ['goalfit_digiuni', fasts.map(f => ({
       inizio: f.started_ts ? new Date(f.started_ts).toLocaleString('it-IT') : '',
       fine_pianificata: f.planned_end_ts ? new Date(f.planned_end_ts).toLocaleString('it-IT') : '',
       fine_effettiva: f.ended_ts ? new Date(f.ended_ts).toLocaleString('it-IT') : '',
@@ -165,7 +165,7 @@ function exportAllCSV({ weights, meals, sleeps, water, workouts, workoutTypes, s
       tipo: f.type ?? '',
       etichetta: f.label ?? '',
     })), ['inizio', 'fine_pianificata', 'fine_effettiva', 'ore_obiettivo', 'tipo', 'etichetta']],
-    ['quercus_diario', diaryNotes.map(n => ({
+    ['goalfit_diario', diaryNotes.map(n => ({
       data: new Date(n.ts).toLocaleString('it-IT'),
       testo: n.text,
     })), ['data', 'testo']],

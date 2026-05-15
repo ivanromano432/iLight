@@ -90,7 +90,7 @@ export default function SubscriptionPage({ user, profile, onClose, paywallMode =
 
         {/* Hero / stato corrente */}
         <div style={{ textAlign: 'center', marginTop: 32 }}>
-          <div style={{ fontFamily: fCinzel, fontSize: 28, letterSpacing: '0.3em', color: Q.gold, textTransform: 'uppercase' }}>QUERCUS</div>
+          <div style={{ fontFamily: fCinzel, fontSize: 28, letterSpacing: '0.3em', color: Q.gold, textTransform: 'uppercase' }}>GOALFIT</div>
           <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 14, color: Q.goldDim, marginTop: 6 }}>Premium</div>
         </div>
 
@@ -99,7 +99,7 @@ export default function SubscriptionPage({ user, profile, onClose, paywallMode =
           <div style={{ marginTop: 28, padding: '14px 18px', textAlign: 'center', border: `1px solid ${Q.gold}66`, background: `${Q.gold}11` }}>
             <div style={{ fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.35em', color: Q.gold, textTransform: 'uppercase' }}>✦ ACCESSO LIFETIME</div>
             <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 14, color: Q.cream, marginTop: 6 }}>
-              Hai accesso completo a Quercus Premium per sempre, senza addebiti.
+              Hai accesso completo a GoalFit Premium per sempre, senza addebiti.
             </div>
           </div>
         )}
@@ -115,7 +115,7 @@ export default function SubscriptionPage({ user, profile, onClose, paywallMode =
           <div style={{ marginTop: 28, padding: '14px 18px', textAlign: 'center', border: `1px solid #C99A7A44`, background: '#C99A7A0E' }}>
             <div style={{ fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.3em', color: '#C99A7A', textTransform: 'uppercase' }}>PROVA TERMINATA</div>
             <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 14, color: Q.cream, marginTop: 6 }}>
-              Per continuare a usare Quercus, scegli un piano
+              Per continuare a usare GoalFit, scegli un piano
             </div>
           </div>
         )}

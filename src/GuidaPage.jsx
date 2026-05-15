@@ -1,4 +1,4 @@
-// Guida completa di Quercus. Accessibile dall'avatar utente in alto a destra.
+// Guida completa di GoalFit. Accessibile dall'avatar utente in alto a destra.
 // Una sezione per ognuno dei 9 mondi + statistiche, obiettivi, abbonamento, FAQ.
 
 import { useState } from 'react';
@@ -11,11 +11,11 @@ const SECTIONS = [
   {
     id: 'intro',
     title: 'Filosofia',
-    short: 'cosa è Quercus',
+    short: 'cosa è GoalFit',
     body: [
-      'Quercus è una quercia. Cresce lenta, ma forte.',
-      'A differenza delle app fitness che ti chiedono di contare calorie e macros ossessivamente, Quercus ti accompagna in un percorso più lento: ti osserva, ti dà spazio per scrivere a parole come stai, e usa l\'intelligenza artificiale per estrarre i dati invece di chiedertelo.',
-      'L\'idea è che il benessere arrivi dalla costanza, non dal controllo. Registra anche solo 30 secondi al giorno e Quercus impara.',
+      'GoalFit è ispirata alla quercia. Cresce lenta, ma forte.',
+      'A differenza delle app fitness che ti chiedono di contare calorie e macros ossessivamente, GoalFit ti accompagna in un percorso più lento: ti osserva, ti dà spazio per scrivere a parole come stai, e usa l\'intelligenza artificiale per estrarre i dati invece di chiedertelo.',
+      'L\'idea è che il benessere arrivi dalla costanza, non dal controllo. Registra anche solo 30 secondi al giorno e GoalFit impara.',
     ],
   },
   {
@@ -35,7 +35,7 @@ const SECTIONS = [
     title: 'II · Diario',
     short: 'la magia dell\'IA',
     body: [
-      'Il diario è il cuore di Quercus. Scrivi naturale, l\'IA estrae i dati.',
+      'Il diario è il cuore di GoalFit. Scrivi naturale, l\'IA estrae i dati.',
       'Esempio: scrivi "stamane caffè, panino al prosciutto a pranzo, due bicchieri d\'acqua, dormito 7 ore e mezza"',
       'Tap "Registra con IA". Dopo qualche secondo, l\'IA ti propone:',
       '·Pasti riconosciuti (colazione, pranzo, etc.) con kcal stimate',
@@ -87,12 +87,12 @@ const SECTIONS = [
     title: 'VI · Digiuno',
     short: 'digiuno intermittente',
     body: [
-      'Quercus supporta i digiuni intermittenti più comuni (16:8, 18:6, 20:4, 24h) o digiuni liberi senza obiettivo.',
+      'GoalFit supporta i digiuni intermittenti più comuni (16:8, 18:6, 20:4, 24h) o digiuni liberi senza obiettivo.',
       '·Tap "AVVIA DIGIUNO" → scegli durata target → il timer parte.',
       '·Vedi il timer in tempo reale: ore trascorse e ore restanti al traguardo. Una barra circolare ti mostra il progresso.',
       '·Quando vuoi interrompere, tap "INTERROMPI". Il digiuno viene chiuso e contato anche se non hai raggiunto il target.',
       '·Lo storico mostra tutti i digiuni passati con durata effettiva.',
-      'Suggerimento: non saltare il digiuno se ti senti male. Quercus celebra anche i "digiuni interrotti consapevolmente" come dati validi.',
+      'Suggerimento: non saltare il digiuno se ti senti male. GoalFit celebra anche i "digiuni interrotti consapevolmente" come dati validi.',
     ],
   },
   {
@@ -152,7 +152,7 @@ const SECTIONS = [
     title: '◆ Abbonamento',
     short: 'piani e gestione',
     body: [
-      'Quercus ti regala 14 giorni di prova gratuita dal momento della registrazione.',
+      'GoalFit ti regala 14 giorni di prova gratuita dal momento della registrazione.',
       'Durante la prova, hai accesso a TUTTE le funzioni senza limiti.',
       'Al termine della prova:',
       '·Mensile: € 4,99/mese',
@@ -203,7 +203,7 @@ export default function GuidaPage({ profile, onClose }) {
 
         {/* Intro hero */}
         <div style={{ textAlign: 'center', marginTop: 32 }}>
-          <div style={{ fontFamily: fCinzel, fontSize: 28, letterSpacing: '0.3em', color: Q.gold, textTransform: 'uppercase' }}>QUERCUS</div>
+          <div style={{ fontFamily: fCinzel, fontSize: 28, letterSpacing: '0.3em', color: Q.gold, textTransform: 'uppercase' }}>GOALFIT</div>
           <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 14, color: Q.goldDim, marginTop: 6 }}>guida completa</div>
         </div>
 
@@ -237,7 +237,7 @@ export default function GuidaPage({ profile, onClose }) {
 
         {/* Footer con versione */}
         <div style={{ textAlign: 'center', marginTop: 40, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 11, color: Q.goldDim }}>
-          Quercus · una quercia cresce lenta ma forte
+          GoalFit · una quercia cresce lenta ma forte
         </div>
       </div>
     </div>

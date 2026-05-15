@@ -95,7 +95,7 @@ export default function AuthScreen() {
           margin: 0,
           color: W.ink,
           lineHeight: 1,
-        }}>quercus</h1>
+        }}>goalfit</h1>
         <div style={{
           fontFamily: fCaveat,
           fontSize: 22,

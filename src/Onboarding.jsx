@@ -1,4 +1,4 @@
-// Onboarding al primo accesso: 6 schermate swipeabili che spiegano Quercus.
+// Onboarding al primo accesso: 6 schermate swipeabili che spiegano GoalFit.
 // Salvato in localStorage con flag namespaced per utente.
 // Skippable con "salta" in alto.
 
@@ -20,17 +20,17 @@ export function markOnboardingSeen(userId) {
 
 const SLIDES = [
   {
-    title: 'Benvenuto in Quercus',
+    title: 'Benvenuto in GoalFit',
     sub: 'il tuo compagno lento per il benessere',
     body: [
-      'Quercus è una quercia. Cresce lenta, ma forte.',
+      'GoalFit è ispirata alla quercia. Cresce lenta, ma forte.',
       'Ti aiuto a perdere peso e stare meglio in 9 mondi tematici — peso, diario, pasti, allenamento, integratori, digiuno, respiro, sonno, sera.',
       'Niente conteggio ossessivo, niente promesse miracolose. Solo le tue abitudini, osservate con cura.',
     ],
   },
   {
     title: 'Il diario libero',
-    sub: 'la magia di Quercus',
+    sub: 'la magia di GoalFit',
     body: [
       'Apri la pagina "II diario" e scrivi naturale: "stamattina caffè e cornetto, pranzo pasta col pesto, due bicchieri d\'acqua, dormito 7 ore".',
       'Tap su "Registra con IA". In pochi secondi, l\'intelligenza artificiale estrae i pasti, i bicchieri d\'acqua e il sonno e li mette nei posti giusti.',
@@ -78,7 +78,7 @@ const SLIDES = [
     title: 'Inizia ora',
     sub: 'fai il primo passo',
     body: [
-      'Quercus impara meglio se la usi tutti i giorni, anche solo per 30 secondi.',
+      'GoalFit impara meglio se la usi tutti i giorni, anche solo per 30 secondi.',
       'Suggerimento per oggi:',
       '· Vai su "I peso" e registra la prima pesata',
       '· Oppure scrivi nel diario cosa hai mangiato a colazione',
