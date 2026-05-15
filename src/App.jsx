@@ -1029,7 +1029,7 @@ function PesoPage({ theme, loaded, weights, goal, updWeights, updGoal, meals, up
       <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${Q.gold}40`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
       <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${Q.gold}1A`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
       <div style={{position:'relative',zIndex:2,padding:'32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
-        <Header q="QUERCUS" sub="il peso del corpo" color={Q.gold} dim={Q.goldDim} mark="✦" />
+        <Header q="QUERCUS" sub="I · il peso" color={Q.gold} dim={Q.goldDim} mark="✦" />
         {!loaded && <Loading color={Q.goldDim} />}
         {loaded && weights.length===0 && (
           <div style={{textAlign:'center',padding:'40px 8px 0'}}>
@@ -1386,11 +1386,12 @@ function DiarioPage({ theme, loaded, notes, water, waterGoal, updNotes, updWater
   const dateLabel = parseDayKey(selectedDay).toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long'});
 
   return (
-    <div style={{minHeight:'100vh',background:W.bg,backgroundImage:'repeating-linear-gradient(0deg, rgba(120,100,80,0.04) 0px, transparent 1px, transparent 3px, rgba(120,100,80,0.04) 4px), repeating-linear-gradient(90deg, rgba(120,100,80,0.04) 0px, transparent 1px, transparent 3px, rgba(120,100,80,0.04) 4px)',color:W.ink,fontFamily:fCardo}}>
-      <div style={{padding:'32px 24px 28px',maxWidth:480,margin:'0 auto'}}>
-        <h1 style={{fontFamily:fCardo,fontStyle:'italic',fontWeight:400,fontSize:40,color:W.ink,lineHeight:1,margin:0}}>quietudine,</h1>
-        <div style={{fontFamily:fCaveat,fontSize:22,color:W.tan,marginTop:4,transform:'rotate(-1deg)',display:'inline-block'}}>{dateLabel} ✿</div>
-        <div style={{width:50,height:2,background:W.ink,opacity:0.7,marginTop:12}}></div>
+    <div style={{minHeight:'100vh',background:`radial-gradient(ellipse at top, ${W.bg1} 0%, ${W.bg2} 100%)`,color:W.cream,fontFamily:fCardo,position:'relative',overflow:'hidden'}}>
+      <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${W.gold}40`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
+      <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${W.gold}1A`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
+      <div style={{position:'relative',zIndex:2,padding:'32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
+        <Header q="QUERCUS" sub="II · il diario" color={W.gold} dim={W.goldDim} mark="✦" />
+        <div style={{textAlign:'center',marginTop:4,fontFamily:fCaveat,fontSize:22,color:W.tan,marginBottom:8}}>{dateLabel} ✿</div>
 
         {!loaded && <Loading color={W.tan} />}
 
@@ -1645,10 +1646,11 @@ function PastiPage({ theme, loaded, meals, updMeals, notes, weights, goal }){
   const editingMeal = editing && editing!=='new' ? meals.find(m=>m.id===editing) : null;
 
   return (
-    <div style={{minHeight:'100vh',background:J.bg,color:J.dark,fontFamily:fMarcellus,position:'relative',overflow:'hidden'}}>
-      <div style={{position:'absolute',top:60,left:-30,width:100,height:100,opacity:0.08,background:`radial-gradient(circle, ${J.dark}, transparent)`}} />
-      <div style={{padding:'32px 24px 28px',maxWidth:480,margin:'0 auto',position:'relative'}}>
-        <Header q="REFETTORIO" sub="— ciò che mangi —" color={J.dark} dim={J.sage} mark="❀" font={fMarcellus} subFont={fGaramond} />
+    <div style={{minHeight:'100vh',background:`radial-gradient(ellipse at top, ${J.bg1} 0%, ${J.bg2} 100%)`,color:J.cream,fontFamily:fMarcellus,position:'relative',overflow:'hidden'}}>
+      <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${J.gold}40`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
+      <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${J.gold}1A`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
+      <div style={{position:'relative',zIndex:2,padding:'32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
+        <Header q="QUERCUS" sub="III · i pasti" color={J.gold} dim={J.goldDim} mark="✦" />
         {!loaded && <Loading color={J.sage} />}
         {loaded && (<>
           <DayStrip selectedKey={selectedDay} onSelect={setSelectedDay} ink={J.dark} tan={J.sage} count={14} fontA={fMarcellus} fontB={fGaramond} />
@@ -1938,6 +1940,8 @@ function MealModal({ existing, onClose, onSave, onDelete, J }){
 
 function AllenaPage({ theme, loaded, workouts, types, updWorkouts, updTypes }){
   const T = theme || { bg: '#F2EBDC', ink: '#1F1A12', dim: '#6B5D45' };
+  // Alias per shadow delle var globali del modulo (Allena originariamente usava A=Alba)
+  const A = T;
   const [detailTypeId, setDetailTypeId] = useState(null);
   const [editingType, setEditingType] = useState(null);
 
@@ -1956,11 +1960,11 @@ function AllenaPage({ theme, loaded, workouts, types, updWorkouts, updTypes }){
   const detailType = detailTypeId ? types.find(t=>t.id===detailTypeId) : null;
 
   return (
-    <div style={{minHeight:'100vh',background:`linear-gradient(135deg, ${A.bg1} 0%, ${A.bg2} 100%)`,color:A.ink,fontFamily:fBodoni,position:'relative'}}>
-      <div style={{position:'absolute',top:0,right:0,width:100,height:140,background:`radial-gradient(ellipse at top, ${A.sage}26 0%, transparent 70%)`}} />
-      <div style={{padding:'32px 24px 28px',maxWidth:480,margin:'0 auto',position:'relative'}}>
-        <div style={{fontFamily:fDmSans,fontSize:9,letterSpacing:'0.5em',color:A.sage,textTransform:'uppercase'}}>MMXXVI · VOL · V</div>
-        <h1 style={{fontFamily:fBodoni,fontWeight:500,fontSize:38,lineHeight:0.9,letterSpacing:'-0.02em',color:A.ink,margin:'6px 0 0'}}>La <em style={{fontStyle:'italic',fontWeight:400,color:A.sage}}>disciplina.</em></h1>
+    <div style={{minHeight:'100vh',background:`radial-gradient(ellipse at top, ${A.bg1} 0%, ${A.bg2} 100%)`,color:A.cream,fontFamily:fBodoni,position:'relative',overflow:'hidden'}}>
+      <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${A.gold}40`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
+      <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${A.gold}1A`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
+      <div style={{position:'relative',zIndex:2,padding:'32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
+        <Header q="QUERCUS" sub="V · l'allenamento" color={A.gold} dim={A.goldDim} mark="✦" font={fBodoni} />
 
         {!loaded && <Loading color={A.sage} />}
 
@@ -2133,7 +2137,9 @@ function TypeModal({ existing, onClose, onSave, onDelete }){
 }
 
 function IntegraPage({ theme, loaded, supps, taken, updSupps, updTaken }){
-  const A = theme || { bg1: '#F4F0E6', bg2: '#E8E2D2', ink: '#1F2724', sage: '#4A5C4D' };
+  // Originariamente questa pagina usava T (palette Cuoio globale).
+  // Shadow di T con il theme attivo passato come prop.
+  const T = theme || { bg: '#F2EBDC', ink: '#1F1A12', dim: '#6B5D45' };
   const [editingSupp, setEditingSupp] = useState(null);
   const [editingDay, setEditingDay] = useState(null);
   const [name, setName] = useState('');
@@ -2166,16 +2172,11 @@ function IntegraPage({ theme, loaded, supps, taken, updSupps, updTaken }){
   function consistency(suppId){ let c=0; days.forEach(d=>{if((taken[dayKey(d)]||[]).includes(suppId)) c++;}); return Math.round((c/28)*100); }
 
   return (
-    <div style={{minHeight:'100vh',background:T.bg,color:T.ink,fontFamily:fCormorant}}>
-      <div style={{padding:'32px 24px 28px',maxWidth:480,margin:'0 auto'}}>
-        <div style={{textAlign:'center'}}>
-          <svg width="36" height="36" viewBox="0 0 64 64" style={{display:'block',margin:'0 auto 6px'}}>
-            <path d="M 32 8 A 24 24 0 1 1 18 50" stroke={T.ink} strokeWidth="3" fill="none" strokeLinecap="round" opacity="0.85" />
-          </svg>
-          <h1 style={{fontFamily:fCormorant,fontWeight:500,fontStyle:'italic',fontSize:30,color:T.ink,margin:0}}>Bōshin</h1>
-          <div style={{fontFamily:fCormorant,fontSize:11,letterSpacing:'0.5em',color:T.dim,marginTop:8}}>— RITUALE —</div>
-          <Ornament color={T.ink} mark="·" />
-        </div>
+    <div style={{minHeight:'100vh',background:`radial-gradient(ellipse at top, ${T.bg1} 0%, ${T.bg2} 100%)`,color:T.cream,fontFamily:fCormorant,position:'relative',overflow:'hidden'}}>
+      <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${T.gold}40`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
+      <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${T.gold}1A`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
+      <div style={{position:'relative',zIndex:2,padding:'32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
+        <Header q="QUERCUS" sub="IV · gli integratori" color={T.gold} dim={T.goldDim} mark="✦" font={fCormorant} />
 
         {!loaded && <Loading color={T.dim} />}
 
@@ -2289,7 +2290,8 @@ function ContinuityRow({ supp, days, taken, consistency, onOpen }){
 }
 
 function SonnoPage({ theme, loaded, sleeps, updSleeps }){
-  const M = theme || { bg1: '#EAE6D2', bg2: '#D8D4C0', ink: '#3A4339', accent: '#7A8E78', dim: '#9CA194', cream: '#F4F1E5' };
+  // Sonno usa S internamente (palette Sera viola era originaria). Shadow.
+  const S = theme || { bg1: '#1E1A2E', bg2: '#0F0D1A', silver: '#B8B0C9', pale: '#F2E8D0', gold: '#C9A876', dim: '#6B6478' };
   const [editing, setEditing] = useState(null);
   const sorted = useMemo(()=>[...sleeps].sort((a,b)=>a.wakeDate.localeCompare(b.wakeDate)),[sleeps]);
   const today = new Date(); const todayK = dayKey(today);
@@ -2318,14 +2320,11 @@ function SonnoPage({ theme, loaded, sleeps, updSleeps }){
   const editingSleep = editing && editing!=='new' ? sleeps.find(s=>s.id===editing) : null;
 
   return (
-    <div style={{minHeight:'100vh',background:`radial-gradient(ellipse at top, ${S.bg1} 0%, ${S.bg2} 85%)`,color:S.silver,fontFamily:fFraunces,position:'relative',overflow:'hidden'}}>
-      <div aria-hidden style={{position:'absolute',inset:0,pointerEvents:'none',backgroundImage:`radial-gradient(circle at 18% 12%, ${S.pale}44 1px, transparent 2px), radial-gradient(circle at 78% 22%, ${S.pale}33 1px, transparent 2px), radial-gradient(circle at 42% 78%, ${S.pale}33 1px, transparent 2px), radial-gradient(circle at 88% 64%, ${S.gold}66 1px, transparent 2px), radial-gradient(circle at 12% 88%, ${S.pale}33 1px, transparent 2px), radial-gradient(circle at 58% 38%, ${S.pale}44 1px, transparent 2px)`}} />
-      <div style={{position:'relative',zIndex:1,padding:'36px 24px 28px',maxWidth:480,margin:'0 auto'}}>
-        <div style={{textAlign:'center'}}>
-          <div style={{fontFamily:fFraunces,fontSize:11,letterSpacing:'0.5em',color:S.gold,textTransform:'uppercase',marginBottom:6}}>✦ ✦ ✦</div>
-          <h1 style={{fontFamily:fFraunces,fontStyle:'italic',fontWeight:300,fontSize:38,color:S.pale,margin:0}}>Costellazione</h1>
-          <div style={{fontFamily:fFraunces,fontSize:10,letterSpacing:'0.5em',color:S.dim,marginTop:8,textTransform:'uppercase'}}>il sonno · il restauro</div>
-        </div>
+    <div style={{minHeight:'100vh',background:`radial-gradient(ellipse at top, ${S.bg1} 0%, ${S.bg2} 100%)`,color:S.cream,fontFamily:fFraunces,position:'relative',overflow:'hidden'}}>
+      <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${S.gold}40`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
+      <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${S.gold}1A`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
+      <div style={{position:'relative',zIndex:2,padding:'32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
+        <Header q="QUERCUS" sub="VIII · il sonno" color={S.gold} dim={S.goldDim} mark="✦" font={fFraunces} />
 
         {!loaded && <Loading color={S.dim} />}
 
@@ -2432,7 +2431,8 @@ function SleepModal({ existing, todayK, onClose, onSave, onDelete }){
 }
 
 function SeraPage({ theme, loaded, weights, goal, notes, water, waterGoal, meals, workouts, workoutTypes, supps, taken, sleeps }){
-  const D = theme || { bg1: '#1F2228', bg2: '#0E1115', cream: '#E8E4D5', accent: '#C9A876', amber: '#D4A23E', dim: '#6B6478', active: '#A8826E', danger: '#C99A7A' };
+  // Sera usa N internamente (palette Notte blu era originaria). Shadow.
+  const N = theme || { bg1: '#2C3340', bg2: '#14171F', cream: '#F2E8D0', dim: '#8A8270', gold: '#C9A876', body: '#DDD3C2' };
   const [aiAnalyzing, setAiAnalyzing] = useState(false);
   const [aiResult, setAiResult] = useState(null);
   const [aiError, setAiError] = useState('');
@@ -2463,11 +2463,11 @@ function SeraPage({ theme, loaded, weights, goal, notes, water, waterGoal, meals
   }
 
   return (
-    <div style={{minHeight:'100vh',background:`radial-gradient(ellipse at 50% 0%, ${N.bg1} 0%, ${N.bg2} 80%)`,color:N.body,fontFamily:fFraunces,position:'relative'}}>
-      <div style={{padding:'38px 24px 28px',maxWidth:480,margin:'0 auto',textAlign:'center'}}>
-        <div style={{width:50,height:50,margin:'0 auto 14px',borderRadius:'50%',background:`radial-gradient(circle at 65% 35%, ${N.cream} 0%, #D6C9A8 60%, transparent 100%)`,boxShadow:`0 0 30px ${N.cream}4D, 0 0 60px ${N.cream}1F`}} />
-        <h1 style={{fontFamily:fFraunces,fontStyle:'italic',fontWeight:300,fontSize:36,color:N.cream,margin:0}}>Notturna</h1>
-        <div style={{fontFamily:fFraunces,fontSize:10,letterSpacing:'0.5em',color:N.dim,marginTop:8}}>LA GIORNATA · IN QUIETE</div>
+    <div style={{minHeight:'100vh',background:`radial-gradient(ellipse at top, ${N.bg1} 0%, ${N.bg2} 100%)`,color:N.cream,fontFamily:fFraunces,position:'relative',overflow:'hidden'}}>
+      <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${N.gold}40`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
+      <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${N.gold}1A`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
+      <div style={{position:'relative',zIndex:2,padding:'32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
+        <Header q="QUERCUS" sub="IX · la sera" color={N.gold} dim={N.goldDim} mark="✦" font={fFraunces} />
 
         {!loaded && <Loading color={N.dim} />}
 
@@ -2596,7 +2596,8 @@ const FAST_PHASES = [
 ];
 
 function DigiunoPage({ theme, loaded, fasts, updFasts }){
-  const S = theme || { bg1: '#1E1A2E', bg2: '#0F0D1A', silver: '#B8B0C9', pale: '#F2E8D0', gold: '#C9A876', dim: '#6B6478' };
+  // Digiuno usa D internamente (palette Notturno ambra era originaria). Shadow.
+  const D = theme || { bg1: '#1F2228', bg2: '#0E1115', cream: '#E8E4D5', accent: '#C9A876', amber: '#D4A23E', dim: '#6B6478', active: '#A8826E', danger: '#C99A7A' };
   const [now, setNow] = useState(Date.now());
   const [pickerOpen, setPickerOpen] = useState(false);
   const [category, setCategory] = useState('intermittent');
@@ -2668,14 +2669,11 @@ function DigiunoPage({ theme, loaded, fasts, updFasts }){
   const longest = past.reduce((a,f)=>{ const dur=(new Date(f.ended_ts)-new Date(f.started_ts))/3600000; return Math.max(a,dur); }, 0);
 
   return (
-    <div style={{minHeight:'100vh',background:`radial-gradient(ellipse at top, ${D.bg1} 0%, ${D.bg2} 90%)`,color:D.cream,fontFamily:fBodoni,position:'relative'}}>
-      <div style={{padding:'34px 24px 28px',maxWidth:480,margin:'0 auto'}}>
-        <div style={{textAlign:'center'}}>
-          <div style={{fontFamily:fDmSans,fontSize:9,letterSpacing:'0.5em',color:D.accent,textTransform:'uppercase',marginBottom:6}}>IV · IEIUNIUM</div>
-          <h1 style={{fontFamily:fBodoni,fontStyle:'italic',fontWeight:400,fontSize:38,color:D.cream,margin:0,letterSpacing:'-0.01em'}}>Digiuno</h1>
-          <div style={{fontFamily:fBodoni,fontStyle:'italic',fontSize:13,color:D.dim,marginTop:6}}>la pausa del corpo</div>
-          <Ornament color={D.accent} mark="·" />
-        </div>
+    <div style={{minHeight:'100vh',background:`radial-gradient(ellipse at top, ${D.bg1} 0%, ${D.bg2} 100%)`,color:D.cream,fontFamily:fBodoni,position:'relative',overflow:'hidden'}}>
+      <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${D.gold}40`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
+      <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${D.gold}1A`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
+      <div style={{position:'relative',zIndex:2,padding:'32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
+        <Header q="QUERCUS" sub="VI · il digiuno" color={D.gold} dim={D.goldDim} mark="✦" font={fBodoni} />
 
         {!loaded && <Loading color={D.dim} />}
 
@@ -2829,7 +2827,8 @@ const MINDFUL_TYPES = [
 ];
 
 function RespiroPage({ theme, loaded, sessions, updSessions }){
-  const N = theme || { bg1: '#2C3340', bg2: '#14171F', cream: '#F2E8D0', dim: '#8A8270', gold: '#C9A876', body: '#DDD3C2' };
+  // Respiro usa M internamente (palette Bosco pastello era originaria). Shadow.
+  const M = theme || { bg1: '#EAE6D2', bg2: '#D8D4C0', ink: '#3A4339', accent: '#7A8E78', dim: '#9CA194', cream: '#F4F1E5' };
   const [breathingOpen, setBreathingOpen] = useState(false);
   const [logging, setLogging] = useState(null); // type id while in form
   const [draftMin, setDraftMin] = useState('');
@@ -2888,14 +2887,11 @@ function RespiroPage({ theme, loaded, sessions, updSessions }){
   const recent = [...sessions].sort((a,b)=>new Date(b.ts)-new Date(a.ts)).slice(0,12);
 
   return (
-    <div style={{minHeight:'100vh',background:`linear-gradient(180deg, ${M.cream} 0%, ${M.bg1} 50%, ${M.bg2} 100%)`,color:M.ink,fontFamily:fCormorant,position:'relative'}}>
-      <div style={{padding:'34px 24px 28px',maxWidth:480,margin:'0 auto'}}>
-        <div style={{textAlign:'center'}}>
-          <div style={{fontFamily:fDmSans,fontSize:9,letterSpacing:'0.5em',color:M.accent,textTransform:'uppercase',marginBottom:6}}>VII · MENS</div>
-          <h1 style={{fontFamily:fCormorant,fontStyle:'italic',fontWeight:400,fontSize:42,color:M.ink,margin:0,letterSpacing:'-0.01em'}}>Respiro</h1>
-          <div style={{fontFamily:fCormorant,fontStyle:'italic',fontSize:14,color:M.dim,marginTop:4}}>il presente, ora</div>
-          <Ornament color={M.accent} mark="·" />
-        </div>
+    <div style={{minHeight:'100vh',background:`radial-gradient(ellipse at top, ${M.bg1} 0%, ${M.bg2} 100%)`,color:M.cream,fontFamily:fCormorant,position:'relative',overflow:'hidden'}}>
+      <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${M.gold}40`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
+      <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${M.gold}1A`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
+      <div style={{position:'relative',zIndex:2,padding:'32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
+        <Header q="QUERCUS" sub="VII · il respiro" color={M.gold} dim={M.goldDim} mark="✦" font={fCormorant} />
 
         {!loaded && <Loading color={M.dim} />}
 
