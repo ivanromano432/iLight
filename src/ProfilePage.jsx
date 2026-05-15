@@ -3,9 +3,8 @@
 // Salvataggio diretto su profiles.avatar_data (base64) e profiles.display_name.
 
 import { useState, useRef, useEffect } from 'react';
-import { THEMES, THEME_ORDER, DEFAULT_THEME } from './themes.js';
+import { THEMES, THEME_ORDER, DEFAULT_THEME, getTheme } from './themes.js';
 
-const Q = { bg1: '#3A2818', bg2: '#1F140C', gold: '#C9A876', goldDim: '#8B7355', cream: '#E8D8B8', ink: '#1F140C' };
 const fGaramond = '"Cormorant Garamond", serif';
 const fCinzel = '"Cinzel", serif';
 
@@ -34,6 +33,9 @@ function resizeAndCropImage(file, size = 200) {
 }
 
 export default function ProfilePage({ user, profile, updProfile, onClose }) {
+  // Tema dinamico — la pagina segue il tema attivo
+  const Q = getTheme(profile?.theme);
+
   const [name, setName] = useState(profile?.display_name || '');
   const [avatar, setAvatar] = useState(profile?.avatar_data || null);
   const [themeId, setThemeId] = useState(profile?.theme || DEFAULT_THEME);

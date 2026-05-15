@@ -4,8 +4,10 @@
 
 import { useState } from 'react';
 import { supabase } from './supabase.js';
+import { getTheme } from './themes.js';
 
-const Q = { bg1: '#3A2818', bg2: '#1F140C', gold: '#C9A876', goldDim: '#8B7355', cream: '#E8D8B8', ink: '#1F140C' };
+// Tema fisso refettorio per modalità paywall (pricing deve essere stabile)
+const REFETTORIO = { bg1: '#3A2818', bg2: '#1F140C', gold: '#C9A876', goldDim: '#8B7355', cream: '#E8D8B8', ink: '#1F140C' };
 const fGaramond = '"Cormorant Garamond", serif';
 const fCinzel = '"Cinzel", serif';
 
@@ -21,6 +23,10 @@ function daysUntil(isoDate) {
 }
 
 export default function SubscriptionPage({ user, profile, onClose, paywallMode = false, onLogout }) {
+  // In modalità paywall mantengo lo stile refettorio coerente coi piani/prezzi.
+  // In modalità normale (dall'avatar) seguo il tema attivo dell'utente.
+  const Q = paywallMode ? REFETTORIO : getTheme(profile?.theme);
+
   const [loading, setLoading] = useState(null); // 'monthly' | 'yearly' | 'portal' | null
   const [error, setError] = useState(null);
 

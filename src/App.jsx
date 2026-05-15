@@ -721,7 +721,7 @@ export default function App({ user, onLogout }){
   }
 
   if (showGuida) {
-    return <GuidaPage onClose={() => setShowGuida(false)} />;
+    return <GuidaPage profile={profile} onClose={() => setShowGuida(false)} />;
   }
 
   if (showProfile) {
@@ -830,6 +830,7 @@ export default function App({ user, onLogout }){
           mindful={mindfulSessions} fasts={fasts} diaryNotes={foodNotes}
           goal={goal}
           userGoals={userGoals} updGoals={updGoals}
+          profile={profile}
           onClose={() => setShowStats(false)}
         />
         {renderAccountMenu()}

@@ -2,8 +2,8 @@
 // Una sezione per ognuno dei 9 mondi + statistiche, obiettivi, abbonamento, FAQ.
 
 import { useState } from 'react';
+import { getTheme } from './themes.js';
 
-const Q = { bg1: '#3A2818', bg2: '#1F140C', gold: '#C9A876', goldDim: '#8B7355', cream: '#E8D8B8', ink: '#1F140C' };
 const fGaramond = '"Cormorant Garamond", serif';
 const fCinzel = '"Cinzel", serif';
 
@@ -184,7 +184,8 @@ const SECTIONS = [
   },
 ];
 
-export default function GuidaPage({ onClose }) {
+export default function GuidaPage({ profile, onClose }) {
+  const Q = getTheme(profile?.theme);
   const [openSection, setOpenSection] = useState('intro');
 
   return (

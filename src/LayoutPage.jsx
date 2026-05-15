@@ -2,14 +2,14 @@
 // Tap su un tema = applicato subito (salvato su Supabase, niente bottone SALVA).
 
 import { useState } from 'react';
-import { THEMES, THEME_ORDER, DEFAULT_THEME } from './themes.js';
+import { THEMES, THEME_ORDER, DEFAULT_THEME, getTheme } from './themes.js';
 
-const Q = { bg1: '#3A2818', bg2: '#1F140C', gold: '#C9A876', goldDim: '#8B7355', cream: '#E8D8B8', ink: '#1F140C' };
 const fGaramond = '"Cormorant Garamond", serif';
 const fCinzel = '"Cinzel", serif';
 
 export default function LayoutPage({ profile, updProfile, onClose }) {
   const currentTheme = profile?.theme || DEFAULT_THEME;
+  const Q = getTheme(currentTheme);
   const [applying, setApplying] = useState(null); // id del tema che si sta applicando
 
   const apply = async (themeId) => {

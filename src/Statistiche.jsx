@@ -2,8 +2,11 @@
 // Accessibile dalla pagina Peso tramite bottone "STATISTICHE COMPLETE".
 
 import { useState, useMemo, useEffect } from 'react';
+import { getTheme } from './themes.js';
 
-// Palette: usa la palette Quercus della pagina Peso
+// Fallback Refettorio per sotto-componenti definiti a livello modulo
+// (StatRow, Section, GoalModal). Il componente principale StatistichePage
+// usa invece Q dinamico via shadow.
 const Q = { bg1: '#3A2818', bg2: '#1F140C', gold: '#C9A876', goldDim: '#8B7355', cream: '#E8D8B8', ink: '#1F140C' };
 const fGaramond = '"Cormorant Garamond", serif';
 const fCinzel = '"Cinzel", serif';
@@ -383,8 +386,10 @@ export default function StatistichePage({
   weights = [], meals = [], sleeps = [], water = {}, workouts = [], workoutTypes = [],
   supplements = [], suppTaken = {}, mindful = [], fasts = [], diaryNotes = [],
   goal = null, userGoals = [], updGoals,
+  profile,
   onClose,
 }) {
+  const Q = getTheme(profile?.theme);
   const [period, setPeriod] = useState('30');
 
   const periodObj = PERIODS.find(p => p.id === period);
