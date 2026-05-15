@@ -24,8 +24,9 @@ export default function SubscriptionPage({ user, profile, onClose, paywallMode =
   const [loading, setLoading] = useState(null); // 'monthly' | 'yearly' | 'portal' | null
   const [error, setError] = useState(null);
 
-  const isTrial = profile?.subscription_status === 'trial';
-  const isActive = profile?.subscription_status === 'active';
+  const isLifetimeFree = !!profile?.is_lifetime_free;
+  const isTrial = !isLifetimeFree && profile?.subscription_status === 'trial';
+  const isActive = !isLifetimeFree && profile?.subscription_status === 'active';
   const isPastDue = profile?.subscription_status === 'past_due';
   const isCanceled = profile?.subscription_status === 'canceled' || profile?.subscription_status === 'none';
   const trialDaysLeft = isTrial ? daysUntil(profile?.trial_ends_at) : 0;
@@ -88,6 +89,14 @@ export default function SubscriptionPage({ user, profile, onClose, paywallMode =
         </div>
 
         {/* Banner stato */}
+        {isLifetimeFree && (
+          <div style={{ marginTop: 28, padding: '14px 18px', textAlign: 'center', border: `1px solid ${Q.gold}66`, background: `${Q.gold}11` }}>
+            <div style={{ fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.35em', color: Q.gold, textTransform: 'uppercase' }}>✦ ACCESSO LIFETIME</div>
+            <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 14, color: Q.cream, marginTop: 6 }}>
+              Hai accesso completo a Quercus Premium per sempre, senza addebiti.
+            </div>
+          </div>
+        )}
         {isTrial && trialDaysLeft > 0 && (
           <div style={{ marginTop: 28, padding: '14px 18px', textAlign: 'center', border: `1px solid #A5B88944`, background: '#A5B8890E' }}>
             <div style={{ fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.3em', color: '#A5B889', textTransform: 'uppercase' }}>PROVA GRATUITA IN CORSO</div>
@@ -123,8 +132,24 @@ export default function SubscriptionPage({ user, profile, onClose, paywallMode =
           </div>
         )}
 
-        {/* Cosa include */}
-        {!isActive && (
+        {/* Cosa include (anche per lifetime, come riepilogo amichevole) */}
+        {(!isActive && !isLifetimeFree) || isLifetimeFree ? (
+          <div style={{ marginTop: 32 }}>
+            <div style={{ fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.4em', color: Q.gold, textTransform: 'uppercase', textAlign: 'center', marginBottom: 16 }}>{isLifetimeFree ? '✦ HAI ACCESSO A' : '✦ INCLUSO'}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 14, color: Q.cream, paddingLeft: 12 }}>
+              <div>· Diario libero con analisi IA dei tuoi pasti</div>
+              <div>· 9 mondi tematici per peso, sonno, allenamento, mindful, digiuno…</div>
+              <div>· Statistiche avanzate: trend lungo periodo, correlazioni, pattern</div>
+              <div>· Riassunti mensili generati dall'IA</div>
+              <div>· Obiettivi multipli con progress bar</div>
+              <div>· Esportazione CSV di tutti i tuoi dati</div>
+              <div>· Sincronizzazione multi-dispositivo</div>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Cosa include (versione ridotta, sostituita sopra) */}
+        {false && !isActive && !isLifetimeFree && (
           <div style={{ marginTop: 32 }}>
             <div style={{ fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.4em', color: Q.gold, textTransform: 'uppercase', textAlign: 'center', marginBottom: 16 }}>✦ INCLUSO</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 14, color: Q.cream, paddingLeft: 12 }}>
@@ -140,7 +165,7 @@ export default function SubscriptionPage({ user, profile, onClose, paywallMode =
         )}
 
         {/* Piani */}
-        {!isActive && (
+        {!isActive && !isLifetimeFree && (
           <div style={{ marginTop: 32 }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {PLANS.map(p => (
@@ -169,7 +194,7 @@ export default function SubscriptionPage({ user, profile, onClose, paywallMode =
         )}
 
         {/* Gestisci abbonamento esistente */}
-        {hasStripeCustomer && (
+        {hasStripeCustomer && !isLifetimeFree && (
           <div style={{ marginTop: 30, textAlign: 'center' }}>
             <button onClick={openPortal} disabled={!!loading}
               style={{ background: 'transparent', color: Q.gold, border: `1px solid ${Q.gold}66`, fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.3em', padding: '10px 18px', cursor: loading ? 'not-allowed' : 'pointer', textTransform: 'uppercase' }}>

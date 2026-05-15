@@ -586,8 +586,10 @@ export default function App({ user }){
   const page = PAGES[pageIdx].id;
 
   // Gate paywall: se la prova è terminata e l'abbonamento non è attivo, mostra solo la pagina abbonamento
+  // is_lifetime_free bypassa tutto (accesso eterno gratuito per creatore/omaggi)
+  const isLifetimeFree = !!profile?.is_lifetime_free;
   const trialExpired = profile?.trial_ends_at && new Date(profile.trial_ends_at) < new Date();
-  const hasActive = profile?.subscription_status === 'active';
+  const hasActive = profile?.subscription_status === 'active' || isLifetimeFree;
   const needsPaywall = loaded && profile && !hasActive && trialExpired;
 
   if (needsPaywall && !showSub) {
@@ -963,12 +965,14 @@ function PesoPage({ loaded, weights, goal, updWeights, updGoal, meals, updMeals,
           {/* Badge stato abbonamento */}
           {profile && openSub && (() => {
             const trialDays = profile.trial_ends_at ? Math.max(0, Math.ceil((new Date(profile.trial_ends_at) - new Date()) / 86400000)) : 0;
+            const isLifetimeFree = !!profile.is_lifetime_free;
             const isTrial = profile.subscription_status === 'trial' && trialDays > 0;
             const isActive = profile.subscription_status === 'active';
             const isPastDue = profile.subscription_status === 'past_due';
             let label = '✦ ABBONAMENTO';
             let color = Q.goldDim;
-            if (isActive) { label = '✦ PREMIUM ATTIVO'; color = '#A5B889'; }
+            if (isLifetimeFree) { label = '✦ ACCESSO LIFETIME'; color = '#C9A876'; }
+            else if (isActive) { label = '✦ PREMIUM ATTIVO'; color = '#A5B889'; }
             else if (isTrial) { label = `✦ PROVA: ${trialDays} ${trialDays === 1 ? 'GIORNO' : 'GIORNI'}`; color = Q.gold; }
             else if (isPastDue) { label = '✦ PAGAMENTO IN SOSPESO'; color = '#C99A7A'; }
             return (
