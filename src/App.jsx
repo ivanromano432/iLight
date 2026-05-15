@@ -252,6 +252,73 @@ ${habitsSummary}${avoidStr}`;
   } catch (e) { return { error: e.message || 'Errore' }; }
 }
 
+// Stima kcal/proteine/carbo/grassi di un pasto a partire da descrizione, quantità in grammi e foto opzionale
+async function estimateMealNutrition({ description, qty_g, photo }) {
+  const desc = (description || '').trim();
+  if (!desc && !photo) return { error: 'Servono almeno descrizione o foto.' };
+  const qtyTxt = (qty_g!=null && qty_g!=='' && !isNaN(qty_g)) ? `${qty_g} g` : 'porzione singola tipica italiana';
+  const promptText = `Sei un nutrizionista italiano. Stima i valori nutrizionali del seguente pasto.
+
+Descrizione: ${desc || '(vedi foto)'}
+Quantità: ${qtyTxt}
+
+Considera porzione, cottura e preparazione tipica italiana. Sii preciso ma realista.
+${photo ? 'Usa anche la foto allegata come riferimento visivo per stimare le porzioni.' : ''}
+
+Rispondi SOLO con JSON valido nella forma:
+{"kcal": <int>, "p": <num>, "c": <num>, "g": <num>, "note": "<breve nota di 5-10 parole su come hai stimato>"}
+
+p = proteine in grammi, c = carboidrati in grammi, g = grassi in grammi. Niente testo prima o dopo.`;
+
+  // Costruisci il content del messaggio: se c'è foto, usa formato multimodale
+  let content;
+  if (photo && typeof photo === 'string' && photo.startsWith('data:image/')) {
+    // Estrai mime type e base64 da data URL
+    const m = photo.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
+    if (m) {
+      content = [
+        { type: 'image', source: { type: 'base64', media_type: m[1], data: m[2] } },
+        { type: 'text', text: promptText },
+      ];
+    } else {
+      content = promptText;
+    }
+  } else {
+    content = promptText;
+  }
+
+  try {
+    const res = await fetch('/api/anthropic', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 400,
+        system: 'Sei un nutrizionista italiano. Rispondi SEMPRE e SOLO con JSON valido. Niente testo extra.',
+        messages: [{ role: 'user', content }],
+      }),
+    });
+    if (!res.ok) {
+      let detail = '';
+      try { const j = await res.json(); detail = j?.error?.message || j?.message || JSON.stringify(j); } catch(_) { detail = await res.text().catch(()=>'') }
+      throw new Error('HTTP ' + res.status + ' ' + (detail || ''));
+    }
+    const data = await res.json();
+    const txt = data.content?.find(c=>c.type==='text')?.text || '';
+    const a = txt.indexOf('{'), b = txt.lastIndexOf('}');
+    if (a === -1 || b === -1) throw new Error('Risposta IA non valida');
+    const parsed = JSON.parse(txt.slice(a, b+1));
+    const kcal = parsed.kcal!=null ? Math.max(0, Math.round(Number(parsed.kcal))) : null;
+    const p = parsed.p!=null ? Math.max(0, Math.round(Number(parsed.p)*10)/10) : null;
+    const c = parsed.c!=null ? Math.max(0, Math.round(Number(parsed.c)*10)/10) : null;
+    const g = parsed.g!=null ? Math.max(0, Math.round(Number(parsed.g)*10)/10) : null;
+    if (kcal == null || p == null || c == null || g == null) throw new Error('Stima incompleta dall\'IA');
+    return { kcal, p, c, g, note: String(parsed.note || '') };
+  } catch (e) {
+    return { error: e.message || 'Errore' };
+  }
+}
+
 function buildEatingHabitsSummary({ meals, weights, goal }){
   const now = new Date();
   const last14 = meals.filter(m=>(now-new Date(m.ts))<14*86400000 && m.status!=='planned');
@@ -1784,10 +1851,31 @@ function MealModal({ existing, onClose, onSave, onDelete, J }){
   const [g, setG] = useState(existing?.g!=null ? String(existing.g) : '');
   const [photo, setPhoto] = useState(existing?.photo || null);
   const [busy, setBusy] = useState(false);
+  const [estimating, setEstimating] = useState(false);
+  const [estimateError, setEstimateError] = useState('');
+  const [estimateNote, setEstimateNote] = useState('');
   const fileRef = useRef(null);
 
   async function pickPhoto(e){ const file=e.target.files?.[0]; if(!file)return; setBusy(true); try{const b64=await resizeImage(file,480,0.7); setPhoto(b64);}catch(_){} finally{setBusy(false);} e.target.value=''; }
   function save(){ onSave({ type, description:description.trim(), qty_g:parseNum(qty,1,5000), kcal:parseNum(kcal,0,10000), p:parseNum(p,0,1000), c:parseNum(c,0,1000), g:parseNum(g,0,1000), photo:photo||null }); }
+
+  async function estimateNutrition(){
+    setEstimateError(''); setEstimateNote(''); setEstimating(true);
+    try {
+      const qtyNum = qty ? parseNum(qty,1,5000) : null;
+      const r = await estimateMealNutrition({ description: description.trim(), qty_g: qtyNum, photo });
+      if (r.error) { setEstimateError(r.error); return; }
+      if (r.kcal != null) setKcal(String(r.kcal));
+      if (r.p != null) setP(String(r.p));
+      if (r.c != null) setC(String(r.c));
+      if (r.g != null) setG(String(r.g));
+      if (r.note) setEstimateNote(r.note);
+    } finally {
+      setEstimating(false);
+    }
+  }
+
+  const canEstimate = !estimating && (description.trim().length > 0 || !!photo);
 
   return (
     <SimpleModal onClose={onClose} bg={J.bg} border={J.dark} wide>
@@ -1817,6 +1905,21 @@ function MealModal({ existing, onClose, onSave, onDelete, J }){
         <div><FieldLabel>quantità (g)</FieldLabel><input type="text" inputMode="numeric" value={qty} onChange={e=>setQty(e.target.value)} placeholder="250" style={fieldInput(J)} /></div>
         <div><FieldLabel>kcal</FieldLabel><input type="text" inputMode="numeric" value={kcal} onChange={e=>setKcal(e.target.value)} placeholder="450" style={fieldInput(J)} /></div>
       </div>
+
+      {/* Stima nutrienti con IA */}
+      <div style={{marginTop:14,padding:'12px 14px',border:`1px dashed ${J.sage}66`,background:`${J.sage}0A`}}>
+        <button onClick={estimateNutrition} disabled={!canEstimate} style={{width:'100%',background:canEstimate?J.sage:'transparent',color:canEstimate?J.bg:J.sage,border:`1px solid ${J.sage}`,fontFamily:fMarcellus,fontSize:10,letterSpacing:'0.3em',padding:'10px 14px',cursor:canEstimate?'pointer':'not-allowed',textTransform:'uppercase',opacity:canEstimate?1:0.5}}>
+          {estimating ? '⋯ STIMO CON L\'IA' : '✦ STIMA NUTRIENTI CON IA'}
+        </button>
+        <div style={{marginTop:8,fontFamily:fGaramond,fontStyle:'italic',fontSize:12,color:J.sage,textAlign:'center',lineHeight:1.4}}>
+          {!description.trim() && !photo
+            ? 'scrivi la descrizione (o aggiungi una foto) per attivare la stima'
+            : 'l\'IA stima kcal, proteine, carboidrati e grassi da descrizione e quantità · puoi sempre correggere a mano'}
+        </div>
+        {estimateNote && <div style={{marginTop:6,fontFamily:fGaramond,fontStyle:'italic',fontSize:12,color:J.dark,textAlign:'center'}}>✓ {estimateNote}</div>}
+        {estimateError && <div style={{marginTop:6,fontFamily:fGaramond,fontStyle:'italic',fontSize:12,color:'#A04848',textAlign:'center'}}>{estimateError}</div>}
+      </div>
+
       <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginTop:14}}>
         <div><FieldLabel>prot. (g)</FieldLabel><input type="text" inputMode="decimal" value={p} onChange={e=>setP(e.target.value)} placeholder="20" style={fieldInput(J)} /></div>
         <div><FieldLabel>carb. (g)</FieldLabel><input type="text" inputMode="decimal" value={c} onChange={e=>setC(e.target.value)} placeholder="60" style={fieldInput(J)} /></div>
