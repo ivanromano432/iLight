@@ -633,6 +633,23 @@ export default function App({ user, onLogout }){
     return <ProfilePage user={user} profile={profile} updProfile={updProfile} onClose={() => setShowProfile(false)} />;
   }
 
+  // Calcolo stato abbonamento per il menu avatar
+  const subState = (() => {
+    if (!profile) return { label: 'caricamento…', color: '#8C6A4E', tone: 'neutral', ctaLabel: '◆ abbonamento', ctaPrimary: false };
+    const isLifetimeFree = !!profile.is_lifetime_free;
+    const trialDays = profile.trial_ends_at ? Math.max(0, Math.ceil((new Date(profile.trial_ends_at) - new Date()) / 86400000)) : 0;
+    const isTrial = !isLifetimeFree && profile.subscription_status === 'trial' && trialDays > 0;
+    const isActive = !isLifetimeFree && profile.subscription_status === 'active';
+    const isPastDue = profile.subscription_status === 'past_due';
+    const trialExpired = !isLifetimeFree && !isActive && profile.trial_ends_at && new Date(profile.trial_ends_at) < new Date();
+    if (isLifetimeFree) return { label: '✦ Accesso lifetime', color: '#8C6A4E', tone: 'lifetime', ctaLabel: '◆ il tuo abbonamento', ctaPrimary: false };
+    if (isActive) return { label: '✦ Premium attivo', color: '#6B8E5C', tone: 'active', ctaLabel: '◆ gestisci abbonamento', ctaPrimary: false };
+    if (isPastDue) return { label: '⚠ pagamento in sospeso', color: '#C99A7A', tone: 'past_due', ctaLabel: '◆ risolvi', ctaPrimary: true };
+    if (trialExpired) return { label: '✕ prova terminata', color: '#C99A7A', tone: 'expired', ctaLabel: '✦ abbonati ora', ctaPrimary: true };
+    if (isTrial) return { label: `✦ Prova: rimangono ${trialDays} ${trialDays === 1 ? 'giorno' : 'giorni'}`, color: '#8C6A4E', tone: 'trial', ctaLabel: '✦ abbonati ora', ctaPrimary: true };
+    return { label: 'abbonamento', color: '#8C6A4E', tone: 'neutral', ctaLabel: '◆ abbonamento', ctaPrimary: false };
+  })();
+
   // Avatar + menu account (rendering subito sotto, in fixed)
   const accountEmail = user?.email || '';
   const displayName = profile?.display_name || '';
@@ -646,9 +663,15 @@ export default function App({ user, onLogout }){
           {avatarSrc ? <img src={avatarSrc} alt="profilo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : accountInitial}
         </button>
         {showAccountMenu && (
-          <div style={{ position: 'absolute', top: 44, right: 0, background: '#E8E0D2', border: '1px solid rgba(60,51,41,0.2)', padding: '14px 16px', minWidth: 220, fontFamily: "'Cardo',serif", color: '#3C3329', boxShadow: '0 4px 16px rgba(0,0,0,0.12)' }}>
+          <div style={{ position: 'absolute', top: 44, right: 0, background: '#E8E0D2', border: '1px solid rgba(60,51,41,0.2)', padding: '14px 16px', minWidth: 240, fontFamily: "'Cardo',serif", color: '#3C3329', boxShadow: '0 4px 16px rgba(0,0,0,0.12)' }}>
             <div style={{ fontSize: 12, fontStyle: 'italic', color: '#8C6A4E', marginBottom: 4 }}>connesso come</div>
-            <div style={{ fontSize: 14, marginBottom: 12, wordBreak: 'break-all' }}>{displayName || accountEmail}</div>
+            <div style={{ fontSize: 14, marginBottom: 10, wordBreak: 'break-all' }}>{displayName || accountEmail}</div>
+
+            {/* Badge stato abbonamento */}
+            <div style={{ padding: '8px 10px', border: `1px solid ${subState.color}66`, background: `${subState.color}14`, marginBottom: 12, fontSize: 13, fontStyle: 'italic', color: subState.color, textAlign: 'center' }}>
+              {subState.label}
+            </div>
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <button onClick={() => { setShowAccountMenu(false); setShowProfile(true); }}
                 style={{ background: 'transparent', color: '#3C3329', border: '1px solid rgba(60,51,41,0.25)', fontFamily: "'Cardo',serif", fontStyle: 'italic', fontSize: 14, padding: '8px 12px', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
@@ -659,8 +682,15 @@ export default function App({ user, onLogout }){
                 ✦ guida
               </button>
               <button onClick={() => { setShowAccountMenu(false); setShowSub(true); }}
-                style={{ background: 'transparent', color: '#3C3329', border: '1px solid rgba(60,51,41,0.25)', fontFamily: "'Cardo',serif", fontStyle: 'italic', fontSize: 14, padding: '8px 12px', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
-                ◆ abbonamento
+                style={{
+                  background: subState.ctaPrimary ? '#C9A876' : 'transparent',
+                  color: subState.ctaPrimary ? '#1F140C' : '#3C3329',
+                  border: subState.ctaPrimary ? '1px solid #C9A876' : '1px solid rgba(60,51,41,0.25)',
+                  fontFamily: "'Cardo',serif", fontStyle: 'italic', fontSize: 14,
+                  padding: '8px 12px', cursor: 'pointer', width: '100%', textAlign: 'left',
+                  fontWeight: subState.ctaPrimary ? 600 : 400,
+                }}>
+                {subState.ctaLabel}
               </button>
               <button onClick={() => { setShowAccountMenu(false); onLogout && onLogout(); }}
                 style={{ background: '#3C3329', color: '#E8E0D2', border: 'none', fontFamily: "'Cardo',serif", fontStyle: 'italic', fontSize: 14, padding: '8px 12px', cursor: 'pointer', width: '100%', marginTop: 4 }}>
