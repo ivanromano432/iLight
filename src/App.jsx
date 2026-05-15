@@ -6,6 +6,7 @@ import {
 } from './repo.js';
 import StatistichePage from './Statistiche.jsx';
 import SubscriptionPage from './SubscriptionPage.jsx';
+import Onboarding, { hasSeenOnboarding } from './Onboarding.jsx';
 import { supabase } from './supabase.js';
 
 const Q = { bg1: '#3A2818', bg2: '#1F140C', gold: '#C9A876', goldDim: '#8B7355', cream: '#E8D8B8', ink: '#1F140C' };
@@ -368,6 +369,7 @@ export default function App({ user }){
   const [pageIdx, setPageIdx] = useState(0);
   const [showStats, setShowStats] = useState(false);
   const [showSub, setShowSub] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const [profile, setProfile] = useState(null);
   const [loaded, setLoaded] = useState(false);
   const [weights, setWeights] = useState([]);
@@ -449,6 +451,11 @@ export default function App({ user }){
     setFasts(fastsFromDb);
     setUserGoals(goalsFromDb);
     setLoaded(true);
+
+    // Mostra onboarding al primo accesso (per utente)
+    if (!hasSeenOnboarding(user.id)) {
+      setShowOnboarding(true);
+    }
   })();},[user]);
 
   // updWeights: aggiorna state + sync delta su Supabase
@@ -601,6 +608,10 @@ export default function App({ user }){
         onLogout={async () => { await supabase.auth.signOut(); }}
       />
     );
+  }
+
+  if (showOnboarding) {
+    return <Onboarding userId={user?.id} onDone={() => setShowOnboarding(false)} />;
   }
 
   if (showSub) {
