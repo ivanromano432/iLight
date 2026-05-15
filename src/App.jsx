@@ -104,13 +104,27 @@ function mealsAreIdentical(a, b){
 // IMPORTANTE: il match per "simile" guarda SOLO la descrizione (ignorando type/orario).
 // Così "caffè colazione" e "caffè merenda" sono trattati come similar (l'utente decide),
 // mentre identical scatta solo se TUTTO coincide perfettamente.
+// CASO SPECIALE: se un pasto esistente ha foto ma descrizione vuota (caricato dal Refettorio),
+// e il candidato ha stesso type, lo trattiamo come 'similar' — è molto probabile sia lo stesso pasto.
 function classifyCandidate(candidate, existingMeals){
+  // 1. Match per descrizione simile (token-based)
   const matches = existingMeals.filter(em => descsAreSimilar(candidate.description, em.description));
-  if (matches.length === 0) return { kind: 'new', match: null };
-  const identicalMatch = matches.find(em => mealsAreIdentical(candidate, em));
-  if (identicalMatch) return { kind: 'identical', match: identicalMatch };
-  // Match per descrizione ma con type/orario/nutrienti diversi → chiedi all'utente
-  return { kind: 'similar', match: matches[0] };
+  if (matches.length > 0) {
+    const identicalMatch = matches.find(em => mealsAreIdentical(candidate, em));
+    if (identicalMatch) return { kind: 'identical', match: identicalMatch };
+    return { kind: 'similar', match: matches[0] };
+  }
+  // 2. Fallback: pasti con foto ma senza descrizione, stesso type → probabilmente è quel pasto
+  const photoOnlyMatches = existingMeals.filter(em =>
+    (em.photo_url || em.photo) &&
+    !normalizeDesc(em.description||'') &&
+    (em.type||'pranzo') === (candidate.type||'pranzo')
+  );
+  if (photoOnlyMatches.length > 0) {
+    // Sempre 'similar': l'utente decide se è davvero quel pasto o uno nuovo
+    return { kind: 'similar', match: photoOnlyMatches[0] };
+  }
+  return { kind: 'new', match: null };
 }
 function isDuplicateMeal(newMeal, existingMeals){
   if (!normalizeDesc(newMeal.description)) return false;
@@ -1690,6 +1704,16 @@ function DiarioPage({ theme, loaded, notes, water, waterGoal, updNotes, updWater
               </div>
             </ToggleRow>
           )}
+          {(() => {
+            const hasMeals = (analysisResult.meals||[]).length > 0;
+            const onlyIdentical = hasMeals && analysisMealKinds.length > 0 && analysisMealKinds.every(k => k.kind === 'identical');
+            if (!onlyIdentical) return null;
+            return (
+              <div style={{marginTop:14,padding:'14px 12px',background:`${W.ink}0D`,border:`1px solid ${W.ink}22`,fontFamily:fCardo,fontStyle:'italic',fontSize:14,color:W.ink,textAlign:'center',borderRadius:2}}>
+                ✓ Tutti i pasti del diario sono già registrati. Niente di nuovo da copiare.
+              </div>
+            );
+          })()}
           {(analysisResult.meals||[]).map((m,i)=>{
             const k = analysisMealKinds[i] || { kind: 'new', match: null };
             const matchTime = k.match ? new Date(k.match.ts).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}) : '';
@@ -1698,18 +1722,8 @@ function DiarioPage({ theme, loaded, notes, water, waterGoal, updNotes, updWater
             const typeName = MEAL_TYPES.find(t=>t.id===m.type)?.name || m.type;
 
             if (k.kind === 'identical') {
-              // Già presente identico → riga in grigio + label, checkbox off
-              return (
-                <div key={`m-${i}`} style={{padding:'12px 0',borderTop:`1px solid ${W.ink}1A`,opacity:0.55}}>
-                  <div style={{display:'flex',alignItems:'center',gap:10}}>
-                    <input type="checkbox" checked={!!analysisSel[`m${i}`]} onChange={()=>setAnalysisSel({...analysisSel,[`m${i}`]:!analysisSel[`m${i}`]})} style={{width:18,height:18,accentColor:W.ink,flexShrink:0}} />
-                    <div style={{flex:1}}>
-                      <div style={{fontFamily:fCardo,fontStyle:'italic',fontSize:15,color:W.ink}}>{typeName}: {m.description}</div>
-                      <div style={{fontFamily:fCaveat,fontSize:15,color:W.tan,marginTop:2}}>✓ già presente alle {matchTime} — identico, lo salto</div>
-                    </div>
-                  </div>
-                </div>
-              );
+              // Già presente identico → NON renderizzare. Il conteggio sta nel sottotitolo.
+              return null;
             }
 
             if (k.kind === 'similar') {
@@ -1819,6 +1833,10 @@ function PastiPage({ user, theme, loaded, meals, updMeals, notes, weights, goal 
   const [analysisMealKinds, setAnalysisMealKinds] = useState([]);
   // Azione utente per i 'similar': 'skip' | 'replace' | 'add'
   const [analysisActions, setAnalysisActions] = useState({});
+  // Bulk stima nutrienti
+  const [bulkEstimating, setBulkEstimating] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0 });
+  const [bulkError, setBulkError] = useState('');
   const [suggestions, setSuggestions] = useState(null);
   const [suggestLoading, setSuggestLoading] = useState(false);
   const [suggestError, setSuggestError] = useState('');
@@ -1942,6 +1960,80 @@ function PastiPage({ user, theme, loaded, meals, updMeals, notes, weights, goal 
       await updMeals([...updatedMeals, ...newMeals]);
     }
     setAnalysisResult(null); setAnalysisError(''); setAnalysisSel({}); setAnalysisMealKinds([]); setAnalysisActions({});
+  }
+
+  // Stima bulk dei nutrienti per i pasti del giorno corrente che hanno descrizione o foto ma mancano kcal
+  async function bulkEstimateNutrients(){
+    const dayDate = parseDayKey(selectedDay);
+    const candidates = meals.filter(m => {
+      if (!sameDay(new Date(m.ts), dayDate)) return false;
+      if (m.kcal != null) return false; // ha già kcal → skip
+      const hasDesc = (m.description||'').trim().length > 0;
+      const hasPhoto = m.photo || m.photo_url;
+      return hasDesc || hasPhoto;
+    });
+    if (candidates.length === 0) {
+      setBulkError('Nessun pasto da stimare. Tutti hanno già i nutrienti o non hanno né descrizione né foto.');
+      setTimeout(()=>setBulkError(''), 4000);
+      return;
+    }
+    setBulkError(''); setBulkEstimating(true);
+    setBulkProgress({ done: 0, total: candidates.length });
+
+    // Helper: scarica URL come data URL base64
+    async function urlToDataUrl(url){
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error('fetch foto fallita');
+      const blob = await resp.blob();
+      return await new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res(r.result);
+        r.onerror = () => rej(new Error('lettura foto fallita'));
+        r.readAsDataURL(blob);
+      });
+    }
+
+    let updated = [...meals];
+    let okCount = 0, errCount = 0;
+    for (let i = 0; i < candidates.length; i++) {
+      const meal = candidates[i];
+      try {
+        let photoData = null;
+        if (meal.photo && typeof meal.photo === 'string' && meal.photo.startsWith('data:image/')) {
+          photoData = meal.photo;
+        } else if (meal.photo_url) {
+          try { photoData = await urlToDataUrl(meal.photo_url); } catch (_) { photoData = null; }
+        }
+        const r = await estimateMealNutrition({ description: meal.description, qty_g: meal.qty_g, photo: photoData });
+        if (!r.error) {
+          const idx = updated.findIndex(m => m.id === meal.id);
+          if (idx >= 0) {
+            updated[idx] = {
+              ...updated[idx],
+              kcal: r.kcal != null ? r.kcal : updated[idx].kcal,
+              p: r.p != null ? r.p : updated[idx].p,
+              c: r.c != null ? r.c : updated[idx].c,
+              g: r.g != null ? r.g : updated[idx].g,
+            };
+            okCount++;
+          }
+        } else {
+          errCount++;
+        }
+      } catch (_) {
+        errCount++;
+      }
+      setBulkProgress({ done: i+1, total: candidates.length });
+    }
+
+    if (okCount > 0) {
+      await updMeals(updated);
+    }
+    setBulkEstimating(false);
+    if (errCount > 0) {
+      setBulkError(`Stimati ${okCount}/${candidates.length}. ${errCount} non riusciti.`);
+      setTimeout(()=>setBulkError(''), 5000);
+    }
   }
 
   const [activeTab, setActiveTab] = useState('fatti');
@@ -2082,6 +2174,38 @@ function PastiPage({ user, theme, loaded, meals, updMeals, notes, weights, goal 
                 <div style={{marginTop:14}}>
                   <button onClick={()=>setEditing('new')} style={{background:'transparent',color:J.sage,border:`1px solid ${J.sage}66`,fontFamily:fGaramond,fontStyle:'italic',fontSize:13,padding:'8px 18px',cursor:'pointer'}}>+ aggiungi a mano</button>
                 </div>
+                {/* Bulk stima nutrienti per i pasti del giorno senza kcal */}
+                {(() => {
+                  const missing = eatenMeals.filter(m => m.kcal == null && ((m.description||'').trim() || m.photo || m.photo_url));
+                  if (missing.length === 0 && !bulkEstimating && !bulkError) return null;
+                  return (
+                    <div style={{marginTop:22,paddingTop:14,borderTop:`1px dashed ${J.sage}33`}}>
+                      <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:13,color:J.sage,marginBottom:10,lineHeight:1.4}}>
+                        {bulkEstimating
+                          ? `Stimando nutrienti... ${bulkProgress.done}/${bulkProgress.total}`
+                          : `${missing.length} ${missing.length===1?'pasto':'pasti'} di ${isToday?'oggi':'questo giorno'} ${missing.length===1?'è':'sono'} senza nutrienti.`}
+                      </div>
+                      <button
+                        onClick={bulkEstimateNutrients}
+                        disabled={bulkEstimating || missing.length === 0}
+                        style={{
+                          background:'transparent',
+                          color:J.dark,
+                          border:`1px solid ${J.dark}`,
+                          fontFamily:fMarcellus,
+                          fontSize:11,
+                          letterSpacing:'0.3em',
+                          padding:'10px 22px',
+                          cursor:bulkEstimating||missing.length===0?'default':'pointer',
+                          opacity:bulkEstimating||missing.length===0?0.5:1,
+                          textTransform:'uppercase',
+                        }}>
+                        {bulkEstimating ? `⋯ ${bulkProgress.done}/${bulkProgress.total}` : '✦ STIMA NUTRIENTI MANCANTI'}
+                      </button>
+                      {bulkError && <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:13,color:'#A04848',marginTop:10}}>{bulkError}</div>}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           )}
@@ -2209,6 +2333,16 @@ function PastiPage({ user, theme, loaded, meals, updMeals, notes, weights, goal 
             );
           })()}
           <div style={{marginTop:14}}>
+            {(() => {
+              const hasMeals = (analysisResult.meals||[]).length > 0;
+              const onlyIdentical = hasMeals && analysisMealKinds.length > 0 && analysisMealKinds.every(k => k.kind === 'identical');
+              if (!onlyIdentical) return null;
+              return (
+                <div style={{padding:'14px 12px',background:`${J.dark}0D`,border:`1px solid ${J.dark}22`,fontFamily:fGaramond,fontStyle:'italic',fontSize:14,color:J.dark,textAlign:'center',borderRadius:2}}>
+                  ✓ Tutti i pasti del diario sono già registrati. Niente di nuovo da copiare.
+                </div>
+              );
+            })()}
             {(analysisResult.meals||[]).map((m,i)=>{
               const k = analysisMealKinds[i] || { kind: 'new', match: null };
               const matchTime = k.match ? new Date(k.match.ts).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}) : '';
@@ -2217,17 +2351,8 @@ function PastiPage({ user, theme, loaded, meals, updMeals, notes, weights, goal 
               const typeName = MEAL_TYPES.find(t=>t.id===m.type)?.name || m.type;
 
               if (k.kind === 'identical') {
-                return (
-                  <div key={`m-${i}`} style={{padding:'12px 0',borderTop:`1px solid ${J.dark}1A`,opacity:0.55}}>
-                    <div style={{display:'flex',alignItems:'center',gap:10}}>
-                      <input type="checkbox" checked={!!analysisSel[`m${i}`]} onChange={()=>setAnalysisSel({...analysisSel,[`m${i}`]:!analysisSel[`m${i}`]})} style={{width:18,height:18,accentColor:J.dark,flexShrink:0}} />
-                      <div style={{flex:1}}>
-                        <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:15,color:J.dark}}>{typeName}: {m.description}</div>
-                        <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:13,color:J.sage,marginTop:2}}>✓ già presente alle {matchTime} — identico, lo salto</div>
-                      </div>
-                    </div>
-                  </div>
-                );
+                // Già presente identico → NON renderizzare. Il conteggio sta nel sottotitolo.
+                return null;
               }
 
               if (k.kind === 'similar') {
