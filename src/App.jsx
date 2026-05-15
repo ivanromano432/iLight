@@ -67,16 +67,21 @@ function normalizeDesc(s){ return (s||'').toLowerCase().trim().replace(/\s+/g,' 
 function mealTokens(s){
   return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9 ]/g,' ').split(/\s+/).filter(w=>w.length>=3 && !['con','dei','del','della','delle','degli','una','uno','gli','che','per','tra','dal','dai','sul','nel','nei','nelle'].includes(w));
 }
-function mealsAreSimilar(a, b){
-  if ((a.type||'pranzo') !== (b.type||'pranzo')) return false;
-  const wa = mealTokens(a.description);
-  const wb = mealTokens(b.description);
-  if (wa.length===0 && wb.length===0) return true;
-  if (wa.length===0 || wb.length===0) return normalizeDesc(a.description) === normalizeDesc(b.description);
+// Confronta solo descrizioni (token-based fuzzy match, indipendente da type)
+function descsAreSimilar(a, b){
+  const wa = mealTokens(a||'');
+  const wb = mealTokens(b||'');
+  if (wa.length===0 && wb.length===0) return false; // entrambi vuoti: non utile come match
+  if (wa.length===0 || wb.length===0) return normalizeDesc(a||'') === normalizeDesc(b||'');
   const sb = new Set(wb);
   let overlap = 0;
   for (const w of wa) if (sb.has(w)) overlap++;
   return overlap / Math.min(wa.length, wb.length) >= 0.6;
+}
+function mealsAreSimilar(a, b){
+  // Mantiene il vecchio comportamento (type + descrizione) — usata per il dedup interno al batch
+  if ((a.type||'pranzo') !== (b.type||'pranzo')) return false;
+  return descsAreSimilar(a.description, b.description);
 }
 // Tutti i dati nutrizionali + descrizione + tipo coincidono (entrambi null = OK)
 function sameNutrient(a, b){
@@ -85,8 +90,9 @@ function sameNutrient(a, b){
   return Math.abs(Number(a) - Number(b)) < 0.5;
 }
 function mealsAreIdentical(a, b){
-  if (!mealsAreSimilar(a, b)) return false;
-  if (normalizeDesc(a.description) !== normalizeDesc(b.description)) return false;
+  // Identical = TUTTO coincide: type + descrizione (normalizzata identica) + nutrienti tutti uguali
+  if ((a.type||'pranzo') !== (b.type||'pranzo')) return false;
+  if (normalizeDesc(a.description||'') !== normalizeDesc(b.description||'')) return false;
   return sameNutrient(a.kcal, b.kcal)
       && sameNutrient(a.p, b.p)
       && sameNutrient(a.c, b.c)
@@ -95,12 +101,15 @@ function mealsAreIdentical(a, b){
 }
 // Classifica un candidato dell'IA rispetto ai pasti già presenti nel giorno
 // → { kind: 'new'|'identical'|'similar', match: meal|null }
+// IMPORTANTE: il match per "simile" guarda SOLO la descrizione (ignorando type/orario).
+// Così "caffè colazione" e "caffè merenda" sono trattati come similar (l'utente decide),
+// mentre identical scatta solo se TUTTO coincide perfettamente.
 function classifyCandidate(candidate, existingMeals){
-  const matches = existingMeals.filter(em => mealsAreSimilar(candidate, em));
+  const matches = existingMeals.filter(em => descsAreSimilar(candidate.description, em.description));
   if (matches.length === 0) return { kind: 'new', match: null };
   const identicalMatch = matches.find(em => mealsAreIdentical(candidate, em));
   if (identicalMatch) return { kind: 'identical', match: identicalMatch };
-  // C'è un match simile ma non identico → l'utente deve scegliere
+  // Match per descrizione ma con type/orario/nutrienti diversi → chiedi all'utente
   return { kind: 'similar', match: matches[0] };
 }
 function isDuplicateMeal(newMeal, existingMeals){
@@ -1706,14 +1715,17 @@ function DiarioPage({ theme, loaded, notes, water, waterGoal, updNotes, updWater
             if (k.kind === 'similar') {
               // Simile ma con dati diversi → mostra confronto e chiedi azione
               const exist = k.match;
+              const existTypeName = MEAL_TYPES.find(t=>t.id===exist.type)?.name || exist.type;
+              const typeChanged = exist.type !== m.type;
               return (
                 <div key={`m-${i}`} style={{padding:'14px 0',borderTop:`1px solid ${W.ink}1A`}}>
                   <div style={{fontFamily:fCardo,fontStyle:'italic',fontSize:15,color:W.ink,marginBottom:6}}>{typeName}: {m.description}</div>
                   <div style={{background:`${W.ink}0D`,border:`1px solid ${W.ink}22`,padding:'8px 10px',marginBottom:8,borderRadius:2}}>
                     <div style={{fontFamily:fCaveat,fontSize:16,color:W.tan,marginBottom:4}}>è simile a uno già presente:</div>
                     <div style={{fontFamily:fCardo,fontSize:13,color:W.ink}}>
-                      <div><span style={{color:W.tan,fontStyle:'italic'}}>esistente:</span> {exist.description} · {matchTime} · {exist.kcal!=null?`${exist.kcal} kcal`:'no kcal'}</div>
-                      <div style={{marginTop:2}}><span style={{color:W.tan,fontStyle:'italic'}}>nuovo IA:</span> {m.description} · {m.kcal!=null?`${m.kcal} kcal`:'no kcal'}{m.qty_g?` · ${m.qty_g}g`:''}</div>
+                      <div><span style={{color:W.tan,fontStyle:'italic'}}>esistente:</span> {exist.description} · <span style={{color:typeChanged?W.ink:W.tan,fontWeight:typeChanged?600:400}}>{existTypeName}</span> · {matchTime} · {exist.kcal!=null?`${exist.kcal} kcal`:'no kcal'}{exist.qty_g?` · ${exist.qty_g}g`:''}</div>
+                      <div style={{marginTop:2}}><span style={{color:W.tan,fontStyle:'italic'}}>nuovo IA:</span> {m.description} · <span style={{color:typeChanged?W.ink:W.tan,fontWeight:typeChanged?600:400}}>{typeName}</span> · {m.kcal!=null?`${m.kcal} kcal`:'no kcal'}{m.qty_g?` · ${m.qty_g}g`:''}</div>
+                      {typeChanged && <div style={{marginTop:4,fontFamily:fCaveat,fontSize:13,color:W.ink,opacity:0.7}}>orari diversi: {existTypeName.toLowerCase()} vs {typeName.toLowerCase()}</div>}
                     </div>
                   </div>
                   <div style={{fontFamily:fCaveat,fontSize:15,color:W.tan,marginBottom:6}}>è lo stesso pasto?</div>
