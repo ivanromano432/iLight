@@ -7,6 +7,7 @@ import {
 import StatistichePage from './Statistiche.jsx';
 import SubscriptionPage from './SubscriptionPage.jsx';
 import Onboarding, { hasSeenOnboarding } from './Onboarding.jsx';
+import GuidaPage from './GuidaPage.jsx';
 import { supabase } from './supabase.js';
 
 const Q = { bg1: '#3A2818', bg2: '#1F140C', gold: '#C9A876', goldDim: '#8B7355', cream: '#E8D8B8', ink: '#1F140C' };
@@ -364,11 +365,13 @@ const MEAL_TYPES = [
   { id:'spuntino_s', name:'Spuntino serale', order:6, abbr:'SPS' },
 ];
 
-export default function App({ user }){
+export default function App({ user, onLogout }){
   useGoogleFonts();
   const [pageIdx, setPageIdx] = useState(0);
   const [showStats, setShowStats] = useState(false);
   const [showSub, setShowSub] = useState(false);
+  const [showGuida, setShowGuida] = useState(false);
+  const [showAccountMenu, setShowAccountMenu] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [profile, setProfile] = useState(null);
   const [loaded, setLoaded] = useState(false);
@@ -614,27 +617,72 @@ export default function App({ user }){
     return <Onboarding userId={user?.id} onDone={() => setShowOnboarding(false)} />;
   }
 
+  if (showGuida) {
+    return <GuidaPage onClose={() => setShowGuida(false)} />;
+  }
+
+  // Avatar + menu account (rendering subito sotto, in fixed)
+  const accountEmail = user?.email || '';
+  const accountInitial = (accountEmail[0] || '?').toUpperCase();
+  const renderAccountMenu = () => (
+    <>
+      <div style={{ position: 'fixed', top: 12, right: 12, zIndex: 9000 }}>
+        <button onClick={() => setShowAccountMenu(!showAccountMenu)} aria-label="account"
+          style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(232,224,210,0.85)', border: '1px solid rgba(60,51,41,0.2)', color: '#3C3329', fontFamily: "'Cardo',serif", fontSize: 16, fontStyle: 'italic', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', boxShadow: '0 2px 6px rgba(0,0,0,0.08)' }}>
+          {accountInitial}
+        </button>
+        {showAccountMenu && (
+          <div style={{ position: 'absolute', top: 44, right: 0, background: '#E8E0D2', border: '1px solid rgba(60,51,41,0.2)', padding: '14px 16px', minWidth: 220, fontFamily: "'Cardo',serif", color: '#3C3329', boxShadow: '0 4px 16px rgba(0,0,0,0.12)' }}>
+            <div style={{ fontSize: 12, fontStyle: 'italic', color: '#8C6A4E', marginBottom: 4 }}>connesso come</div>
+            <div style={{ fontSize: 14, marginBottom: 12, wordBreak: 'break-all' }}>{accountEmail}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <button onClick={() => { setShowAccountMenu(false); setShowGuida(true); }}
+                style={{ background: 'transparent', color: '#3C3329', border: '1px solid rgba(60,51,41,0.25)', fontFamily: "'Cardo',serif", fontStyle: 'italic', fontSize: 14, padding: '8px 12px', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
+                ✦ guida
+              </button>
+              <button onClick={() => { setShowAccountMenu(false); setShowSub(true); }}
+                style={{ background: 'transparent', color: '#3C3329', border: '1px solid rgba(60,51,41,0.25)', fontFamily: "'Cardo',serif", fontStyle: 'italic', fontSize: 14, padding: '8px 12px', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
+                ◆ abbonamento
+              </button>
+              <button onClick={() => { setShowAccountMenu(false); onLogout && onLogout(); }}
+                style={{ background: '#3C3329', color: '#E8E0D2', border: 'none', fontFamily: "'Cardo',serif", fontStyle: 'italic', fontSize: 14, padding: '8px 12px', cursor: 'pointer', width: '100%', marginTop: 4 }}>
+                esci
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+      {showAccountMenu && <div onClick={() => setShowAccountMenu(false)} style={{ position: 'fixed', inset: 0, zIndex: 8999, background: 'transparent' }} />}
+    </>
+  );
+
   if (showSub) {
     return (
-      <SubscriptionPage
-        user={user}
-        profile={profile}
-        onClose={() => setShowSub(false)}
-      />
+      <>
+        <SubscriptionPage
+          user={user}
+          profile={profile}
+          onClose={() => setShowSub(false)}
+        />
+        {renderAccountMenu()}
+      </>
     );
   }
 
   if (showStats) {
     return (
-      <StatistichePage
-        weights={weights} meals={meals} sleeps={sleeps} water={waterByDay}
-        workouts={workouts} workoutTypes={workoutTypes}
-        supplements={supplements} suppTaken={suppTaken}
-        mindful={mindfulSessions} fasts={fasts} diaryNotes={foodNotes}
-        goal={goal}
-        userGoals={userGoals} updGoals={updGoals}
-        onClose={() => setShowStats(false)}
-      />
+      <>
+        <StatistichePage
+          weights={weights} meals={meals} sleeps={sleeps} water={waterByDay}
+          workouts={workouts} workoutTypes={workoutTypes}
+          supplements={supplements} suppTaken={suppTaken}
+          mindful={mindfulSessions} fasts={fasts} diaryNotes={foodNotes}
+          goal={goal}
+          userGoals={userGoals} updGoals={updGoals}
+          onClose={() => setShowStats(false)}
+        />
+        {renderAccountMenu()}
+      </>
     );
   }
   return (
@@ -651,6 +699,7 @@ export default function App({ user }){
         {page==='sera' && <SeraPage loaded={loaded} weights={weights} goal={goal} notes={foodNotes} water={waterByDay} waterGoal={waterGoal} meals={meals} workouts={workouts} workoutTypes={workoutTypes} supps={supplements} taken={suppTaken} sleeps={sleeps} />}
       </div>
       <BottomNav currentIdx={pageIdx} onChange={setPageIdx} />
+      {renderAccountMenu()}
     </div>
   );
 }
