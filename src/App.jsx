@@ -111,7 +111,24 @@ Note IMPORTANTI:
   * "svegliato alle 6:30" → waketime="06:30", bedtime stimato 7-8h prima
   * Quality: "male"/"poco"/"male"=2, "così così"=3, default/non specificato/"bene"=4, "benissimo"/"profondo"=5
   * SOLO se il diario non menziona MAI il dormire/sonno → sleep=null
-- PASTI: estrai OGNI alimento e bevanda con calorie. "Caffè e fetta biscottata" è UN pasto con description="caffè e fetta biscottata", kcal complessivi. Non saltare niente. Caffè, cappuccino, biscotti → tutto va estratto come pasto/spuntino.
+- PASTI: estrai OGNI alimento e bevanda con calorie. SEPARA elementi distinti in voci separate, ma NON spezzare i piatti compositi.
+
+  REGOLA:
+  * Un PIATTO/RICETTA con più ingredienti = 1 voce sola (perché si mangia come un unicum)
+    Es. "pasta al pomodoro" → 1 voce
+    Es. "panino al prosciutto con pomodoro e lattuga" → 1 voce
+    Es. "insalata mista con tonno, uova, mais" → 1 voce
+    Es. "petto di pollo con insalata" → 1 voce (il piatto è insieme)
+
+  * Elementi DISTINTI consumati nello stesso momento = più voci separate
+    Es. "caffè e fetta biscottata" → 2 voci: "caffè" + "fetta biscottata"
+    Es. "cappuccino, brioche e succo d'arancia" → 3 voci
+    Es. "yogurt, biscotti e una mela" → 3 voci
+    Es. "primo: pasta carbonara, secondo: bistecca con patate" → 2 voci ("pasta carbonara" + "bistecca con patate")
+    Es. "dopo cena: caffè e biscotto" → 2 voci tipo spuntino_s
+
+  Non saltare niente: caffè, tisane, biscotti, frutta — tutto va come voce.
+  Ogni voce deve avere description chiaro, kcal/p/c/g STIMATI realistici per quella singola voce.
 - ORARI: mattina presto (5-10)=colazione, metà mattina (10-12)=spuntino_m, 12-15=pranzo, 15-18=merenda, 18-22=cena, dopo le 22 o notte=spuntino_s.
 
 Testo: "${text}"`;
