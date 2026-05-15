@@ -1029,7 +1029,7 @@ function PesoPage({ theme, loaded, weights, goal, updWeights, updGoal, meals, up
       <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${Q.gold}40`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
       <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${Q.gold}1A`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
       <div style={{position:'relative',zIndex:2,padding:'32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
-        <Header q="QUERCUS" sub="I · il peso" color={Q.gold} dim={Q.goldDim} mark="✦" />
+        <Header q="PESO" sub="I" color={Q.gold} dim={Q.goldDim} mark="✦" />
         {!loaded && <Loading color={Q.goldDim} />}
         {loaded && weights.length===0 && (
           <div style={{textAlign:'center',padding:'40px 8px 0'}}>
@@ -1390,7 +1390,7 @@ function DiarioPage({ theme, loaded, notes, water, waterGoal, updNotes, updWater
       <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${W.gold}40`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
       <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${W.gold}1A`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
       <div style={{position:'relative',zIndex:2,padding:'32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
-        <Header q="QUERCUS" sub="II · il diario" color={W.gold} dim={W.goldDim} mark="✦" />
+        <Header q="DIARIO" sub="II" color={W.gold} dim={W.goldDim} mark="✦" />
         <div style={{textAlign:'center',marginTop:4,fontFamily:fCaveat,fontSize:22,color:W.tan,marginBottom:8}}>{dateLabel} ✿</div>
 
         {!loaded && <Loading color={W.tan} />}
@@ -1650,7 +1650,7 @@ function PastiPage({ theme, loaded, meals, updMeals, notes, weights, goal }){
       <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${J.gold}40`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
       <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${J.gold}1A`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
       <div style={{position:'relative',zIndex:2,padding:'32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
-        <Header q="QUERCUS" sub="III · i pasti" color={J.gold} dim={J.goldDim} mark="✦" />
+        <Header q="PASTI" sub="III" color={J.gold} dim={J.goldDim} mark="✦" />
         {!loaded && <Loading color={J.sage} />}
         {loaded && (<>
           <DayStrip selectedKey={selectedDay} onSelect={setSelectedDay} ink={J.dark} tan={J.sage} count={14} fontA={fMarcellus} fontB={fGaramond} />
@@ -1964,7 +1964,7 @@ function AllenaPage({ theme, loaded, workouts, types, updWorkouts, updTypes }){
       <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${A.gold}40`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
       <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${A.gold}1A`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
       <div style={{position:'relative',zIndex:2,padding:'32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
-        <Header q="QUERCUS" sub="V · l'allenamento" color={A.gold} dim={A.goldDim} mark="✦" font={fBodoni} />
+        <Header q="ALLENA" sub="V" color={A.gold} dim={A.goldDim} mark="✦" font={fBodoni} />
 
         {!loaded && <Loading color={A.sage} />}
 
@@ -2176,7 +2176,7 @@ function IntegraPage({ theme, loaded, supps, taken, updSupps, updTaken }){
       <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${T.gold}40`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
       <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${T.gold}1A`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
       <div style={{position:'relative',zIndex:2,padding:'32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
-        <Header q="QUERCUS" sub="IV · gli integratori" color={T.gold} dim={T.goldDim} mark="✦" font={fCormorant} />
+        <Header q="INTEGRA" sub="IV" color={T.gold} dim={T.goldDim} mark="✦" font={fCormorant} />
 
         {!loaded && <Loading color={T.dim} />}
 
@@ -2324,7 +2324,7 @@ function SonnoPage({ theme, loaded, sleeps, updSleeps }){
       <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${S.gold}40`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
       <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${S.gold}1A`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
       <div style={{position:'relative',zIndex:2,padding:'32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
-        <Header q="QUERCUS" sub="VIII · il sonno" color={S.gold} dim={S.goldDim} mark="✦" font={fFraunces} />
+        <Header q="SONNO" sub="VIII" color={S.gold} dim={S.goldDim} mark="✦" font={fFraunces} />
 
         {!loaded && <Loading color={S.dim} />}
 
@@ -2467,7 +2467,7 @@ function SeraPage({ theme, loaded, weights, goal, notes, water, waterGoal, meals
       <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${N.gold}40`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
       <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${N.gold}1A`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
       <div style={{position:'relative',zIndex:2,padding:'32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
-        <Header q="QUERCUS" sub="IX · la sera" color={N.gold} dim={N.goldDim} mark="✦" font={fFraunces} />
+        <Header q="SERA" sub="IX" color={N.gold} dim={N.goldDim} mark="✦" font={fFraunces} />
 
         {!loaded && <Loading color={N.dim} />}
 
@@ -2673,7 +2673,7 @@ function DigiunoPage({ theme, loaded, fasts, updFasts }){
       <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${D.gold}40`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
       <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${D.gold}1A`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
       <div style={{position:'relative',zIndex:2,padding:'32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
-        <Header q="QUERCUS" sub="VI · il digiuno" color={D.gold} dim={D.goldDim} mark="✦" font={fBodoni} />
+        <Header q="DIGIUNO" sub="VI" color={D.gold} dim={D.goldDim} mark="✦" font={fBodoni} />
 
         {!loaded && <Loading color={D.dim} />}
 
@@ -2891,7 +2891,7 @@ function RespiroPage({ theme, loaded, sessions, updSessions }){
       <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${M.gold}40`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
       <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${M.gold}1A`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
       <div style={{position:'relative',zIndex:2,padding:'32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
-        <Header q="QUERCUS" sub="VII · il respiro" color={M.gold} dim={M.goldDim} mark="✦" font={fCormorant} />
+        <Header q="RESPIRO" sub="VII" color={M.gold} dim={M.goldDim} mark="✦" font={fCormorant} />
 
         {!loaded && <Loading color={M.dim} />}
 
