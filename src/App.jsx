@@ -78,6 +78,31 @@ function mealsAreSimilar(a, b){
   for (const w of wa) if (sb.has(w)) overlap++;
   return overlap / Math.min(wa.length, wb.length) >= 0.6;
 }
+// Tutti i dati nutrizionali + descrizione + tipo coincidono (entrambi null = OK)
+function sameNutrient(a, b){
+  if (a == null && b == null) return true;
+  if (a == null || b == null) return false;
+  return Math.abs(Number(a) - Number(b)) < 0.5;
+}
+function mealsAreIdentical(a, b){
+  if (!mealsAreSimilar(a, b)) return false;
+  if (normalizeDesc(a.description) !== normalizeDesc(b.description)) return false;
+  return sameNutrient(a.kcal, b.kcal)
+      && sameNutrient(a.p, b.p)
+      && sameNutrient(a.c, b.c)
+      && sameNutrient(a.g, b.g)
+      && sameNutrient(a.qty_g, b.qty_g);
+}
+// Classifica un candidato dell'IA rispetto ai pasti già presenti nel giorno
+// → { kind: 'new'|'identical'|'similar', match: meal|null }
+function classifyCandidate(candidate, existingMeals){
+  const matches = existingMeals.filter(em => mealsAreSimilar(candidate, em));
+  if (matches.length === 0) return { kind: 'new', match: null };
+  const identicalMatch = matches.find(em => mealsAreIdentical(candidate, em));
+  if (identicalMatch) return { kind: 'identical', match: identicalMatch };
+  // C'è un match simile ma non identico → l'utente deve scegliere
+  return { kind: 'similar', match: matches[0] };
+}
 function isDuplicateMeal(newMeal, existingMeals){
   if (!normalizeDesc(newMeal.description)) return false;
   return existingMeals.some(em => mealsAreSimilar(newMeal, em));
@@ -1414,6 +1439,10 @@ function DiarioPage({ theme, loaded, notes, water, waterGoal, updNotes, updWater
   const [analysisResult, setAnalysisResult] = useState(null);
   const [analysisError, setAnalysisError] = useState('');
   const [analysisSel, setAnalysisSel] = useState({});
+  // Per ogni pasto candidato dell'IA: { kind: 'new'|'identical'|'similar', match: meal|null }
+  const [analysisMealKinds, setAnalysisMealKinds] = useState([]);
+  // Per i pasti 'similar', azione scelta dall'utente: 'skip' | 'replace' | 'add'
+  const [analysisActions, setAnalysisActions] = useState({});
 
   const isToday = selectedDay===dayKey(new Date());
   const dayWater = water[selectedDay] || 0;
@@ -1430,8 +1459,13 @@ function DiarioPage({ theme, loaded, notes, water, waterGoal, updNotes, updWater
     // Analizza TUTTE le voci del giorno selezionato
     if (dayNotes.length === 0) { setAnalysisError('Il diario di questo giorno è vuoto.'); return; }
     const fullText = dayNotes.map(n=>{ const t=new Date(n.ts).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}); return `[${t}] ${n.text}`; }).join('\n');
-    setAnalyzing(true); setAnalysisError(''); setAnalysisResult(null);
+    setAnalyzing(true); setAnalysisError(''); setAnalysisResult(null); setAnalysisMealKinds([]); setAnalysisActions({});
     const local = quickExtract(fullText);
+
+    // Pasti già nel giorno (sia eaten che planned) — userò per dedup
+    const dayDate = parseDayKey(selectedDay);
+    const dayExisting = meals.filter(m => sameDay(new Date(m.ts), dayDate));
+
     try {
       const r = await analyzeDiary(fullText);
       if(r.error){
@@ -1444,9 +1478,27 @@ function DiarioPage({ theme, loaded, notes, water, waterGoal, updNotes, updWater
       } else {
         const water_ = Math.max(r.water_glasses, local.water_glasses);
         const sel = { water: water_ > 0, sleep: !!r.sleep };
-        (r.meals||[]).forEach((_,i)=>{sel[`m${i}`]=true;});
+        const actions = {};
+
+        // Classifica ogni pasto candidato
+        const kinds = (r.meals||[]).map(m => classifyCandidate(m, dayExisting));
+
+        (r.meals||[]).forEach((_,i)=>{
+          const k = kinds[i];
+          // Default selezione:
+          // - new → checked (sì, aggiungi)
+          // - identical → unchecked (no, è già presente)
+          // - similar → unchecked (chiediamo all'utente cosa fare prima)
+          sel[`m${i}`] = k.kind === 'new';
+          // Default azione per similar: skip (no copia)
+          if (k.kind === 'similar') actions[`m${i}`] = 'skip';
+        });
         (r.supplements||[]).forEach((_,i)=>{sel[`s${i}`]=true;});
-        setAnalysisSel(sel); setAnalysisResult({ ...r, water_glasses: water_ });
+
+        setAnalysisSel(sel);
+        setAnalysisMealKinds(kinds);
+        setAnalysisActions(actions);
+        setAnalysisResult({ ...r, water_glasses: water_ });
       }
     } catch(e){
       if (local.water_glasses > 0) {
@@ -1469,25 +1521,61 @@ function DiarioPage({ theme, loaded, notes, water, waterGoal, updNotes, updWater
       if(existing) await updSleeps(sleeps.map(s=>s.wakeDate===selectedDay?{...s,...r.sleep}:s));
       else await updSleeps([...sleeps,{id:newId(),wakeDate:selectedDay,bedtime:r.sleep.bedtime,waketime:r.sleep.waketime,quality:r.sleep.quality,notes:''}]);
     }
-    // Pasti: dedup fuzzy (60%+ parole comuni + stesso tipo) contro pasti "eaten" già del giorno
-    const dayDate = parseDayKey(selectedDay);
-    const dayExistingEaten = meals.filter(m=>m.status==='eaten' && sameDay(new Date(m.ts),dayDate));
-    const newMeals=[];
+    // Pasti: gestione 3 stati (new / identical / similar) con azioni utente
+    let updatedMeals = [...meals];
+    const newMeals = [];
     (r.meals||[]).forEach((m,i)=>{
-      if(!analysisSel[`m${i}`]) return;
-      // 1. Confronta con pasti già nel diario
-      if(dayExistingEaten.some(em => mealsAreSimilar(m, em))) return;
-      // 2. Confronta con pasti già aggiunti in questo stesso batch
-      if(newMeals.some(nm => mealsAreSimilar(m, nm))) return;
-      const ts=isToday?new Date():(()=>{const d=parseDayKey(selectedDay); d.setHours(12,0); return d;})();
-      newMeals.push({id:newId(),ts:ts.toISOString(),type:m.type||'pranzo',description:m.description||'',qty_g:m.qty_g!=null?Number(m.qty_g):null,kcal:m.kcal!=null?Number(m.kcal):null,p:m.p!=null?Number(m.p):null,c:m.c!=null?Number(m.c):null,g:m.g!=null?Number(m.g):null,photo:null,status:'eaten'});
+      const k = analysisMealKinds[i] || { kind: 'new', match: null };
+      const checked = !!analysisSel[`m${i}`];
+      const action = analysisActions[`m${i}`]; // solo per 'similar'
+
+      if (k.kind === 'identical') {
+        // Identico → skip a meno che l'utente non lo abbia esplicitamente flaggato (caso raro)
+        if (checked) {
+          const ts = isToday ? new Date() : (()=>{const d=parseDayKey(selectedDay); d.setHours(12,0); return d;})();
+          newMeals.push({id:newId(),ts:ts.toISOString(),type:m.type||'pranzo',description:m.description||'',qty_g:m.qty_g!=null?Number(m.qty_g):null,kcal:m.kcal!=null?Number(m.kcal):null,p:m.p!=null?Number(m.p):null,c:m.c!=null?Number(m.c):null,g:m.g!=null?Number(m.g):null,photo:null,photo_url:null,status:'eaten'});
+        }
+        return;
+      }
+
+      if (k.kind === 'similar') {
+        // L'utente ha scelto un'azione esplicita
+        if (action === 'replace' && k.match) {
+          // Aggiorna i campi del pasto esistente con quelli proposti dall'IA, mantenendo id/photo
+          updatedMeals = updatedMeals.map(em => em.id === k.match.id ? {
+            ...em,
+            type: m.type || em.type,
+            description: m.description || em.description,
+            qty_g: m.qty_g!=null ? Number(m.qty_g) : em.qty_g,
+            kcal: m.kcal!=null ? Number(m.kcal) : em.kcal,
+            p: m.p!=null ? Number(m.p) : em.p,
+            c: m.c!=null ? Number(m.c) : em.c,
+            g: m.g!=null ? Number(m.g) : em.g,
+          } : em);
+        } else if (action === 'add') {
+          const ts = isToday ? new Date() : (()=>{const d=parseDayKey(selectedDay); d.setHours(12,0); return d;})();
+          newMeals.push({id:newId(),ts:ts.toISOString(),type:m.type||'pranzo',description:m.description||'',qty_g:m.qty_g!=null?Number(m.qty_g):null,kcal:m.kcal!=null?Number(m.kcal):null,p:m.p!=null?Number(m.p):null,c:m.c!=null?Number(m.c):null,g:m.g!=null?Number(m.g):null,photo:null,photo_url:null,status:'eaten'});
+        }
+        // action === 'skip' o undefined → niente
+        return;
+      }
+
+      // k.kind === 'new': comportamento standard, rispetta la checkbox
+      if (!checked) return;
+      // Defense in depth: evita duplicati interni al batch
+      if (newMeals.some(nm => mealsAreSimilar(m, nm))) return;
+      const ts = isToday ? new Date() : (()=>{const d=parseDayKey(selectedDay); d.setHours(12,0); return d;})();
+      newMeals.push({id:newId(),ts:ts.toISOString(),type:m.type||'pranzo',description:m.description||'',qty_g:m.qty_g!=null?Number(m.qty_g):null,kcal:m.kcal!=null?Number(m.kcal):null,p:m.p!=null?Number(m.p):null,c:m.c!=null?Number(m.c):null,g:m.g!=null?Number(m.g):null,photo:null,photo_url:null,status:'eaten'});
     });
-    if(newMeals.length>0) await updMeals([...meals,...newMeals]);
+    if (newMeals.length > 0 || updatedMeals.length !== meals.length || updatedMeals.some((m,i)=>m!==meals[i])) {
+      await updMeals([...updatedMeals, ...newMeals]);
+    }
+
     const suppsToAdd=[]; const newTaken={...taken};
     (r.supplements||[]).forEach((name,i)=>{ if(!analysisSel[`s${i}`])return; const existing=supps.find(s=>s.name.toLowerCase().trim()===name.toLowerCase().trim()); let id; if(existing) id=existing.id; else { id=newId(); suppsToAdd.push({id,name:name.trim(),color:SUPP_COLORS[(supps.length+suppsToAdd.length)%SUPP_COLORS.length]}); } const list=newTaken[selectedDay]||[]; if(!list.includes(id)) newTaken[selectedDay]=[...list,id]; });
     if(suppsToAdd.length>0) await updSupps([...supps,...suppsToAdd]);
     if(suppsToAdd.length>0 || (r.supplements||[]).some((_,i)=>analysisSel[`s${i}`])) await updTaken(newTaken);
-    setAnalysisResult(null); setAnalysisError(''); setAnalysisSel({});
+    setAnalysisResult(null); setAnalysisError(''); setAnalysisSel({}); setAnalysisMealKinds([]); setAnalysisActions({});
   }
 
   async function saveEdit(){ const text=editText.trim(); if(!text){ setEditing(null); return; } await updNotes(notes.map(n=>n.id===editing?{...n,text}:n)); setEditing(null); }
@@ -1559,7 +1647,23 @@ function DiarioPage({ theme, loaded, notes, water, waterGoal, updNotes, updWater
       {analysisResult && (
         <SimpleModal onClose={()=>setAnalysisResult(null)} bg={W.bg} border={W.ink} wide>
           <h2 style={{fontFamily:fCardo,fontStyle:'italic',fontSize:22,color:W.ink,margin:0,textAlign:'center'}}>✦ Cos'ho letto</h2>
-          <div style={{fontFamily:fCaveat,fontSize:16,color:W.tan,textAlign:'center',marginTop:4}}>tocca per togliere ciò che non vuoi salvare</div>
+          {(() => {
+            const newCount = analysisMealKinds.filter(k => k.kind==='new').length;
+            const idCount = analysisMealKinds.filter(k => k.kind==='identical').length;
+            const simCount = analysisMealKinds.filter(k => k.kind==='similar').length;
+            if (idCount === 0 && simCount === 0) return (
+              <div style={{fontFamily:fCaveat,fontSize:16,color:W.tan,textAlign:'center',marginTop:4}}>tocca per togliere ciò che non vuoi salvare</div>
+            );
+            return (
+              <div style={{fontFamily:fCaveat,fontSize:16,color:W.tan,textAlign:'center',marginTop:4,lineHeight:1.3}}>
+                {newCount>0 && <span>{newCount} {newCount===1?'pasto nuovo':'pasti nuovi'}</span>}
+                {newCount>0 && (idCount>0||simCount>0) && <span> · </span>}
+                {idCount>0 && <span>{idCount} {idCount===1?'già presente':'già presenti'}</span>}
+                {idCount>0 && simCount>0 && <span> · </span>}
+                {simCount>0 && <span style={{color:W.ink}}>{simCount} da decidere ↓</span>}
+              </div>
+            );
+          })()}
           {(!analysisResult.water_glasses && !analysisResult.sleep && analysisResult.meals.length===0 && analysisResult.supplements.length===0) && (
             <div style={{marginTop:16,padding:'12px 0',textAlign:'center',fontFamily:fCardo,fontStyle:'italic',fontSize:15,color:W.tan}}>Nessun dato strutturato trovato.</div>
           )}
@@ -1577,14 +1681,68 @@ function DiarioPage({ theme, loaded, notes, water, waterGoal, updNotes, updWater
               </div>
             </ToggleRow>
           )}
-          {(analysisResult.meals||[]).map((m,i)=>(
-            <ToggleRow key={`m-${i}`} checked={analysisSel[`m${i}`]} onToggle={()=>setAnalysisSel({...analysisSel,[`m${i}`]:!analysisSel[`m${i}`]})} ink={W.ink}>
-              <div style={{flex:1}}>
-                <div style={{fontFamily:fCardo,fontStyle:'italic',fontSize:15}}>{(MEAL_TYPES.find(t=>t.id===m.type)?.name||m.type)}: {m.description}</div>
-                <div style={{fontFamily:fCardo,fontSize:12,color:W.tan,marginTop:2}}>{m.qty_g?`${m.qty_g}g · `:''}{m.kcal} kcal · P {m.p} · C {m.c} · G {m.g}</div>
-              </div>
-            </ToggleRow>
-          ))}
+          {(analysisResult.meals||[]).map((m,i)=>{
+            const k = analysisMealKinds[i] || { kind: 'new', match: null };
+            const matchTime = k.match ? new Date(k.match.ts).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}) : '';
+            const action = analysisActions[`m${i}`] || 'skip';
+            const setAction = (a) => setAnalysisActions({...analysisActions,[`m${i}`]:a});
+            const typeName = MEAL_TYPES.find(t=>t.id===m.type)?.name || m.type;
+
+            if (k.kind === 'identical') {
+              // Già presente identico → riga in grigio + label, checkbox off
+              return (
+                <div key={`m-${i}`} style={{padding:'12px 0',borderTop:`1px solid ${W.ink}1A`,opacity:0.55}}>
+                  <div style={{display:'flex',alignItems:'center',gap:10}}>
+                    <input type="checkbox" checked={!!analysisSel[`m${i}`]} onChange={()=>setAnalysisSel({...analysisSel,[`m${i}`]:!analysisSel[`m${i}`]})} style={{width:18,height:18,accentColor:W.ink,flexShrink:0}} />
+                    <div style={{flex:1}}>
+                      <div style={{fontFamily:fCardo,fontStyle:'italic',fontSize:15,color:W.ink}}>{typeName}: {m.description}</div>
+                      <div style={{fontFamily:fCaveat,fontSize:15,color:W.tan,marginTop:2}}>✓ già presente alle {matchTime} — identico, lo salto</div>
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+
+            if (k.kind === 'similar') {
+              // Simile ma con dati diversi → mostra confronto e chiedi azione
+              const exist = k.match;
+              return (
+                <div key={`m-${i}`} style={{padding:'14px 0',borderTop:`1px solid ${W.ink}1A`}}>
+                  <div style={{fontFamily:fCardo,fontStyle:'italic',fontSize:15,color:W.ink,marginBottom:6}}>{typeName}: {m.description}</div>
+                  <div style={{background:`${W.ink}0D`,border:`1px solid ${W.ink}22`,padding:'8px 10px',marginBottom:8,borderRadius:2}}>
+                    <div style={{fontFamily:fCaveat,fontSize:16,color:W.tan,marginBottom:4}}>è simile a uno già presente:</div>
+                    <div style={{fontFamily:fCardo,fontSize:13,color:W.ink}}>
+                      <div><span style={{color:W.tan,fontStyle:'italic'}}>esistente:</span> {exist.description} · {matchTime} · {exist.kcal!=null?`${exist.kcal} kcal`:'no kcal'}</div>
+                      <div style={{marginTop:2}}><span style={{color:W.tan,fontStyle:'italic'}}>nuovo IA:</span> {m.description} · {m.kcal!=null?`${m.kcal} kcal`:'no kcal'}{m.qty_g?` · ${m.qty_g}g`:''}</div>
+                    </div>
+                  </div>
+                  <div style={{fontFamily:fCaveat,fontSize:15,color:W.tan,marginBottom:6}}>è lo stesso pasto?</div>
+                  <div style={{display:'flex',flexDirection:'column',gap:4}}>
+                    {[
+                      {id:'skip',label:'Sì — salta (tieni l\'esistente così com\'è)'},
+                      {id:'replace',label:'Sì — aggiorna l\'esistente con i nuovi dati'},
+                      {id:'add',label:'No — aggiungilo come pasto diverso'},
+                    ].map(opt => (
+                      <label key={opt.id} style={{display:'flex',alignItems:'flex-start',gap:8,cursor:'pointer',padding:'6px 8px',background:action===opt.id?`${W.ink}1A`:'transparent',border:`1px solid ${action===opt.id?W.ink+'55':W.ink+'1A'}`,borderRadius:2}}>
+                        <input type="radio" name={`act-${i}`} checked={action===opt.id} onChange={()=>setAction(opt.id)} style={{marginTop:2,accentColor:W.ink}} />
+                        <span style={{fontFamily:fCardo,fontStyle:'italic',fontSize:13,color:W.ink,lineHeight:1.3}}>{opt.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              );
+            }
+
+            // k.kind === 'new' → comportamento standard
+            return (
+              <ToggleRow key={`m-${i}`} checked={analysisSel[`m${i}`]} onToggle={()=>setAnalysisSel({...analysisSel,[`m${i}`]:!analysisSel[`m${i}`]})} ink={W.ink}>
+                <div style={{flex:1}}>
+                  <div style={{fontFamily:fCardo,fontStyle:'italic',fontSize:15}}>{typeName}: {m.description}</div>
+                  <div style={{fontFamily:fCardo,fontSize:12,color:W.tan,marginTop:2}}>{m.qty_g?`${m.qty_g}g · `:''}{m.kcal} kcal · P {m.p} · C {m.c} · G {m.g}</div>
+                </div>
+              </ToggleRow>
+            );
+          })}
           {(analysisResult.supplements||[]).map((name,i)=>(
             <ToggleRow key={`s-${i}`} checked={analysisSel[`s${i}`]} onToggle={()=>setAnalysisSel({...analysisSel,[`s${i}`]:!analysisSel[`s${i}`]})} ink={W.ink}>
               <span style={{fontFamily:fCaveat,fontSize:16,color:W.tan,marginRight:6}}>integratore:</span>
