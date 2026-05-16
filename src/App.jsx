@@ -968,7 +968,7 @@ export default function App({ user, onLogout }){
         {page==='oggi' && <OggiPage theme={__theme} loaded={loaded} profile={profile} weights={weights} goal={goal} meals={meals} notes={foodNotes} water={waterByDay} waterGoal={waterGoal} workouts={workouts} sleeps={sleeps} fasts={fasts} supps={supplements} taken={suppTaken} updWater={updWater} setPage={setPageIdx} />}
         {page==='peso' && <PesoPage theme={__theme} loaded={loaded} weights={weights} goal={goal} updWeights={updWeights} updGoal={updGoal} meals={meals} updMeals={updMeals} openStats={() => setShowStats(true)} profile={profile} openSub={() => setShowSub(true)} />}
         {page==='pasti' && <PastiPage user={user} theme={__theme} loaded={loaded} meals={meals} updMeals={updMeals} notes={foodNotes} weights={weights} goal={goal} />}
-        {page==='menu' && <MenuPage theme={__theme} loaded={loaded} meals={meals} updMeals={updMeals} weights={weights} goal={goal} profile={profile} />}
+        {page==='menu' && <MenuPage theme={__theme} loaded={loaded} meals={meals} updMeals={updMeals} weights={weights} goal={goal} profile={profile} updProfile={updProfile} />}
         {page==='integra' && <IntegraPage theme={__theme} loaded={loaded} supps={supplements} taken={suppTaken} updSupps={updSupps} updTaken={updTaken} />}
         {page==='digiuno' && <DigiunoPage theme={__theme} loaded={loaded} fasts={fasts} updFasts={updFasts} />}
         {page==='respiro' && <RespiroPage theme={__theme} loaded={loaded} sessions={mindfulSessions} updSessions={updMindful} workouts={workouts} types={workoutTypes} updWorkouts={updWorkouts} updTypes={updWorkoutTypes} />}
@@ -2456,25 +2456,38 @@ function PastiPage({ user, theme, loaded, meals, updMeals, notes, weights, goal 
 }
 
 // === MenuPage: pianificazione del menù giornaliero con proposte IA cliccabili e progress su kcal/macro target ===
-function MenuPage({ theme, loaded, meals, updMeals, weights, goal, profile }) {
+function MenuPage({ theme, loaded, meals, updMeals, weights, goal, profile, updProfile }) {
   const J = theme || { bg: '#E5E3D5', dark: '#2D3A2E', sage: '#5C6B4E', light: '#8FA288' };
   const [suggestions, setSuggestions] = useState(null);
   const [suggestLoading, setSuggestLoading] = useState(false);
   const [suggestError, setSuggestError] = useState('');
   const [previousSuggested, setPreviousSuggested] = useState([]);
-  const [editingMealId, setEditingMealId] = useState(null);
+  // Modal di modifica target nutrizionali
+  const [editingTargets, setEditingTargets] = useState(false);
 
-  // Target giornalieri di kcal e macronutrienti
-  // Stima: usiamo il profilo se presente, altrimenti default ragionevoli per dimagrimento
+  // Target giornalieri di kcal e macronutrienti.
+  // LOGICA DIETA A ZONA (per dimagrimento): bilanciamento 40% carboidrati · 30% proteine · 30% grassi.
+  // I valori personalizzati nel profilo prevalgono; altrimenti calcolo da peso corrente (≈25 kcal/kg per leggera ipocalorica).
   const target = useMemo(() => {
+    if (profile?.daily_kcal_goal != null) {
+      const kcal = Number(profile.daily_kcal_goal);
+      return {
+        kcal,
+        protein: profile.daily_protein_g != null ? Number(profile.daily_protein_g) : Math.round((kcal * 0.30) / 4),
+        carbs:   profile.daily_carbs_g   != null ? Number(profile.daily_carbs_g)   : Math.round((kcal * 0.40) / 4),
+        fat:     profile.daily_fat_g     != null ? Number(profile.daily_fat_g)     : Math.round((kcal * 0.30) / 9),
+      };
+    }
+    // Stima da peso corrente in regime ipocalorico (Zona 40/30/30)
     const sortedW = [...(weights||[])].sort((a,b)=>new Date(b.ts)-new Date(a.ts));
-    const latestW = sortedW[0]?.weight || 70; // peso corrente o default
-    // Profilo personalizzato sovrascrive
-    const kcal = profile?.daily_kcal_goal != null ? Number(profile.daily_kcal_goal) : 1800;
-    const protein = profile?.daily_protein_g != null ? Number(profile.daily_protein_g) : Math.round(latestW * 1.6);
-    const fat = profile?.daily_fat_g != null ? Number(profile.daily_fat_g) : Math.round((kcal * 0.30) / 9);
-    const carbs = profile?.daily_carbs_g != null ? Number(profile.daily_carbs_g) : Math.round((kcal - protein*4 - fat*9) / 4);
-    return { kcal, protein, carbs, fat };
+    const latestW = sortedW[0]?.weight || 70;
+    const kcal = Math.round(latestW * 25); // deficit calorico moderato per dimagrimento
+    return {
+      kcal,
+      protein: Math.round((kcal * 0.30) / 4),
+      carbs:   Math.round((kcal * 0.40) / 4),
+      fat:     Math.round((kcal * 0.30) / 9),
+    };
   }, [profile, weights]);
 
   // Pasti pianificati di OGGI
@@ -2492,19 +2505,24 @@ function MenuPage({ theme, loaded, meals, updMeals, weights, goal, profile }) {
     fat: acc.fat + (m.g||0),
   }), { kcal: 0, protein: 0, carbs: 0, fat: 0 }), [plannedMeals]);
 
-  // Quanto manca al target (negativo = superato)
-  const remaining = {
-    kcal: target.kcal - totals.kcal,
-    protein: target.protein - totals.protein,
-    carbs: target.carbs - totals.carbs,
-    fat: target.fat - totals.fat,
-  };
   const targetReached = totals.kcal >= target.kcal * 0.95 && totals.kcal <= target.kcal * 1.05;
 
   async function loadSuggestions(){
     setSuggestLoading(true); setSuggestError('');
     try {
-      const summary = buildEatingHabitsSummary({ meals, weights, goal });
+      // Costruisco un summary arricchito con target Zona + macro residui, così l'IA propone pasti che chiudono il gap
+      const summary = buildEatingHabitsSummary({ meals, weights, goal })
+        + `\n\nTARGET ODIERNO (Dieta a Zona 40/30/30 per dimagrimento):\n`
+        + `- Calorie: ${target.kcal} kcal · Proteine: ${target.protein}g · Carb: ${target.carbs}g · Grassi: ${target.fat}g\n`
+        + `MENU GIÀ PIANIFICATO OGGI:\n`
+        + `- Calorie: ${totals.kcal}/${target.kcal} kcal · Proteine: ${totals.protein}/${target.protein}g · Carb: ${totals.carbs}/${target.carbs}g · Grassi: ${totals.fat}/${target.fat}g\n`
+        + `RESIDUI DA COPRIRE: ${Math.max(0,target.kcal-totals.kcal)} kcal · ${Math.max(0,target.protein-totals.protein)}g P · ${Math.max(0,target.carbs-totals.carbs)}g C · ${Math.max(0,target.fat-totals.fat)}g G\n\n`
+        + `LINEE GUIDA per i suggerimenti:\n`
+        + `- Proponi solo alimenti che favoriscono il dimagrimento (alta sazietà, indice glicemico basso/medio, ricchi di nutrienti).\n`
+        + `- PRIVILEGIA: pesce azzurro/magro, carni bianche magre, uova, legumi, verdure di stagione, frutti di bosco, agrumi, mela, pera, frutta secca a porzioni controllate, cereali integrali (avena, farro, quinoa, riso integrale), latticini magri (greco, ricotta), olio extravergine.\n`
+        + `- EVITA: zuccheri raffinati, dolci industriali, bibite zuccherate, alcolici, fritti, salumi grassi, pane bianco, pasta raffinata in eccesso, succhi confezionati.\n`
+        + `- Bilancia ogni piatto verso la Zona 40/30/30 quando possibile (in particolare il pranzo e la cena).\n`
+        + `- Dai precedenza ai macro residui (se mancano molte proteine, proponi pasti proteici; se mancano carb, proponi cereali integrali; ecc.).\n`;
       const r = await suggestMeals(summary, previousSuggested);
       if (r.error) setSuggestError('IA: ' + (r.error || 'errore sconosciuto'));
       else if (!r.meals || r.meals.length === 0) setSuggestError('Nessun suggerimento ricevuto.');
@@ -2529,7 +2547,6 @@ function MenuPage({ theme, loaded, meals, updMeals, weights, goal, profile }) {
       photo: null,
       status: 'planned',
     }]);
-    // Lascio la proposta nella lista (Ivan vuole le proposte sempre visibili e cliccabili più volte)
   }
 
   async function markAsEaten(mealId){
@@ -2538,7 +2555,6 @@ function MenuPage({ theme, loaded, meals, updMeals, weights, goal, profile }) {
 
   async function removeFromMenu(mealId){
     await updMeals((meals||[]).filter(m => m.id !== mealId));
-    setEditingMealId(null);
   }
 
   // Componenti helper per progress bar
@@ -2572,13 +2588,16 @@ function MenuPage({ theme, loaded, meals, updMeals, weights, goal, profile }) {
         {!loaded && <Loading color={J.sage} />}
 
         {loaded && (<>
-          {/* === SEZIONE TOTALI / TARGET === */}
-          <div style={{marginTop:22,padding:'14px 14px 8px',background:`${J.sage}10`,border:`1px solid ${J.sage}33`}}>
-            <div style={{fontFamily:fMarcellus,fontSize:10,letterSpacing:'0.4em',color:J.sage,textTransform:'uppercase',marginBottom:10,textAlign:'center'}}>obiettivo del giorno</div>
+          {/* === SEZIONE TOTALI / TARGET — cliccabile per modificare === */}
+          <div onClick={()=>setEditingTargets(true)} style={{marginTop:22,padding:'14px 14px 8px',background:`${J.sage}10`,border:`1px solid ${J.sage}33`,cursor:'pointer',position:'relative'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+              <div style={{fontFamily:fMarcellus,fontSize:10,letterSpacing:'0.4em',color:J.sage,textTransform:'uppercase'}}>obiettivo del giorno · zona 40/30/30</div>
+              <span style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:11,color:J.sage,opacity:0.75}}>tocca per modificare ›</span>
+            </div>
             <ProgressRow label="calorie" current={totals.kcal} target={target.kcal} unit="kcal" />
-            <ProgressRow label="proteine" current={totals.protein} target={target.protein} unit="g" />
-            <ProgressRow label="carboidrati" current={totals.carbs} target={target.carbs} unit="g" />
-            <ProgressRow label="grassi" current={totals.fat} target={target.fat} unit="g" />
+            <ProgressRow label="proteine · 30%" current={totals.protein} target={target.protein} unit="g" />
+            <ProgressRow label="carboidrati · 40%" current={totals.carbs} target={target.carbs} unit="g" />
+            <ProgressRow label="grassi · 30%" current={totals.fat} target={target.fat} unit="g" />
             {targetReached && (
               <div style={{marginTop:6,padding:'8px 10px',background:`#A5B88922`,border:`1px solid #A5B889`,fontFamily:fGaramond,fontStyle:'italic',fontSize:12,color:'#6B8060',textAlign:'center'}}>
                 ✓ obiettivo del giorno raggiunto
@@ -2633,7 +2652,7 @@ function MenuPage({ theme, loaded, meals, updMeals, weights, goal, profile }) {
 
             {!suggestions && !suggestLoading && !suggestError && (
               <div style={{textAlign:'center'}}>
-                <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:13,color:J.sage,marginBottom:12,lineHeight:1.5,maxWidth:340,margin:'0 auto 12px'}}>L'IA studia le tue abitudini e propone pasti bilanciati. Tocca per aggiungere al menù.</div>
+                <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:13,color:J.sage,marginBottom:12,lineHeight:1.5,maxWidth:340,margin:'0 auto 12px'}}>L'IA propone pasti bilanciati Zona 40/30/30 con alimenti che favoriscono il dimagrimento, in base ai macro che ti mancano.</div>
                 <button onClick={loadSuggestions} style={{background:'transparent',color:'#C8763C',border:`1px solid #C8763C`,fontFamily:fMarcellus,fontSize:10,letterSpacing:'0.35em',padding:'12px 24px',cursor:'pointer',textTransform:'uppercase'}}>chiedi suggerimenti</button>
               </div>
             )}
@@ -2671,6 +2690,109 @@ function MenuPage({ theme, loaded, meals, updMeals, weights, goal, profile }) {
             )}
           </div>
         </>)}
+      </div>
+
+      {editingTargets && <TargetsModal J={J} target={target} updProfile={updProfile} onClose={()=>setEditingTargets(false)} />}
+    </div>
+  );
+}
+
+// Modal per modificare i target nutrizionali. Mostra anche un bottone "Riapplica Zona 40/30/30" che ricalcola da kcal.
+function TargetsModal({ J, target, updProfile, onClose }) {
+  const [kcalStr, setKcalStr] = useState(String(target.kcal));
+  const [pStr, setPStr] = useState(String(target.protein));
+  const [cStr, setCStr] = useState(String(target.carbs));
+  const [gStr, setGStr] = useState(String(target.fat));
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+
+  function applyZone(){
+    const kcal = parseInt(kcalStr); if (isNaN(kcal) || kcal <= 0) return;
+    setPStr(String(Math.round((kcal * 0.30) / 4)));
+    setCStr(String(Math.round((kcal * 0.40) / 4)));
+    setGStr(String(Math.round((kcal * 0.30) / 9)));
+  }
+
+  async function save(){
+    const kcal = parseInt(kcalStr);
+    const p = parseInt(pStr);
+    const c = parseInt(cStr);
+    const g = parseInt(gStr);
+    if (isNaN(kcal) || kcal <= 0) { setErr('Calorie non valide'); return; }
+    if (isNaN(p) || isNaN(c) || isNaN(g) || p<0 || c<0 || g<0) { setErr('Macronutrienti non validi'); return; }
+    setSaving(true); setErr('');
+    try {
+      await updProfile({ daily_kcal_goal: kcal, daily_protein_g: p, daily_carbs_g: c, daily_fat_g: g });
+      onClose();
+    } catch (e) {
+      setErr('Errore nel salvataggio');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function resetToZone(){
+    setSaving(true); setErr('');
+    try {
+      await updProfile({ daily_kcal_goal: null, daily_protein_g: null, daily_carbs_g: null, daily_fat_g: null });
+      onClose();
+    } catch (e) {
+      setErr('Errore');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // Live check: la somma kcal dai macro deve rispettare il totale (entro 5%)
+  const kcalFromMacros = (parseInt(pStr)||0)*4 + (parseInt(cStr)||0)*4 + (parseInt(gStr)||0)*9;
+  const kcalNum = parseInt(kcalStr) || 0;
+  const diff = kcalFromMacros - kcalNum;
+  const diffPct = kcalNum > 0 ? (diff / kcalNum) * 100 : 0;
+  const balanced = Math.abs(diffPct) <= 5;
+
+  return (
+    <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.65)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:200,padding:16}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:J.bg||'#E5E3D5',border:`1px solid ${J.dark}55`,padding:'22px 20px',maxWidth:380,width:'100%',maxHeight:'90vh',overflowY:'auto'}}>
+        <div style={{fontFamily:fMarcellus,fontSize:12,letterSpacing:'0.4em',color:J.dark,textAlign:'center',marginBottom:6,textTransform:'uppercase'}}>obiettivo del giorno</div>
+        <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:12,color:J.sage,textAlign:'center',marginBottom:18,lineHeight:1.4}}>Dieta a Zona 40/30/30 per dimagrimento: <b>40% carboidrati · 30% proteine · 30% grassi</b>.</div>
+
+        <div style={{marginBottom:14}}>
+          <div style={{fontFamily:fMarcellus,fontSize:9,letterSpacing:'0.4em',color:J.sage,textTransform:'uppercase',marginBottom:4}}>calorie / giorno</div>
+          <input type="text" inputMode="numeric" value={kcalStr} onChange={e=>setKcalStr(e.target.value.replace(/[^0-9]/g,''))} style={fieldInput(J)} />
+        </div>
+
+        <div style={{textAlign:'center',marginBottom:14}}>
+          <button onClick={applyZone} style={{background:'transparent',color:J.sage,border:`1px solid ${J.sage}66`,fontFamily:fMarcellus,fontSize:9,letterSpacing:'0.3em',padding:'7px 14px',cursor:'pointer',textTransform:'uppercase'}}>↻ ricalcola macro da kcal (zona 40/30/30)</button>
+        </div>
+
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10,marginBottom:10}}>
+          <div>
+            <div style={{fontFamily:fMarcellus,fontSize:9,letterSpacing:'0.3em',color:J.sage,textTransform:'uppercase',marginBottom:4}}>prot · g</div>
+            <input type="text" inputMode="numeric" value={pStr} onChange={e=>setPStr(e.target.value.replace(/[^0-9]/g,''))} style={fieldInput(J)} />
+          </div>
+          <div>
+            <div style={{fontFamily:fMarcellus,fontSize:9,letterSpacing:'0.3em',color:J.sage,textTransform:'uppercase',marginBottom:4}}>carb · g</div>
+            <input type="text" inputMode="numeric" value={cStr} onChange={e=>setCStr(e.target.value.replace(/[^0-9]/g,''))} style={fieldInput(J)} />
+          </div>
+          <div>
+            <div style={{fontFamily:fMarcellus,fontSize:9,letterSpacing:'0.3em',color:J.sage,textTransform:'uppercase',marginBottom:4}}>gras · g</div>
+            <input type="text" inputMode="numeric" value={gStr} onChange={e=>setGStr(e.target.value.replace(/[^0-9]/g,''))} style={fieldInput(J)} />
+          </div>
+        </div>
+
+        <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:11,textAlign:'center',marginBottom:14,color:balanced?'#6B8060':'#C8763C',padding:'6px 10px',background:`${balanced?'#A5B889':'#C8763C'}11`,border:`1px solid ${balanced?'#A5B889':'#C8763C'}33`}}>
+          kcal da macro: {fmt0(kcalFromMacros)} ({diff>0?'+':''}{fmt0(diff)} dal target {diffPct>0?'+':''}{Math.round(diffPct)}%){balanced?' · ok':''}
+        </div>
+
+        {err && <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:12,color:'#A04848',textAlign:'center',marginBottom:10}}>{err}</div>}
+
+        <div style={{display:'flex',gap:8,justifyContent:'space-between',flexWrap:'wrap'}}>
+          <button onClick={resetToZone} disabled={saving} style={{background:'transparent',color:J.sage,border:`1px solid ${J.sage}66`,fontFamily:fMarcellus,fontSize:9,letterSpacing:'0.3em',padding:'8px 12px',cursor:saving?'default':'pointer',textTransform:'uppercase'}}>auto (da peso)</button>
+          <div style={{display:'flex',gap:8}}>
+            <button onClick={onClose} disabled={saving} style={{background:'transparent',color:J.sage,border:`1px solid ${J.sage}66`,fontFamily:fMarcellus,fontSize:9,letterSpacing:'0.3em',padding:'8px 14px',cursor:saving?'default':'pointer',textTransform:'uppercase'}}>annulla</button>
+            <button onClick={save} disabled={saving} style={{background:J.dark,color:J.bg,border:`1px solid ${J.dark}`,fontFamily:fMarcellus,fontSize:9,letterSpacing:'0.3em',padding:'8px 18px',cursor:saving?'default':'pointer',textTransform:'uppercase',opacity:saving?0.6:1}}>{saving?'⋯':'salva'}</button>
+          </div>
+        </div>
       </div>
     </div>
   );
