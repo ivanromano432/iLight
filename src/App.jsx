@@ -3928,8 +3928,21 @@ function RespiroPage({ theme, loaded, sessions, updSessions, workouts, types, up
           </div>
           {/* === FINE SEZIONE MOVIMENTO === */}
 
+          {/* Divisore decorativo tra MOVIMENTO e RESPIRO */}
+          <div style={{display:'flex',alignItems:'center',gap:14,marginTop:36,marginBottom:8}}>
+            <div style={{flex:1,height:1,background:`linear-gradient(90deg, transparent, ${M.accent}55)`}} />
+            <span style={{fontFamily:fCormorant,fontSize:18,color:M.accent,opacity:0.7}}>✦</span>
+            <div style={{flex:1,height:1,background:`linear-gradient(90deg, ${M.accent}55, transparent)`}} />
+          </div>
+
+          {/* === SEZIONE RESPIRO === */}
+          <div style={{padding:'10px 0 0',display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:10}}>
+            <span style={{fontFamily:fDmSans,fontSize:9,letterSpacing:'0.4em',color:M.accent,textTransform:'uppercase'}}>respiro</span>
+            <span style={{fontFamily:fDmSans,fontSize:9,letterSpacing:'0.35em',color:M.dim,textTransform:'uppercase'}}>mente · presenza</span>
+          </div>
+
           {/* Esercizio respiro */}
-          <div style={{textAlign:'center',marginTop:22,padding:'18px 14px',background:`${M.accent}1A`,border:`1px solid ${M.accent}33`}}>
+          <div style={{textAlign:'center',marginTop:6,padding:'18px 14px',background:`${M.accent}1A`,border:`1px solid ${M.accent}33`}}>
             <div style={{fontFamily:fDmSans,fontSize:9,letterSpacing:'0.4em',color:M.accent,textTransform:'uppercase',marginBottom:8}}>respira ora</div>
             <div style={{fontFamily:fCormorant,fontStyle:'italic',fontSize:14,color:M.ink,lineHeight:1.5,marginBottom:14}}>respirazione quadrata · 4 secondi per fase<br/><span style={{fontSize:12,color:M.dim}}>per calmare la mente, anche solo 1 minuto</span></div>
             <button onClick={()=>setBreathingOpen(true)} style={{background:M.ink,color:M.cream,border:`1px solid ${M.ink}`,fontFamily:fDmSans,fontSize:10,letterSpacing:'0.4em',padding:'12px 24px',cursor:'pointer',textTransform:'uppercase'}}>inizia</button>
