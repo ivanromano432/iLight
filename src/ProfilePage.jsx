@@ -5,6 +5,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { THEMES, THEME_ORDER, DEFAULT_THEME, getTheme } from './themes.js';
 import { supabase } from './supabase.js';
+import { pushSupported, getPushStatus, subscribePush, unsubscribePush, registerServiceWorker } from './pushNotifications.js';
 
 const fGaramond = '"Cormorant Garamond", serif';
 const fCinzel = '"Cinzel", serif';
@@ -51,7 +52,83 @@ export default function ProfilePage({ user, profile, updProfile, onClose }) {
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+  // Notifiche push
+  const [pushStatus, setPushStatus] = useState({ supported: false, permission: 'default', subscribed: false });
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushError, setPushError] = useState('');
+  const [notifMorning, setNotifMorning] = useState(!!profile?.notif_morning_enabled);
+  const [notifAfternoon, setNotifAfternoon] = useState(!!profile?.notif_afternoon_enabled);
+  const [notifEvening, setNotifEvening] = useState(!!profile?.notif_evening_enabled);
+  const [notifMorningHour, setNotifMorningHour] = useState(profile?.notif_morning_hour ?? 8);
+  const [notifAfternoonHour, setNotifAfternoonHour] = useState(profile?.notif_afternoon_hour ?? 13);
+  const [notifEveningHour, setNotifEveningHour] = useState(profile?.notif_evening_hour ?? 20);
   const fileInputRef = useRef(null);
+
+  // Al mount: registra SW e leggi stato push
+  useEffect(() => {
+    (async () => {
+      await registerServiceWorker();
+      const status = await getPushStatus();
+      setPushStatus(status);
+    })();
+  }, []);
+
+  // Sync preferenze notifiche dal profile (quando arriva da Supabase dopo il mount)
+  useEffect(() => {
+    if (profile?.notif_morning_enabled !== undefined) setNotifMorning(!!profile.notif_morning_enabled);
+    if (profile?.notif_afternoon_enabled !== undefined) setNotifAfternoon(!!profile.notif_afternoon_enabled);
+    if (profile?.notif_evening_enabled !== undefined) setNotifEvening(!!profile.notif_evening_enabled);
+    if (profile?.notif_morning_hour != null) setNotifMorningHour(profile.notif_morning_hour);
+    if (profile?.notif_afternoon_hour != null) setNotifAfternoonHour(profile.notif_afternoon_hour);
+    if (profile?.notif_evening_hour != null) setNotifEveningHour(profile.notif_evening_hour);
+  }, [profile?.notif_morning_enabled, profile?.notif_afternoon_enabled, profile?.notif_evening_enabled,
+      profile?.notif_morning_hour, profile?.notif_afternoon_hour, profile?.notif_evening_hour]);
+
+  // Toggle di una singola preferenza notifica (salva immediatamente)
+  async function toggleNotif(key, currentValue) {
+    const newValue = !currentValue;
+    // Aggiorno state locale ottimisticamente
+    if (key === 'morning') setNotifMorning(newValue);
+    if (key === 'afternoon') setNotifAfternoon(newValue);
+    if (key === 'evening') setNotifEvening(newValue);
+    // Se sto attivando una notifica ma push non è ancora attivato, attivalo
+    if (newValue && !pushStatus.subscribed) {
+      setPushBusy(true); setPushError('');
+      const r = await subscribePush();
+      setPushBusy(false);
+      if (!r.ok) {
+        setPushError(r.error || 'Errore attivazione notifiche');
+        // Rollback
+        if (key === 'morning') setNotifMorning(false);
+        if (key === 'afternoon') setNotifAfternoon(false);
+        if (key === 'evening') setNotifEvening(false);
+        return;
+      }
+      setPushStatus(await getPushStatus());
+    }
+    // Salva nel profilo
+    const field = `notif_${key}_enabled`;
+    await updProfile({ [field]: newValue });
+  }
+
+  async function updateNotifHour(key, hour) {
+    if (key === 'morning') setNotifMorningHour(hour);
+    if (key === 'afternoon') setNotifAfternoonHour(hour);
+    if (key === 'evening') setNotifEveningHour(hour);
+    const field = `notif_${key}_hour`;
+    await updProfile({ [field]: hour });
+  }
+
+  // Disattiva push completamente (annulla sottoscrizione + spegne tutti i flag)
+  async function disablePushCompletely() {
+    setPushBusy(true); setPushError('');
+    const r = await unsubscribePush();
+    setPushBusy(false);
+    if (!r.ok) { setPushError(r.error); return; }
+    setPushStatus(await getPushStatus());
+    setNotifMorning(false); setNotifAfternoon(false); setNotifEvening(false);
+    await updProfile({ notif_morning_enabled: false, notif_afternoon_enabled: false, notif_evening_enabled: false });
+  }
 
   // Se il profile cambia dopo il mount (es. perché ancora in caricamento al primo render
   // o aggiornato da altra azione), risincronizza lo state locale.
@@ -363,6 +440,74 @@ export default function ProfilePage({ user, profile, updProfile, onClose }) {
           </button>
         </div>
 
+        {/* === NOTIFICHE === Promemoria push (richiede iOS 16.4+ con PWA installata) */}
+        <div style={{ marginTop: 40, paddingTop: 24, borderTop: `1px solid ${Q.gold}22` }}>
+          <div style={{ fontFamily: fCinzel, fontSize: 9, letterSpacing: '0.35em', color: Q.goldDim, textTransform: 'uppercase', marginBottom: 8, textAlign: 'center' }}>NOTIFICHE PROMEMORIA</div>
+          {!pushStatus.supported ? (
+            <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 12, color: Q.goldDim, textAlign: 'center', padding: '12px', lineHeight: 1.6 }}>
+              Le notifiche push non sono supportate dal tuo browser. Su iPhone serve iOS 16.4+ con la PWA installata sulla schermata Home.
+            </div>
+          ) : pushStatus.permission === 'denied' ? (
+            <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 12, color: '#C99A7A', textAlign: 'center', padding: '12px', lineHeight: 1.6 }}>
+              Hai negato i permessi notifica. Vai nelle impostazioni del browser/iOS per riabilitarli.
+            </div>
+          ) : (
+            <>
+              <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 12, color: Q.goldDim, textAlign: 'center', marginBottom: 16, lineHeight: 1.5 }}>
+                Tre promemoria al giorno, scegli quali e a che ora.
+              </div>
+
+              {/* Toggle Mattina */}
+              <NotifToggleRow Q={Q} fGaramond={fGaramond} fCinzel={fCinzel}
+                label="Mattina · pesata"
+                desc="Buongiorno, ricordati di pesarti"
+                enabled={notifMorning}
+                hour={notifMorningHour}
+                onToggle={() => toggleNotif('morning', notifMorning)}
+                onHourChange={(h) => updateNotifHour('morning', h)}
+                busy={pushBusy}
+              />
+
+              {/* Toggle Pomeriggio */}
+              <NotifToggleRow Q={Q} fGaramond={fGaramond} fCinzel={fCinzel}
+                label="Pomeriggio · acqua"
+                desc="Pausa idratazione"
+                enabled={notifAfternoon}
+                hour={notifAfternoonHour}
+                onToggle={() => toggleNotif('afternoon', notifAfternoon)}
+                onHourChange={(h) => updateNotifHour('afternoon', h)}
+                busy={pushBusy}
+              />
+
+              {/* Toggle Sera */}
+              <NotifToggleRow Q={Q} fGaramond={fGaramond} fCinzel={fCinzel}
+                label="Sera · diario"
+                desc="Una nota per chiudere la giornata"
+                enabled={notifEvening}
+                hour={notifEveningHour}
+                onToggle={() => toggleNotif('evening', notifEvening)}
+                onHourChange={(h) => updateNotifHour('evening', h)}
+                busy={pushBusy}
+              />
+
+              {pushError && (
+                <div style={{ marginTop: 10, padding: '8px 12px', border: `1px solid #C99A7A66`, background: '#C99A7A14', color: '#C99A7A', fontFamily: fGaramond, fontStyle: 'italic', fontSize: 12, textAlign: 'center' }}>
+                  {pushError}
+                </div>
+              )}
+
+              {pushStatus.subscribed && (
+                <div style={{ marginTop: 14, textAlign: 'center' }}>
+                  <button onClick={disablePushCompletely} disabled={pushBusy}
+                    style={{ background: 'transparent', color: Q.goldDim, border: `1px solid ${Q.goldDim}44`, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 11, padding: '6px 14px', cursor: pushBusy ? 'default' : 'pointer' }}>
+                    spegni tutte le notifiche
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
         {/* Link legali */}
         <div style={{ marginTop: 50, paddingTop: 24, borderTop: `1px solid ${Q.gold}22`, textAlign: 'center' }}>
           <div style={{ fontFamily: fCinzel, fontSize: 9, letterSpacing: '0.35em', color: Q.goldDim, textTransform: 'uppercase', marginBottom: 10 }}>DOCUMENTI LEGALI</div>
@@ -433,6 +578,36 @@ export default function ProfilePage({ user, profile, updProfile, onClose }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// Riga di un singolo toggle notifica con selettore orario.
+function NotifToggleRow({ Q, fGaramond, fCinzel, label, desc, enabled, hour, onToggle, onHourChange, busy }) {
+  return (
+    <div style={{ marginBottom: 10, padding: '10px 12px', border: `1px solid ${Q.gold}33`, background: `${Q.gold}06`, display: 'flex', alignItems: 'center', gap: 10 }}>
+      {/* Toggle visivo */}
+      <button onClick={onToggle} disabled={busy}
+        style={{ width: 42, height: 22, borderRadius: 11, background: enabled ? Q.gold : `${Q.goldDim}55`, border: 'none', position: 'relative', cursor: busy ? 'default' : 'pointer', flexShrink: 0, transition: 'background 0.2s', opacity: busy ? 0.5 : 1 }}>
+        <span style={{ position: 'absolute', top: 2, left: enabled ? 22 : 2, width: 18, height: 18, borderRadius: '50%', background: Q.bg2 || '#fff', transition: 'left 0.2s' }} />
+      </button>
+
+      {/* Label e descrizione */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.25em', color: enabled ? Q.gold : Q.goldDim, textTransform: 'uppercase' }}>{label}</div>
+        <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 12, color: Q.goldDim, lineHeight: 1.3, marginTop: 2 }}>{desc}</div>
+      </div>
+
+      {/* Selettore orario */}
+      <select value={hour} onChange={e => onHourChange(parseInt(e.target.value))}
+        disabled={!enabled || busy}
+        style={{ background: 'transparent', border: `1px solid ${Q.gold}44`, color: enabled ? Q.gold : Q.goldDim, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 14, padding: '5px 8px', cursor: enabled ? 'pointer' : 'default', borderRadius: 0, flexShrink: 0 }}>
+        {Array.from({ length: 24 }, (_, i) => (
+          <option key={i} value={i} style={{ background: Q.bg2 || '#1F140C', color: Q.cream }}>
+            {String(i).padStart(2, '0')}:00
+          </option>
+        ))}
+      </select>
     </div>
   );
 }
