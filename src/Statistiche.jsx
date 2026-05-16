@@ -225,6 +225,20 @@ const DOW_LABELS = ['lun', 'mar', 'mer', 'gio', 'ven', 'sab', 'dom'];
 
 // === Definizioni tipologie obiettivo ===
 const GOAL_TYPES = {
+  weight_kg: {
+    label: 'Peso', icon: '⚖', unit: 'kg', period: 'target', direction: 'target',
+    suggestedTarget: 70, step: 0.5, min: 30, max: 250,
+    current: ({ weights }) => {
+      if (!weights || !weights.length) return null;
+      const sorted = [...weights].sort((a, b) => new Date(b.ts) - new Date(a.ts));
+      return Number(sorted[0].weight);
+    },
+    startValue: ({ weights }) => {
+      if (!weights || !weights.length) return null;
+      const sorted = [...weights].sort((a, b) => new Date(a.ts) - new Date(b.ts));
+      return Number(sorted[0].weight);
+    },
+  },
   sleep_h: {
     label: 'Sonno', icon: '☾', unit: 'ore/notte', period: 'per_day',
     suggestedTarget: 7.5, step: 0.5, min: 4, max: 12,
@@ -306,18 +320,30 @@ function newGoalId() {
   return (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : (Date.now()+Math.random()).toString();
 }
 
-function GoalModal({ Q, existing, alreadyUsed, onClose, onSave, onDelete }) {
+function GoalModal({ Q, existing, alreadyUsed, profileGoal, weights, onClose, onSave, onDelete }) {
   const editMode = !!existing;
   const [type, setType] = useState(existing?.goal_type || null);
   const [target, setTarget] = useState(existing?.target_value != null ? String(existing.target_value).replace('.', ',') : '');
+  // Suggerimento dinamico: per il peso usa profile.goal se esiste, altrimenti l'ultimo peso registrato, altrimenti il default del tipo
+  const dynSuggest = (k) => {
+    if (k === 'weight_kg') {
+      if (profileGoal != null) return Number(profileGoal);
+      if (weights && weights.length) {
+        const sorted = [...weights].sort((a, b) => new Date(b.ts) - new Date(a.ts));
+        return Number(sorted[0].weight);
+      }
+    }
+    return GOAL_TYPES[k]?.suggestedTarget;
+  };
   useEffect(() => {
     if (type && !editMode) {
       const def = GOAL_TYPES[type];
-      if (def && !target) setTarget(String(def.suggestedTarget).replace('.', ','));
+      if (def && !target) setTarget(String(dynSuggest(type)).replace('.', ','));
     }
     // eslint-disable-next-line
   }, [type]);
   const def = type ? GOAL_TYPES[type] : null;
+  const suggested = type ? dynSuggest(type) : null;
   const targetN = parseFloat((target || '').replace(',', '.'));
   const valid = type && !isNaN(targetN) && targetN > 0;
   const availableTypes = Object.entries(GOAL_TYPES).filter(([k]) => editMode || !alreadyUsed.has(k));
@@ -365,9 +391,9 @@ function GoalModal({ Q, existing, alreadyUsed, onClose, onSave, onDelete }) {
             <div style={{ marginBottom: 18 }}>
               <div style={{ fontFamily: fCinzel, fontSize: 9, letterSpacing: '0.35em', color: Q.goldDim, textTransform: 'uppercase', marginBottom: 6 }}>OBIETTIVO</div>
               <input type="text" inputMode="decimal" value={target} onChange={e => setTarget(e.target.value)}
-                placeholder={String(def.suggestedTarget).replace('.', ',')}
+                placeholder={String(suggested).replace('.', ',')}
                 style={{ width: '100%', background: 'transparent', border: `1px solid ${Q.gold}66`, color: Q.cream, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 22, padding: '10px 12px', textAlign: 'center', outline: 'none' }} />
-              <div style={{ marginTop: 6, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 11, color: Q.goldDim, textAlign: 'center' }}>{def.unit} · suggerito {def.suggestedTarget}</div>
+              <div style={{ marginTop: 6, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 11, color: Q.goldDim, textAlign: 'center' }}>{def.unit} · suggerito {String(suggested).replace('.', ',')}</div>
             </div>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 18, flexWrap: 'wrap' }}>
               {editMode && onDelete && (
@@ -1047,9 +1073,23 @@ export default function StatistichePage({
                   if (!def) return null;
                   const cur = def.current(dataForGoals);
                   const target = Number(g.target_value);
-                  const pct = cur != null ? Math.min(100, (cur / target) * 100) : 0;
-                  const reached = cur != null && cur >= target;
-                  const near = !reached && pct >= 75;
+                  const dir = def.direction || 'up';
+                  let pct = 0, reached = false, near = false;
+                  if (cur != null) {
+                    if (dir === 'target') {
+                      const start = def.startValue ? def.startValue(dataForGoals) : null;
+                      const span = (start != null && Math.abs(start - target) > 0.5) ? Math.abs(start - target) : Math.max(Math.abs(cur - target), 1);
+                      const traveled = start != null ? Math.abs(start - cur) : 0;
+                      pct = Math.min(100, Math.max(0, (traveled / span) * 100));
+                      reached = Math.abs(cur - target) < 0.5;
+                      near = !reached && Math.abs(cur - target) <= Math.max(span * 0.15, 1);
+                    } else {
+                      // direction 'up' (default): più è meglio, target = soglia da raggiungere
+                      pct = Math.min(100, (cur / target) * 100);
+                      reached = cur >= target;
+                      near = !reached && pct >= 75;
+                    }
+                  }
                   const barColor = reached ? '#A5B889' : near ? Q.gold : Q.goldDim;
                   return (
                     <div key={g.id} onClick={() => setGoalModal(g)}
@@ -1283,6 +1323,8 @@ export default function StatistichePage({
           Q={Q}
           existing={goalModal === 'new' ? null : goalModal}
           alreadyUsed={goalsAlreadyUsed}
+          profileGoal={goal}
+          weights={weights}
           onClose={() => setGoalModal(null)}
           onSave={saveGoal}
           onDelete={goalModal !== 'new' ? deleteGoal : null}
