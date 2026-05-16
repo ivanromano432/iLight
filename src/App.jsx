@@ -1030,6 +1030,8 @@ function OggiPage({ theme, loaded, profile, weights, goal, meals, notes, water, 
   const lastWeight = todayWeights[todayWeights.length - 1];
   const todayMeals = (meals || []).filter(m => sameDay(new Date(m.ts), now) && m.status !== 'planned');
   const todayKcal = todayMeals.reduce((a, m) => a + (m.kcal || 0), 0);
+  // Target kcal del giorno (Zona 40/30/30, stessa formula di MenuPage e SeraPage)
+  const kcalTarget = computeNutritionTarget(profile, weights, goal).kcal;
   const todayNotes = (notes || []).filter(n => sameDay(new Date(n.ts), now));
   const todayWater = water?.[todayKey] || 0;
   const todayWorkouts = (workouts || []).filter(w => sameDay(new Date(w.ts), now));
@@ -1138,31 +1140,23 @@ function OggiPage({ theme, loaded, profile, weights, goal, meals, notes, water, 
             </div>
           </div>
 
-          {/* Pasti */}
+          {/* Pasti — mostra kcal consumate / obiettivo invece del conteggio */}
           <div style={card({ marginBottom: 10 })}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div style={{ flex: 1 }}>
                 <div style={cardTitle}>III · pasti</div>
-                <div style={cardValue}>{todayMeals.length} <span style={{ fontSize: 11, color: Q.goldDim || Q.gold, opacity: 0.7, fontFamily: fCinzel, letterSpacing: '0.2em', fontStyle: 'normal' }}>{todayMeals.length === 1 ? 'PASTO' : 'PASTI'}</span></div>
+                <div style={cardValue}>{fmt0(todayKcal)}<span style={{ fontSize: 16, color: Q.goldDim || Q.gold, opacity: 0.7, fontFamily: fGaramond, fontStyle: 'italic', margin: '0 4px' }}>/</span>{fmt0(kcalTarget)} <span style={{ fontSize: 11, color: Q.goldDim || Q.gold, opacity: 0.7, fontFamily: fCinzel, letterSpacing: '0.2em', fontStyle: 'normal' }}>KCAL</span></div>
                 <div style={cardSub}>
-                  {todayKcal > 0 ? `${fmt0(todayKcal)} kcal totali` : 'nessun pasto registrato oggi'}
+                  {todayKcal === 0
+                    ? 'nessun pasto registrato oggi'
+                    : todayKcal < kcalTarget * 0.95
+                      ? `mancano ${fmt0(kcalTarget - todayKcal)} kcal all'obiettivo`
+                      : todayKcal > kcalTarget * 1.05
+                        ? `+${fmt0(todayKcal - kcalTarget)} kcal sopra l'obiettivo`
+                        : "✓ obiettivo del giorno raggiunto"}
                 </div>
               </div>
               <button onClick={() => go('pasti')} style={miniBtn}>+ pasto</button>
-            </div>
-          </div>
-
-          {/* Diario */}
-          <div style={card({ marginBottom: 10 })}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div style={{ flex: 1 }}>
-                <div style={cardTitle}>II · diario</div>
-                <div style={cardValue}>{todayNotes.length} <span style={{ fontSize: 11, color: Q.goldDim || Q.gold, opacity: 0.7, fontFamily: fCinzel, letterSpacing: '0.2em', fontStyle: 'normal' }}>{todayNotes.length === 1 ? 'VOCE' : 'VOCI'}</span></div>
-                <div style={cardSub}>
-                  {todayNotes.length === 0 ? 'scrivi come va la giornata, l\'IA fa il resto' : `${todayWater > 0 || lastNight ? 'già usato per estrarre dati' : 'tocca per analizzare'}`}
-                </div>
-              </div>
-              <button onClick={() => go('diario')} style={miniBtn}>+ scrivi</button>
             </div>
           </div>
 
