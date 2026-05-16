@@ -254,7 +254,7 @@ function quickExtract(text){
     const n = numMap[v] !== undefined ? numMap[v] : parseInt(v) || 0;
     if (n > 0 && n < 10) water += n * 4;
   }
-  return { water_glasses: Math.min(20, water) };
+  return { water_glasses: Math.min(100, water) };
 }
 
 // Suggerimenti IA — propone pasti bilanciati basati sulle abitudini
@@ -1145,7 +1145,7 @@ function OggiPage({ theme, loaded, profile, weights, goal, meals, notes, water, 
 
           {/* Acqua + Sonno + Allenamento (riga compatta a 3 colonne) */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 10 }}>
-            <button onClick={async () => { await updWater({ ...water, [todayKey]: Math.min(20, todayWater + 1) }); }}
+            <button onClick={async () => { await updWater({ ...water, [todayKey]: Math.min(100, todayWater + 1) }); }}
               style={{ ...card({}), textAlign: 'left', cursor: 'pointer', borderRadius: 2 }}>
               <div style={cardTitle}>acqua</div>
               <div style={{ ...cardValue, fontSize: 18 }}>{todayWater}<span style={{ fontSize: 11, color: Q.goldDim || Q.gold, opacity: 0.7, fontFamily: fGaramond, fontStyle: 'italic' }}>/{waterGoal}</span></div>
@@ -1859,7 +1859,7 @@ function DiarioPage({ theme, loaded, notes, water, waterGoal, updNotes, updWater
   async function applyAnalysis(){
     const r=analysisResult; if(!r)return;
     // Acqua: usa MAX invece di sommare (evita raddoppio se rilanciato sullo stesso diario)
-    if(analysisSel.water && r.water_glasses>0){ const cur=water[selectedDay]||0; await updWater({...water,[selectedDay]:Math.min(20,Math.max(cur,r.water_glasses))}); }
+    if(analysisSel.water && r.water_glasses>0){ const cur=water[selectedDay]||0; await updWater({...water,[selectedDay]:Math.min(100,Math.max(cur,r.water_glasses))}); }
     if(analysisSel.sleep && r.sleep){
       // Sostituisci se c'è già un sonno per questa data, altrimenti aggiungi
       const existing = sleeps.find(s=>s.wakeDate===selectedDay);
@@ -1925,8 +1925,8 @@ function DiarioPage({ theme, loaded, notes, water, waterGoal, updNotes, updWater
 
   async function saveEdit(){ const text=editText.trim(); if(!text){ setEditing(null); return; } await updNotes(notes.map(n=>n.id===editing?{...n,text}:n)); setEditing(null); }
   async function delNote(id){ await updNotes(notes.filter(n=>n.id!==id)); setEditing(null); }
-  async function setW(n){ const v=Math.max(0,Math.min(20,n)); await updWater({...water,[selectedDay]:v}); }
-  async function saveWaterGoal(){ const n=parseInt(draftGoal); if(isNaN(n)||n<1||n>20)return; await updWaterGoal(n); setShowWaterGoal(false); setDraftGoal(''); }
+  async function setW(n){ const v=Math.max(0,Math.min(100,n)); await updWater({...water,[selectedDay]:v}); }
+  async function saveWaterGoal(){ const n=parseInt(draftGoal); if(isNaN(n)||n<1||n>100)return; await updWaterGoal(n); setShowWaterGoal(false); setDraftGoal(''); }
 
   const dateLabel = parseDayKey(selectedDay).toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long'});
 

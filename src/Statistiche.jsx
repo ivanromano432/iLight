@@ -256,7 +256,7 @@ const GOAL_TYPES = {
   },
   water_glasses: {
     label: 'Idratazione', icon: '~', unit: 'bicchieri/giorno', period: 'per_day',
-    suggestedTarget: 8, step: 1, min: 1, max: 20,
+    suggestedTarget: 8, step: 1, min: 1, max: 100,
     current: ({ water }) => {
       const cut = new Date(); cut.setDate(cut.getDate() - 7);
       const e = Object.entries(water || {}).filter(([d]) => new Date(d) >= cut);
