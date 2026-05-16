@@ -17,7 +17,7 @@ function newId() {
   return (Date.now() + Math.random()).toString();
 }
 
-export default function ProfileSetup({ profile, updProfile, onCreateWeight, onDone }) {
+export default function ProfileSetup({ profile, updProfile, onCreateWeight, onDone, latestWeight }) {
   const Q = getTheme(profile?.theme);
   const [step, setStep] = useState(0);
 
@@ -26,7 +26,8 @@ export default function ProfileSetup({ profile, updProfile, onCreateWeight, onDo
   const [sex, setSex] = useState(profile?.sex || '');
   const [birthYear, setBirthYear] = useState(profile?.birth_year ? String(profile.birth_year) : '');
   const [heightCm, setHeightCm] = useState(profile?.height_cm ? String(profile.height_cm) : '');
-  const [currentWeight, setCurrentWeight] = useState('');
+  // Per utenti esistenti: precompila con l'ultima pesata in modo che il campo non sia vuoto
+  const [currentWeight, setCurrentWeight] = useState(latestWeight != null ? String(latestWeight) : '');
   const [goalWeight, setGoalWeight] = useState(profile?.goal_weight ? String(profile.goal_weight) : '');
   const [dietStyle, setDietStyle] = useState(profile?.diet_style || '');
   const [allergies, setAllergies] = useState(profile?.allergies || '');
@@ -122,13 +123,13 @@ export default function ProfileSetup({ profile, updProfile, onCreateWeight, onDo
         setup_completed: true,
       };
       await updProfile(fields);
-      // Crea la prima pesata
+      // Crea la pesata SOLO se è diversa dall'ultima registrata (evita duplicati per utenti esistenti)
       const kg = parseFloat(currentWeight);
-      if (kg && onCreateWeight) {
+      if (kg && onCreateWeight && kg !== latestWeight) {
         await onCreateWeight({
           id: newId(),
           ts: new Date().toISOString(),
-          kg,
+          weight: kg,
         });
       }
       onDone();
@@ -218,8 +219,8 @@ export default function ProfileSetup({ profile, updProfile, onCreateWeight, onDo
               <div style={{ marginBottom: 32 }}>
                 <div style={{ fontFamily: fCinzel, fontSize: 9, letterSpacing: '0.4em', color: Q.gold, opacity: 0.7, textTransform: 'uppercase', textAlign: 'center', marginBottom: 12 }}>sesso</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                  <button onClick={() => setSex('F')} style={optBtn(sex === 'F')}>Donna</button>
-                  <button onClick={() => setSex('M')} style={optBtn(sex === 'M')}>Uomo</button>
+                  <button onClick={() => setSex('f')} style={optBtn(sex === 'f')}>Donna</button>
+                  <button onClick={() => setSex('m')} style={optBtn(sex === 'm')}>Uomo</button>
                   <button onClick={() => setSex('other')} style={optBtn(sex === 'other')}>Altro</button>
                   <button onClick={() => setSex('prefer_not_say')} style={optBtn(sex === 'prefer_not_say')}>Preferisco non dire</button>
                 </div>

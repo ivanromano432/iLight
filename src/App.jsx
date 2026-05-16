@@ -462,17 +462,20 @@ export default function App({ user, onLogout }){
 
     // Mostra onboarding al primo accesso. Controllo sia il flag persistente
     // su Supabase (profile.onboarded) sia il fallback in localStorage.
-    // Dopo l'onboarding, se setup_completed=false, mostra ProfileSetup.
+    // Dopo l'onboarding, se setup_completed=false oppure mancano i 3 dati chiave
+    // (sex/height_cm/birth_year) necessari per il calcolo nutrizionale, mostra ProfileSetup.
     const isOnboardedServer = !!profile?.onboarded;
     const isOnboardedLocal = hasSeenOnboarding(user.id);
     const setupDone = !!profile?.setup_completed;
+    const hasCoreData = !!(profile?.sex && profile?.height_cm && profile?.birth_year);
+    const needsSetup = !setupDone || !hasCoreData;
     if (!isOnboardedServer && !isOnboardedLocal) {
       setShowOnboarding(true);
     } else {
       if (isOnboardedServer && !isOnboardedLocal) {
         try { markOnboardingSeen(user.id); } catch (_) {}
       }
-      if (!setupDone) {
+      if (needsSetup) {
         setShowProfileSetup(true);
       }
     }
@@ -644,18 +647,22 @@ export default function App({ user, onLogout }){
         updProfile={updProfile}
         onDone={() => {
           setShowOnboarding(false);
-          // Dopo l'onboarding, se non è completato il setup, mostra il form
-          if (!profile?.setup_completed) setShowProfileSetup(true);
+          // Dopo l'onboarding, se non è completato il setup OPPURE mancano i dati chiave, mostra il form
+          const hasCoreData = !!(profile?.sex && profile?.height_cm && profile?.birth_year);
+          if (!profile?.setup_completed || !hasCoreData) setShowProfileSetup(true);
         }}
       />
     );
   }
 
   if (showProfileSetup) {
+    const sortedW = [...(weights||[])].sort((a,b)=>new Date(b.ts)-new Date(a.ts));
+    const latestWeight = sortedW[0]?.weight || null;
     return (
       <ProfileSetup
         profile={profile}
         updProfile={updProfile}
+        latestWeight={latestWeight}
         onCreateWeight={async (w) => { await updWeights([...(weights||[]), w]); }}
         onDone={() => setShowProfileSetup(false)}
       />
@@ -1927,7 +1934,7 @@ function computeNutritionTarget(profile, weights, goal) {
   const height = profile?.height_cm != null ? Number(profile.height_cm) : null;
   const birth = profile?.birth_year != null ? Number(profile.birth_year) : null;
   const age = birth ? (new Date().getFullYear() - birth) : null;
-  const sex = profile?.sex || null;
+  const sex = (profile?.sex || '').toLowerCase() || null;
 
   let kcal, source;
   if (height && age && sex) {
