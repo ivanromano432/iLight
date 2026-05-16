@@ -523,6 +523,10 @@ const MEAL_TYPES = [
 export default function App({ user, onLogout }){
   useGoogleFonts();
   const [pageIdx, setPageIdx] = useState(0);
+  // Scroll automatico in cima quando si cambia tab della nav
+  useEffect(() => {
+    try { window.scrollTo({ top: 0, behavior: 'auto' }); } catch (_) { try { window.scrollTo(0, 0); } catch (__) {} }
+  }, [pageIdx]);
   const [showStats, setShowStats] = useState(false);
   const [showSub, setShowSub] = useState(false);
   const [showGuida, setShowGuida] = useState(false);
