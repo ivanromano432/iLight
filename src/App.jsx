@@ -3162,7 +3162,13 @@ function SeraPage({ theme, loaded, weights, goal, notes, water, waterGoal, meals
   // Sera usa N internamente (palette Notte blu era originaria). Shadow.
   const N = theme || { bg1: '#2C3340', bg2: '#14171F', cream: '#F2E8D0', dim: '#8A8270', gold: '#C9A876', body: '#DDD3C2' };
   const [aiAnalyzing, setAiAnalyzing] = useState(false);
-  const [aiResult, setAiResult] = useState(null);
+  // L'analisi IA viene persistita in localStorage con chiave per giorno (per utente).
+  // Così sopravvive a cambi di pagina, refresh del browser, riapertura PWA — e si
+  // "azzera" naturalmente quando cambia giorno o l'utente clicca rianalizza.
+  const aiStorageKey = `goalfit_ai_sera_${profile?.id || 'anon'}_${dayKey(new Date())}`;
+  const [aiResult, setAiResult] = useState(() => {
+    try { const raw = localStorage.getItem(aiStorageKey); return raw ? JSON.parse(raw) : null; } catch (_) { return null; }
+  });
   const [aiError, setAiError] = useState('');
   // Diario (note) — sezione fusa qui dalla ex-pagina Diario
   const [noteInput, setNoteInput] = useState('');
@@ -3233,12 +3239,19 @@ function SeraPage({ theme, loaded, weights, goal, notes, water, waterGoal, meals
 
   async function runAiAnalysis(){
     setAiAnalyzing(true); setAiError(''); setAiResult(null);
+    // Pulisco la versione persistita prima di riprovare, così se l'utente cambia
+    // pagina mentre l'analisi è in corso non rivede il risultato vecchio.
+    try { localStorage.removeItem(aiStorageKey); } catch (_) {}
     try {
       // Costruisci il riepilogo dei dati
       const summary = buildWeightLossSummary({ weights, goal, meals, workouts, workoutTypes, supps, taken, sleeps, water });
       const r = await analyzeWeightLoss(summary);
       if (r.error) setAiError('IA: '+(r.error||'errore sconosciuto'));
-      else setAiResult(r);
+      else {
+        setAiResult(r);
+        // Persisto il risultato per il giorno corrente
+        try { localStorage.setItem(aiStorageKey, JSON.stringify(r)); } catch (_) {}
+      }
     } catch (e) { setAiError('Errore'); }
     finally { setAiAnalyzing(false); }
   }
