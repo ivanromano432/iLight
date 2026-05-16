@@ -2409,27 +2409,29 @@ function PastiPage({ user, theme, loaded, meals, updMeals, notes, weights, goal 
                     if (!hasPhoto && hasDesc && m.kcal == null) return true;
                     return false;
                   });
-                  if (missing.length === 0 && !bulkEstimating && !bulkError) return null;
+                  const nothingToAnalyze = missing.length === 0 && !bulkEstimating;
                   return (
                     <div style={{marginTop:22,paddingTop:14,borderTop:`1px dashed ${J.sage}33`}}>
                       <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:13,color:J.sage,marginBottom:10,lineHeight:1.4}}>
                         {bulkEstimating
                           ? `Analizzando... ${bulkProgress.done}/${bulkProgress.total}`
-                          : `${missing.length} ${missing.length===1?'pasto':'pasti'} di ${isToday?'oggi':'questo giorno'} ${missing.length===1?'ha':'hanno'} la foto ma ${missing.length===1?'manca':'mancano'} nome, peso o nutrienti.`}
+                          : nothingToAnalyze
+                            ? `${eatenMeals.length === 0 ? 'Nessun pasto registrato' : 'Tutti i pasti di ' + (isToday?'oggi':'questo giorno') + ' hanno nome, peso e calorie'} · Il bottone si attiva quando ci sono foto da analizzare.`
+                            : `${missing.length} ${missing.length===1?'pasto':'pasti'} di ${isToday?'oggi':'questo giorno'} ${missing.length===1?'ha':'hanno'} la foto ma ${missing.length===1?'manca':'mancano'} nome, peso o nutrienti.`}
                       </div>
                       <button
                         onClick={bulkEstimateNutrients}
-                        disabled={bulkEstimating || missing.length === 0}
+                        disabled={bulkEstimating || nothingToAnalyze}
                         style={{
-                          background:bulkEstimating||missing.length===0?'transparent':J.sage,
-                          color:bulkEstimating||missing.length===0?J.dark:J.bg,
-                          border:`1px solid ${J.sage}`,
+                          background:bulkEstimating||nothingToAnalyze?'transparent':J.sage,
+                          color:bulkEstimating||nothingToAnalyze?J.sage:J.bg,
+                          border:`1px solid ${J.sage}${nothingToAnalyze?'55':''}`,
                           fontFamily:fMarcellus,
                           fontSize:11,
                           letterSpacing:'0.3em',
                           padding:'10px 22px',
-                          cursor:bulkEstimating||missing.length===0?'default':'pointer',
-                          opacity:bulkEstimating||missing.length===0?0.5:1,
+                          cursor:bulkEstimating||nothingToAnalyze?'default':'pointer',
+                          opacity:nothingToAnalyze?0.5:1,
                           textTransform:'uppercase',
                         }}>
                         {bulkEstimating ? `⋯ ${bulkProgress.done}/${bulkProgress.total}` : '✦ analizza foto con ia'}
