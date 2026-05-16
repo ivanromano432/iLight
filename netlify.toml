@@ -6,6 +6,18 @@
 [build.environment]
   NODE_VERSION = "22"
 
+# Redirect: URL puliti /privacy e /termini → file HTML statici
+# IMPORTANTE: questi devono stare PRIMA del fallback SPA, altrimenti vengono catturati come route React.
+[[redirects]]
+  from = "/privacy"
+  to = "/privacy.html"
+  status = 200
+
+[[redirects]]
+  from = "/termini"
+  to = "/termini.html"
+  status = 200
+
 # SPA fallback (per evitare 404 su path React)
 # La function è esposta direttamente su /api/anthropic via `config.path`
 [[redirects]]

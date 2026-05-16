@@ -23,12 +23,19 @@ export default function AuthScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
+  // Consensi GDPR richiesti al signup
+  const [consentTerms, setConsentTerms] = useState(false); // accettazione termini e privacy policy (lettura)
+  const [consentHealth, setConsentHealth] = useState(false); // consenso esplicito al trattamento dati sanitari (art. 9.2.a GDPR)
 
   async function handleSubmit(e) {
     e?.preventDefault?.();
     setError(''); setInfo('');
     if (!email || !password) { setError('Email e password richieste.'); return; }
     if (password.length < 6) { setError('La password deve avere almeno 6 caratteri.'); return; }
+    if (mode === 'signup') {
+      if (!consentTerms) { setError('Devi accettare i Termini di Servizio e l\'Informativa Privacy per registrarti.'); return; }
+      if (!consentHealth) { setError('Devi dare il consenso esplicito al trattamento dei dati sanitari (è richiesto dal GDPR per usare l\'app).'); return; }
+    }
     setBusy(true);
     try {
       if (mode === 'signup') {
@@ -37,6 +44,8 @@ export default function AuthScreen() {
         setInfo('Account creato. Controlla la tua email per confermare e poi torna ad accedere ✿');
         setMode('signin');
         setPassword('');
+        setConsentTerms(false);
+        setConsentHealth(false);
       } else {
         const { error: e2 } = await supabase.auth.signInWithPassword({ email, password });
         if (e2) throw e2;
@@ -160,6 +169,23 @@ export default function AuthScreen() {
               color: W.tan,
               marginTop: 4,
             }}>{info}</div>
+          )}
+
+          {/* Consensi GDPR — solo in fase di registrazione */}
+          {isSignup && (
+            <div style={{marginTop: 12, display:'flex', flexDirection:'column', gap:10}}>
+              <label style={{display:'flex', alignItems:'flex-start', gap:10, cursor:'pointer', fontFamily:fCardo, fontStyle:'italic', fontSize:13, color:W.ink, lineHeight:1.5}}>
+                <input type="checkbox" checked={consentTerms} onChange={e=>setConsentTerms(e.target.checked)} style={{marginTop:3, width:16, height:16, accentColor:W.ink, flexShrink:0}} />
+                <span>Ho letto e accetto i <a href="/termini" target="_blank" rel="noopener noreferrer" style={{color:W.tan, borderBottom:`1px solid ${W.tan}66`, textDecoration:'none'}}>Termini di Servizio</a> e l'<a href="/privacy" target="_blank" rel="noopener noreferrer" style={{color:W.tan, borderBottom:`1px solid ${W.tan}66`, textDecoration:'none'}}>Informativa Privacy</a>.</span>
+              </label>
+              <label style={{display:'flex', alignItems:'flex-start', gap:10, cursor:'pointer', fontFamily:fCardo, fontStyle:'italic', fontSize:13, color:W.ink, lineHeight:1.5}}>
+                <input type="checkbox" checked={consentHealth} onChange={e=>setConsentHealth(e.target.checked)} style={{marginTop:3, width:16, height:16, accentColor:W.ink, flexShrink:0}} />
+                <span>Acconsento esplicitamente al trattamento dei miei <b>dati sanitari</b> (peso, alimentazione, sonno, attività fisica) per le finalità descritte nell'informativa, ai sensi dell'art. 9.2.a GDPR.</span>
+              </label>
+              <div style={{fontFamily:fCardo, fontSize:11, color:W.tan, fontStyle:'italic', marginTop:2, lineHeight:1.5, opacity:0.85}}>
+                Hai 18 anni o più. Puoi revocare i consensi in qualunque momento dal tuo profilo.
+              </div>
+            </div>
           )}
 
           <button

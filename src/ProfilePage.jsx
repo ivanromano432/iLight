@@ -320,6 +320,18 @@ export default function ProfilePage({ user, profile, updProfile, onClose }) {
             {saving ? 'salvataggio…' : justSaved ? '✓ salvato' : 'SALVA'}
           </button>
         </div>
+
+        {/* Link legali */}
+        <div style={{ marginTop: 50, paddingTop: 24, borderTop: `1px solid ${Q.gold}22`, textAlign: 'center' }}>
+          <div style={{ fontFamily: fCinzel, fontSize: 9, letterSpacing: '0.35em', color: Q.goldDim, textTransform: 'uppercase', marginBottom: 10 }}>DOCUMENTI LEGALI</div>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 18 }}>
+            <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 13, color: Q.gold, textDecoration: 'none', borderBottom: `1px solid ${Q.gold}66`, paddingBottom: 2 }}>Privacy Policy</a>
+            <a href="/termini" target="_blank" rel="noopener noreferrer" style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 13, color: Q.gold, textDecoration: 'none', borderBottom: `1px solid ${Q.gold}66`, paddingBottom: 2 }}>Termini di Servizio</a>
+          </div>
+          <div style={{ marginTop: 14, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 11, color: Q.goldDim, lineHeight: 1.5 }}>
+            Romano Formazione S.a.s. · P.IVA 02477940999<br/>Via Macaggi 25/10 — 16121 Genova
+          </div>
+        </div>
       </div>
     </div>
   );
