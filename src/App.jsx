@@ -3982,7 +3982,7 @@ function Ornament({ color, mark }){
 function Loading({ color }){ return <div style={{textAlign:'center',marginTop:60,fontStyle:'italic',fontSize:14,color}}>⋯</div>; }
 function Stat({ label, value, color, dim, onTap }){
   return (
-    <div onClick={onTap ? (e) => { e.stopPropagation(); onTap(); } : undefined} style={{textAlign:'center',cursor:onTap?'pointer':'default'}}>
+    <div onClick={onTap} style={{textAlign:'center',cursor:onTap?'pointer':'default'}}>
       <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:20,color,lineHeight:1}}>{value}</div>
       <div style={{fontFamily:fCinzel,fontSize:9,letterSpacing:'0.3em',color:dim,textTransform:'uppercase',marginTop:6}}>{label}</div>
     </div>
