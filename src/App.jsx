@@ -320,21 +320,38 @@ ${habitsSummary}${avoidStr}`;
   } catch (e) { return { error: e.message || 'Errore' }; }
 }
 
-// Stima kcal/proteine/carbo/grassi di un pasto a partire da descrizione, quantità in grammi e foto opzionale
+// Stima kcal/proteine/carbo/grassi di un pasto a partire da descrizione, quantità in grammi e foto opzionale.
+// Se è presente solo la foto (no descrizione né quantità), l'AI identifica il nome del cibo e stima la quantità.
 async function estimateMealNutrition({ description, qty_g, photo }) {
   const desc = (description || '').trim();
   if (!desc && !photo) return { error: 'Servono almeno descrizione o foto.' };
-  const qtyTxt = (qty_g!=null && qty_g!=='' && !isNaN(qty_g)) ? `${qty_g} g` : 'porzione singola tipica italiana';
-  const promptText = `Sei un nutrizionista italiano. Stima i valori nutrizionali del seguente pasto.
+  const hasDesc = !!desc;
+  const hasQty = qty_g!=null && qty_g!=='' && !isNaN(qty_g);
+  const qtyTxt = hasQty ? `${qty_g} g` : '(da stimare tu dalla foto)';
+  const photoOnly = !!photo && !hasDesc;
+  const promptText = photoOnly
+    ? `Sei un nutrizionista italiano. Analizza la foto del pasto allegata.
+
+Devi:
+1. Identificare il piatto/alimento principale (nome breve e descrittivo in italiano, es. "Spaghetti alla carbonara", "Insalata di pollo", "Pizza margherita")
+2. Stimare la quantità in grammi guardando la porzione nella foto
+3. Calcolare i valori nutrizionali per quella quantità stimata
+
+Rispondi SOLO con JSON valido nella forma:
+{"name": "<nome del piatto in italiano>", "qty_g": <int grammi stimati>, "kcal": <int>, "p": <num>, "c": <num>, "g": <num>, "note": "<breve nota di 5-10 parole su come hai stimato>"}
+
+p = proteine in grammi, c = carboidrati in grammi, g = grassi in grammi. Niente testo prima o dopo.`
+    : `Sei un nutrizionista italiano. Stima i valori nutrizionali del seguente pasto.
 
 Descrizione: ${desc || '(vedi foto)'}
 Quantità: ${qtyTxt}
 
 Considera porzione, cottura e preparazione tipica italiana. Sii preciso ma realista.
 ${photo ? 'Usa anche la foto allegata come riferimento visivo per stimare le porzioni.' : ''}
+${!hasQty ? 'Stima tu la quantità in grammi e includila nel campo qty_g.' : ''}
 
 Rispondi SOLO con JSON valido nella forma:
-{"kcal": <int>, "p": <num>, "c": <num>, "g": <num>, "note": "<breve nota di 5-10 parole su come hai stimato>"}
+{"qty_g": <int grammi${hasQty?' (uguale a '+qty_g+')':' stimati'}>, "kcal": <int>, "p": <num>, "c": <num>, "g": <num>, "note": "<breve nota di 5-10 parole su come hai stimato>"}
 
 p = proteine in grammi, c = carboidrati in grammi, g = grassi in grammi. Niente testo prima o dopo.`;
 
@@ -361,7 +378,7 @@ p = proteine in grammi, c = carboidrati in grammi, g = grassi in grammi. Niente 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
-        max_tokens: 400,
+        max_tokens: 500,
         system: 'Sei un nutrizionista italiano. Rispondi SEMPRE e SOLO con JSON valido. Niente testo extra.',
         messages: [{ role: 'user', content }],
       }),
@@ -380,8 +397,10 @@ p = proteine in grammi, c = carboidrati in grammi, g = grassi in grammi. Niente 
     const p = parsed.p!=null ? Math.max(0, Math.round(Number(parsed.p)*10)/10) : null;
     const c = parsed.c!=null ? Math.max(0, Math.round(Number(parsed.c)*10)/10) : null;
     const g = parsed.g!=null ? Math.max(0, Math.round(Number(parsed.g)*10)/10) : null;
+    const qg = parsed.qty_g!=null ? Math.max(0, Math.round(Number(parsed.qty_g))) : null;
+    const name = parsed.name ? String(parsed.name).trim() : null;
     if (kcal == null || p == null || c == null || g == null) throw new Error('Stima incompleta dall\'IA');
-    return { kcal, p, c, g, note: String(parsed.note || '') };
+    return { name, qty_g: qg, kcal, p, c, g, note: String(parsed.note || '') };
   } catch (e) {
     return { error: e.message || 'Errore' };
   }
@@ -2145,14 +2164,6 @@ function PastiPage({ user, theme, loaded, meals, updMeals, notes, weights, goal 
   const J = theme || { bg: '#E5E3D5', dark: '#2D3A2E', sage: '#5C6B4E', light: '#8FA288' };
   const [selectedDay, setSelectedDay] = useState(dayKey(new Date()));
   const [editing, setEditing] = useState(null);
-  const [analyzing, setAnalyzing] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState(null);
-  const [analysisError, setAnalysisError] = useState('');
-  const [analysisSel, setAnalysisSel] = useState({});
-  // Classificazione per ogni meal candidato: { kind: 'new'|'identical'|'similar', match: meal|null }
-  const [analysisMealKinds, setAnalysisMealKinds] = useState([]);
-  // Azione utente per i 'similar': 'skip' | 'replace' | 'add'
-  const [analysisActions, setAnalysisActions] = useState({});
   // Bulk stima nutrienti
   const [bulkEstimating, setBulkEstimating] = useState(false);
   const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0 });
@@ -2196,92 +2207,6 @@ function PastiPage({ user, theme, loaded, meals, updMeals, notes, weights, goal 
   }
 
   const isToday = selectedDay===dayKey(new Date());
-  const dayNotesForAI = useMemo(()=>{ const date=parseDayKey(selectedDay); return notes.filter(e=>sameDay(new Date(e.ts),date)).sort((a,b)=>new Date(a.ts)-new Date(b.ts)); },[notes,selectedDay]);
-
-  async function handleAnalyzeMeals(){
-    if (dayNotesForAI.length === 0) { setAnalysisError('Il diario di questo giorno è vuoto. Scrivi prima cosa hai mangiato nel Diario.'); return; }
-    const fullText = dayNotesForAI.map(n=>{ const t=new Date(n.ts).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}); return `[${t}] ${n.text}`; }).join('\n');
-    setAnalyzing(true); setAnalysisError(''); setAnalysisResult(null); setAnalysisMealKinds([]); setAnalysisActions({});
-
-    // Pasti già nel giorno (eaten + planned) per la dedup
-    const dayExisting = meals.filter(m => sameDay(new Date(m.ts), parseDayKey(selectedDay)));
-
-    try {
-      const r = await analyzeDiary(fullText);
-      if(r.error){ setAnalysisError('IA: '+r.error); }
-      else {
-        const allFound = r.meals || [];
-        if (allFound.length === 0) {
-          setAnalysisError('Nessun pasto trovato nel diario di questo giorno.');
-        } else {
-          // Classifica ogni candidato → new / identical / similar
-          const kinds = allFound.map(m => classifyCandidate(m, dayExisting));
-          const sel = {};
-          const actions = {};
-          allFound.forEach((_,i)=>{
-            const k = kinds[i];
-            // Default: 'new' selezionato, 'identical' deselezionato, 'similar' deselezionato (utente sceglie)
-            sel[`m${i}`] = k.kind === 'new';
-            if (k.kind === 'similar') actions[`m${i}`] = 'skip';
-          });
-          setAnalysisSel(sel);
-          setAnalysisMealKinds(kinds);
-          setAnalysisActions(actions);
-          setAnalysisResult({ ...r, meals: allFound });
-        }
-      }
-    } catch(e){ setAnalysisError('Errore'); }
-    finally { setAnalyzing(false); }
-  }
-
-  async function applyMealsAnalysis(){
-    const r = analysisResult; if (!r) return;
-    let updatedMeals = [...meals];
-    const newMeals = [];
-    (r.meals||[]).forEach((m,i)=>{
-      const k = analysisMealKinds[i] || { kind: 'new', match: null };
-      const checked = !!analysisSel[`m${i}`];
-      const action = analysisActions[`m${i}`];
-
-      if (k.kind === 'identical') {
-        if (checked) {
-          const ts = isToday ? new Date() : (()=>{const d=parseDayKey(selectedDay); d.setHours(12,0); return d;})();
-          newMeals.push({id:newId(),ts:ts.toISOString(),type:m.type||'pranzo',description:m.description||'',qty_g:m.qty_g!=null?Number(m.qty_g):null,kcal:m.kcal!=null?Number(m.kcal):null,p:m.p!=null?Number(m.p):null,c:m.c!=null?Number(m.c):null,g:m.g!=null?Number(m.g):null,photo:null,photo_url:null,status:'eaten'});
-        }
-        return;
-      }
-
-      if (k.kind === 'similar') {
-        if (action === 'replace' && k.match) {
-          updatedMeals = updatedMeals.map(em => em.id === k.match.id ? {
-            ...em,
-            type: m.type || em.type,
-            description: m.description || em.description,
-            qty_g: m.qty_g!=null ? Number(m.qty_g) : em.qty_g,
-            kcal: m.kcal!=null ? Number(m.kcal) : em.kcal,
-            p: m.p!=null ? Number(m.p) : em.p,
-            c: m.c!=null ? Number(m.c) : em.c,
-            g: m.g!=null ? Number(m.g) : em.g,
-          } : em);
-        } else if (action === 'add') {
-          const ts = isToday ? new Date() : (()=>{const d=parseDayKey(selectedDay); d.setHours(12,0); return d;})();
-          newMeals.push({id:newId(),ts:ts.toISOString(),type:m.type||'pranzo',description:m.description||'',qty_g:m.qty_g!=null?Number(m.qty_g):null,kcal:m.kcal!=null?Number(m.kcal):null,p:m.p!=null?Number(m.p):null,c:m.c!=null?Number(m.c):null,g:m.g!=null?Number(m.g):null,photo:null,photo_url:null,status:'eaten'});
-        }
-        return;
-      }
-
-      // k.kind === 'new'
-      if (!checked) return;
-      if (newMeals.some(nm => mealsAreSimilar(m, nm))) return;
-      const ts = isToday ? new Date() : (()=>{const d=parseDayKey(selectedDay); d.setHours(12,0); return d;})();
-      newMeals.push({id:newId(),ts:ts.toISOString(),type:m.type||'pranzo',description:m.description||'',qty_g:m.qty_g!=null?Number(m.qty_g):null,kcal:m.kcal!=null?Number(m.kcal):null,p:m.p!=null?Number(m.p):null,c:m.c!=null?Number(m.c):null,g:m.g!=null?Number(m.g):null,photo:null,photo_url:null,status:'eaten'});
-    });
-    if (newMeals.length > 0 || updatedMeals.length !== meals.length || updatedMeals.some((m,i)=>m!==meals[i])) {
-      await updMeals([...updatedMeals, ...newMeals]);
-    }
-    setAnalysisResult(null); setAnalysisError(''); setAnalysisSel({}); setAnalysisMealKinds([]); setAnalysisActions({});
-  }
-
   // Stima bulk dei nutrienti per i pasti del giorno corrente che hanno descrizione o foto ma mancano kcal
   async function bulkEstimateNutrients(){
     const dayDate = parseDayKey(selectedDay);
@@ -2492,13 +2417,8 @@ function PastiPage({ user, theme, loaded, meals, updMeals, notes, weights, goal 
               })}
 
               <div style={{marginTop:28,paddingTop:18,borderTop:`1px solid ${J.sage}33`,textAlign:'center'}}>
-                <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:13,color:J.sage,marginBottom:10,lineHeight:1.4}}>L'IA legge il diario di {isToday?'oggi':'questo giorno'} e ne estrae i pasti fatti.</div>
-                <button onClick={handleAnalyzeMeals} disabled={analyzing||dayNotesForAI.length===0} style={{background:J.dark,color:J.bg,border:`1px solid ${J.dark}`,fontFamily:fMarcellus,fontSize:11,letterSpacing:'0.4em',padding:'12px 28px',cursor:analyzing||dayNotesForAI.length===0?'default':'pointer',opacity:dayNotesForAI.length===0?0.4:(analyzing?0.6:1)}}>{analyzing?'⋯ ANALIZZO':'✦ REGISTRA CON L\'IA'}</button>
-                {analysisError && <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:13,color:'#A04848',marginTop:10}}>{analysisError}</div>}
-                {dayNotesForAI.length===0 && !analysisError && <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:12,color:J.sage,marginTop:10,opacity:0.7}}>vai nel Diario per scrivere cosa hai mangiato</div>}
-                <div style={{marginTop:14}}>
-                  <button onClick={()=>setEditing('new')} style={{background:'transparent',color:J.sage,border:`1px solid ${J.sage}66`,fontFamily:fGaramond,fontStyle:'italic',fontSize:13,padding:'8px 18px',cursor:'pointer'}}>+ aggiungi a mano</button>
-                </div>
+                <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:13,color:J.sage,marginBottom:14,lineHeight:1.5,maxWidth:340,margin:'0 auto 14px'}}>Aggiungi un pasto. Dopo aver caricato una foto, l'IA può identificare il piatto, stimare quantità e macronutrienti.</div>
+                <button onClick={()=>setEditing('new')} style={{background:J.dark,color:J.bg,border:`1px solid ${J.dark}`,fontFamily:fMarcellus,fontSize:11,letterSpacing:'0.4em',padding:'12px 28px',cursor:'pointer'}}>+ NUOVO PASTO</button>
                 {/* Bulk stima nutrienti per i pasti del giorno senza kcal */}
                 {(() => {
                   const missing = eatenMeals.filter(m => m.kcal == null && ((m.description||'').trim() || m.photo || m.photo_url));
@@ -2635,100 +2555,6 @@ function PastiPage({ user, theme, loaded, meals, updMeals, notes, weights, goal 
         </>)}
       </div>
       {editing && <MealModal J={J} existing={editingMeal} onClose={()=>setEditing(null)} onSave={saveMeal} onDelete={editing!=='new'?delMeal:null} />}
-
-
-      {analysisResult && (
-        <SimpleModal onClose={()=>setAnalysisResult(null)} bg={J.bg} border={J.dark} wide>
-          <h2 style={{fontFamily:fMarcellus,fontSize:14,letterSpacing:'0.3em',color:J.dark,textAlign:'center',margin:0}}>✦ PASTI TROVATI</h2>
-          {(() => {
-            const newCount = analysisMealKinds.filter(k => k.kind==='new').length;
-            const idCount = analysisMealKinds.filter(k => k.kind==='identical').length;
-            const simCount = analysisMealKinds.filter(k => k.kind==='similar').length;
-            if (idCount === 0 && simCount === 0) return (
-              <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:14,color:J.sage,textAlign:'center',marginTop:6}}>tocca per togliere ciò che non vuoi salvare</div>
-            );
-            return (
-              <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:14,color:J.sage,textAlign:'center',marginTop:6,lineHeight:1.3}}>
-                {newCount>0 && <span>{newCount} {newCount===1?'pasto nuovo':'pasti nuovi'}</span>}
-                {newCount>0 && (idCount>0||simCount>0) && <span> · </span>}
-                {idCount>0 && <span>{idCount} {idCount===1?'già presente':'già presenti'}</span>}
-                {idCount>0 && simCount>0 && <span> · </span>}
-                {simCount>0 && <span style={{color:J.dark}}>{simCount} da decidere ↓</span>}
-              </div>
-            );
-          })()}
-          <div style={{marginTop:14}}>
-            {(() => {
-              const hasMeals = (analysisResult.meals||[]).length > 0;
-              const onlyIdentical = hasMeals && analysisMealKinds.length > 0 && analysisMealKinds.every(k => k.kind === 'identical');
-              if (!onlyIdentical) return null;
-              return (
-                <div style={{padding:'14px 12px',background:`${J.dark}0D`,border:`1px solid ${J.dark}22`,fontFamily:fGaramond,fontStyle:'italic',fontSize:14,color:J.dark,textAlign:'center',borderRadius:2}}>
-                  ✓ Tutti i pasti del diario sono già registrati. Niente di nuovo da copiare.
-                </div>
-              );
-            })()}
-            {(analysisResult.meals||[]).map((m,i)=>{
-              const k = analysisMealKinds[i] || { kind: 'new', match: null };
-              const matchTime = k.match ? new Date(k.match.ts).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}) : '';
-              const action = analysisActions[`m${i}`] || 'skip';
-              const setAction = (a) => setAnalysisActions({...analysisActions,[`m${i}`]:a});
-              const typeName = MEAL_TYPES.find(t=>t.id===m.type)?.name || m.type;
-
-              if (k.kind === 'identical') {
-                // Già presente identico → NON renderizzare. Il conteggio sta nel sottotitolo.
-                return null;
-              }
-
-              if (k.kind === 'similar') {
-                const exist = k.match;
-                const existTypeName = MEAL_TYPES.find(t=>t.id===exist.type)?.name || exist.type;
-                const typeChanged = exist.type !== m.type;
-                return (
-                  <div key={`m-${i}`} style={{padding:'14px 0',borderTop:`1px solid ${J.dark}1A`}}>
-                    <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:15,color:J.dark,marginBottom:6}}>{typeName}: {m.description}</div>
-                    <div style={{background:`${J.dark}0D`,border:`1px solid ${J.dark}22`,padding:'8px 10px',marginBottom:8,borderRadius:2}}>
-                      <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:14,color:J.sage,marginBottom:4}}>è simile a uno già presente:</div>
-                      <div style={{fontFamily:fGaramond,fontSize:13,color:J.dark}}>
-                        <div><span style={{color:J.sage,fontStyle:'italic'}}>esistente:</span> {exist.description} · <span style={{color:typeChanged?J.dark:J.sage,fontWeight:typeChanged?600:400}}>{existTypeName}</span> · {matchTime} · {exist.kcal!=null?`${exist.kcal} kcal`:'no kcal'}{exist.qty_g?` · ${exist.qty_g}g`:''}</div>
-                        <div style={{marginTop:2}}><span style={{color:J.sage,fontStyle:'italic'}}>nuovo IA:</span> {m.description} · <span style={{color:typeChanged?J.dark:J.sage,fontWeight:typeChanged?600:400}}>{typeName}</span> · {m.kcal!=null?`${m.kcal} kcal`:'no kcal'}{m.qty_g?` · ${m.qty_g}g`:''}</div>
-                        {typeChanged && <div style={{marginTop:4,fontFamily:fGaramond,fontStyle:'italic',fontSize:13,color:J.dark,opacity:0.7}}>orari diversi: {existTypeName.toLowerCase()} vs {typeName.toLowerCase()}</div>}
-                      </div>
-                    </div>
-                    <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:14,color:J.sage,marginBottom:6}}>è lo stesso pasto?</div>
-                    <div style={{display:'flex',flexDirection:'column',gap:4}}>
-                      {[
-                        {id:'skip',label:'Sì — salta (tieni l\'esistente così com\'è)'},
-                        {id:'replace',label:'Sì — aggiorna l\'esistente con i nuovi dati'},
-                        {id:'add',label:'No — aggiungilo come pasto diverso'},
-                      ].map(opt => (
-                        <label key={opt.id} style={{display:'flex',alignItems:'flex-start',gap:8,cursor:'pointer',padding:'6px 8px',background:action===opt.id?`${J.dark}1A`:'transparent',border:`1px solid ${action===opt.id?J.dark+'55':J.dark+'1A'}`,borderRadius:2}}>
-                          <input type="radio" name={`act-meals-${i}`} checked={action===opt.id} onChange={()=>setAction(opt.id)} style={{marginTop:2,accentColor:J.dark}} />
-                          <span style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:13,color:J.dark,lineHeight:1.3}}>{opt.label}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                );
-              }
-
-              // k.kind === 'new'
-              return (
-                <ToggleRow key={`m-${i}`} checked={analysisSel[`m${i}`]} onToggle={()=>setAnalysisSel({...analysisSel,[`m${i}`]:!analysisSel[`m${i}`]})} ink={J.dark}>
-                  <div style={{flex:1}}>
-                    <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:15}}>{typeName}: {m.description}</div>
-                    <div style={{fontFamily:fMarcellus,fontSize:9,letterSpacing:'0.15em',color:J.sage,marginTop:2,textTransform:'uppercase'}}>{m.qty_g?`${m.qty_g}g · `:''}{m.kcal} kcal · P {m.p} · C {m.c} · G {m.g}</div>
-                  </div>
-                </ToggleRow>
-              );
-            })}
-          </div>
-          <div style={{display:'flex',gap:8,marginTop:20,justifyContent:'flex-end'}}>
-            <button onClick={()=>setAnalysisResult(null)} style={{background:'transparent',color:J.sage,border:`1px solid ${J.sage}66`,fontFamily:fMarcellus,fontSize:10,letterSpacing:'0.2em',padding:'8px 16px',cursor:'pointer',textTransform:'uppercase'}}>annulla</button>
-            <button onClick={applyMealsAnalysis} style={{background:J.dark,color:J.bg,border:'none',fontFamily:fMarcellus,fontSize:10,letterSpacing:'0.3em',padding:'8px 22px',cursor:'pointer'}}>APPLICA</button>
-          </div>
-        </SimpleModal>
-      )}
     </div>
   );
 }
@@ -2816,6 +2642,10 @@ function MealModal({ existing, onClose, onSave, onDelete, J }){
       const qtyNum = qty ? parseNum(qty,1,5000) : null;
       const r = await estimateMealNutrition({ description: description.trim(), qty_g: qtyNum, photo: photo || legacyPhoto });
       if (r.error) { setEstimateError(r.error); return; }
+      // Se l'AI ha identificato il nome (caso solo foto), popolo description se vuoto
+      if (r.name && !description.trim()) setDescription(r.name);
+      // Se l'AI ha stimato la quantità e l'utente non l'ha specificata, la popolo
+      if (r.qty_g != null && !qty) setQty(String(r.qty_g));
       if (r.kcal != null) setKcal(String(r.kcal));
       if (r.p != null) setP(String(r.p));
       if (r.c != null) setC(String(r.c));
@@ -2880,12 +2710,14 @@ function MealModal({ existing, onClose, onSave, onDelete, J }){
       {/* Stima nutrienti con IA */}
       <div style={{marginTop:14,padding:'12px 14px',border:`1px dashed ${J.sage}66`,background:`${J.sage}0A`}}>
         <button onClick={estimateNutrition} disabled={!canEstimate} style={{width:'100%',background:canEstimate?J.sage:'transparent',color:canEstimate?J.bg:J.sage,border:`1px solid ${J.sage}`,fontFamily:fMarcellus,fontSize:10,letterSpacing:'0.3em',padding:'10px 14px',cursor:canEstimate?'pointer':'not-allowed',textTransform:'uppercase',opacity:canEstimate?1:0.5}}>
-          {estimating ? '⋯ STIMO CON L\'IA' : '✦ STIMA NUTRIENTI CON IA'}
+          {estimating ? '⋯ ANALIZZO' : (!!displayPhoto && !description.trim() ? '✦ IDENTIFICA DALLA FOTO' : '✦ STIMA NUTRIENTI CON IA')}
         </button>
         <div style={{marginTop:8,fontFamily:fGaramond,fontStyle:'italic',fontSize:12,color:J.sage,textAlign:'center',lineHeight:1.4}}>
-          {!description.trim() && !photo
+          {!description.trim() && !displayPhoto
             ? 'scrivi la descrizione (o aggiungi una foto) per attivare la stima'
-            : 'l\'IA stima kcal, proteine, carboidrati e grassi da descrizione e quantità · puoi sempre correggere a mano'}
+            : (!!displayPhoto && !description.trim()
+              ? 'l\'IA riconosce il piatto dalla foto, ne stima quantità e macronutrienti · puoi sempre correggere'
+              : 'l\'IA stima kcal, proteine, carboidrati e grassi da descrizione e quantità · puoi sempre correggere')}
         </div>
         {estimateNote && <div style={{marginTop:6,fontFamily:fGaramond,fontStyle:'italic',fontSize:12,color:J.dark,textAlign:'center'}}>✓ {estimateNote}</div>}
         {estimateError && <div style={{marginTop:6,fontFamily:fGaramond,fontStyle:'italic',fontSize:12,color:'#A04848',textAlign:'center'}}>{estimateError}</div>}
