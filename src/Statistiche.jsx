@@ -724,7 +724,6 @@ export default function StatistichePage({
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <button onClick={onClose} style={{ background: 'transparent', color: Q.gold, border: `1px solid ${Q.gold}66`, fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.3em', padding: '8px 14px', cursor: 'pointer' }}>← INDIETRO</button>
           <div style={{ fontFamily: fCinzel, fontSize: 11, letterSpacing: '0.45em', color: Q.gold, textTransform: 'uppercase' }}>STATISTICHE</div>
-          <div style={{ fontFamily: 'monospace', fontSize: 9, color: Q.goldDim, marginTop: 4, opacity: 0.6 }}>v.16mag-0945</div>
           <div style={{ width: 70 }} />
         </div>
 
