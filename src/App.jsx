@@ -950,7 +950,7 @@ export default function App({ user, onLogout }){
         {page==='digiuno' && <DigiunoPage theme={__theme} loaded={loaded} fasts={fasts} updFasts={updFasts} />}
         {page==='respiro' && <RespiroPage theme={__theme} loaded={loaded} sessions={mindfulSessions} updSessions={updMindful} workouts={workouts} types={workoutTypes} updWorkouts={updWorkouts} updTypes={updWorkoutTypes} />}
         {page==='sonno' && <SonnoPage theme={__theme} loaded={loaded} sleeps={sleeps} updSleeps={updSleeps} />}
-        {page==='sera' && <SeraPage theme={__theme} loaded={loaded} weights={weights} goal={goal} notes={foodNotes} water={waterByDay} waterGoal={waterGoal} meals={meals} workouts={workouts} workoutTypes={workoutTypes} supps={supplements} taken={suppTaken} sleeps={sleeps} />}
+        {page==='sera' && <SeraPage theme={__theme} loaded={loaded} weights={weights} goal={goal} notes={foodNotes} water={waterByDay} waterGoal={waterGoal} meals={meals} workouts={workouts} workoutTypes={workoutTypes} supps={supplements} taken={suppTaken} sleeps={sleeps} mindful={mindfulSessions} />}
         </>); })()}
       </div>
       <BottomNav theme={getTheme(profile?.theme)} currentIdx={pageIdx} onChange={setPageIdx} />
@@ -3401,7 +3401,7 @@ function SleepModal({ existing, todayK, onClose, onSave, onDelete }){
   );
 }
 
-function SeraPage({ theme, loaded, weights, goal, notes, water, waterGoal, meals, workouts, workoutTypes, supps, taken, sleeps }){
+function SeraPage({ theme, loaded, weights, goal, notes, water, waterGoal, meals, workouts, workoutTypes, supps, taken, sleeps, mindful }){
   // Sera usa N internamente (palette Notte blu era originaria). Shadow.
   const N = theme || { bg1: '#2C3340', bg2: '#14171F', cream: '#F2E8D0', dim: '#8A8270', gold: '#C9A876', body: '#DDD3C2' };
   const [aiAnalyzing, setAiAnalyzing] = useState(false);
@@ -3416,10 +3416,39 @@ function SeraPage({ theme, loaded, weights, goal, notes, water, waterGoal, meals
   const todayWorkouts = workouts.filter(e=>sameDay(new Date(e.ts),new Date()));
   const todayK = dayKey(new Date());
   const todayWater = water[todayK] || 0;
-  const suppsTakenToday = (taken[todayK] || []).length;
+  const todaySuppIds = (taken[todayK] || []);
+  const suppsTakenToday = todaySuppIds.length;
   const totalKcal = todayMeals.reduce((a,m)=>a+(m.kcal||0),0);
   const lastNight = sleeps.find(s=>s.wakeDate===todayK);
   const lastNightDur = lastNight ? durHours(lastNight.bedtime, lastNight.waketime) : null;
+
+  // Dettagli allenamenti di oggi: per tipo, somma qty (es. "Corsa 5km · Pesi 30min")
+  const workoutDetails = (() => {
+    if (todayWorkouts.length === 0) return null;
+    const byType = {};
+    todayWorkouts.forEach(w => {
+      const t = (workoutTypes||[]).find(x => x.id === w.typeId);
+      const name = t ? t.name : 'Altro';
+      const unit = t ? t.unit : '';
+      if (!byType[name]) byType[name] = { qty: 0, unit };
+      byType[name].qty += (w.qty || 0);
+    });
+    return Object.entries(byType).map(([name, v]) => `${name} ${fmt0(v.qty)}${v.unit}`).join(' · ');
+  })();
+
+  // Meditazione di oggi: somma minuti dalle sessioni mindful
+  const todayMindful = (mindful || []).filter(s => sameDay(new Date(s.ts), new Date()));
+  const totalMindfulMin = todayMindful.reduce((a, s) => a + (s.duration_min || 0), 0);
+
+  // Dettagli integratori presi oggi: nomi separati da ·
+  const suppDetails = (() => {
+    if (todaySuppIds.length === 0) return null;
+    const names = todaySuppIds.map(id => {
+      const s = (supps || []).find(x => x.id === id);
+      return s ? s.name : null;
+    }).filter(Boolean);
+    return names.length > 0 ? names.join(' · ') : null;
+  })();
 
   async function runAiAnalysis(){
     setAiAnalyzing(true); setAiError(''); setAiResult(null);
@@ -3447,12 +3476,11 @@ function SeraPage({ theme, loaded, weights, goal, notes, water, waterGoal, meals
             <Row theme={N} label="sonno notte scorsa" value={lastNightDur!=null?fmtDur(lastNightDur):'—'} />
             <Row theme={N} label="peso · mattina" value={morning?fmt(morning.weight):'—'} unit="kg" />
             <Row theme={N} label="peso · sera" value={evening&&evening!==morning?fmt(evening.weight):'—'} unit="kg" />
-            <Row theme={N} label="pasti registrati" value={todayMeals.length} />
             <Row theme={N} label="calorie" value={totalKcal>0?fmt0(totalKcal):'—'} unit="kcal" />
-            <Row theme={N} label="voci diario" value={todayNotes.length} />
             <Row theme={N} label="acqua" value={todayWater} unit={`/ ${waterGoal}`} />
-            <Row theme={N} label="allenamenti" value={todayWorkouts.length} />
-            <Row theme={N} label="integratori" value={supps.length>0?`${suppsTakenToday} / ${supps.length}`:'—'} />
+            <Row theme={N} label="allenamenti" value={todayWorkouts.length||'—'} details={workoutDetails} />
+            <Row theme={N} label="meditazione" value={totalMindfulMin>0?fmt0(totalMindfulMin):'—'} unit={totalMindfulMin>0?'min':''} details={todayMindful.length>1?`${todayMindful.length} sessioni`:null} />
+            <Row theme={N} label="integratori" value={supps.length>0?`${suppsTakenToday} / ${supps.length}`:'—'} details={suppDetails} />
           </div>
           <div style={{marginTop:22,padding:14,background:`${N.gold}0F`,border:`1px solid ${N.gold}33`,borderRadius:2,textAlign:'left'}}>
             <div style={{fontFamily:fFraunces,fontSize:9,letterSpacing:'0.4em',color:N.gold,textTransform:'uppercase'}}>⟡ riflessione</div>
@@ -4065,12 +4093,15 @@ function Totale({ label, value, unit, dark, sage, font, big }){
     </div>
   );
 }
-function Row({ label, value, unit, theme }){
+function Row({ label, value, unit, details, theme }){
   const T = theme || N;
   return (
-    <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',padding:'10px 0',borderBottom:`1px solid ${T.gold}1F`}}>
-      <span style={{fontFamily:fFraunces,fontStyle:'italic',fontSize:13,color:T.dim||T.goldDim}}>{label}</span>
-      <span style={{fontFamily:fFraunces,fontWeight:400,fontSize:20,color:T.gold}}>{value}{unit && <span style={{fontSize:11,color:T.dim||T.goldDim,marginLeft:4,fontWeight:300}}>{unit}</span>}</span>
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:12,padding:'10px 0',borderBottom:`1px solid ${T.gold}1F`}}>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{fontFamily:fFraunces,fontStyle:'italic',fontSize:13,color:T.dim||T.goldDim}}>{label}</div>
+        {details && <div style={{fontFamily:fFraunces,fontSize:11,color:T.dim||T.goldDim,opacity:0.75,marginTop:3,lineHeight:1.4}}>{details}</div>}
+      </div>
+      <span style={{fontFamily:fFraunces,fontWeight:400,fontSize:20,color:T.gold,whiteSpace:'nowrap'}}>{value}{unit && <span style={{fontSize:11,color:T.dim||T.goldDim,marginLeft:4,fontWeight:300}}>{unit}</span>}</span>
     </div>
   );
 }
