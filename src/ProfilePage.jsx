@@ -4,6 +4,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { THEMES, THEME_ORDER, DEFAULT_THEME, getTheme } from './themes.js';
+import { supabase } from './supabase.js';
 
 const fGaramond = '"Cormorant Garamond", serif';
 const fCinzel = '"Cinzel", serif';
@@ -45,6 +46,11 @@ export default function ProfilePage({ user, profile, updProfile, onClose }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [savedAt, setSavedAt] = useState(0);
+  // Cancellazione account (GDPR art. 17)
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
   const fileInputRef = useRef(null);
 
   // Se il profile cambia dopo il mount (es. perché ancora in caricamento al primo render
@@ -136,6 +142,42 @@ export default function ProfilePage({ user, profile, updProfile, onClose }) {
   };
 
   const justSaved = savedAt && Date.now() - savedAt < 3000;
+
+  // Cancellazione account: chiama l'API /api/delete-account passando il JWT corrente
+  async function deleteAccount() {
+    if (deleteConfirmText.trim().toUpperCase() !== 'ELIMINA') {
+      setDeleteError('Devi scrivere ELIMINA in maiuscolo per confermare.');
+      return;
+    }
+    setDeleting(true); setDeleteError('');
+    try {
+      // Recupero il JWT corrente
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if (!token) {
+        setDeleteError('Sessione non valida. Esci e accedi di nuovo.');
+        setDeleting(false);
+        return;
+      }
+      const res = await fetch('/api/delete-account', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        setDeleteError(data.error || `Errore HTTP ${res.status}`);
+        setDeleting(false);
+        return;
+      }
+      // Successo: faccio logout dal client, l'utente è già cancellato server-side
+      await supabase.auth.signOut();
+      // Reload completo: l'app riparte e mostra la schermata di login
+      window.location.href = '/';
+    } catch (err) {
+      setDeleteError(err.message || 'Errore di rete');
+      setDeleting(false);
+    }
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: `radial-gradient(ellipse at top, ${Q.bg1} 0%, ${Q.bg2} 100%)`, color: Q.cream, fontFamily: fGaramond, position: 'relative', overflow: 'hidden' }}>
@@ -332,7 +374,65 @@ export default function ProfilePage({ user, profile, updProfile, onClose }) {
             Romano Formazione S.a.s. · P.IVA 02477940999<br/>Via Macaggi 25/10 — 16121 Genova
           </div>
         </div>
+
+        {/* Zona pericolosa: cancellazione account (GDPR art. 17) */}
+        <div style={{ marginTop: 40, paddingTop: 24, borderTop: `1px solid #C99A7A33`, textAlign: 'center' }}>
+          <div style={{ fontFamily: fCinzel, fontSize: 9, letterSpacing: '0.35em', color: '#C99A7A', textTransform: 'uppercase', marginBottom: 12 }}>ZONA RISERVATA</div>
+          <button onClick={() => { setDeleteOpen(true); setDeleteConfirmText(''); setDeleteError(''); }}
+            style={{ background: 'transparent', color: '#C99A7A', border: `1px solid #C99A7A66`, fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.3em', padding: '10px 22px', cursor: 'pointer', textTransform: 'uppercase' }}>
+            elimina il mio account
+          </button>
+          <div style={{ marginTop: 10, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 11, color: Q.goldDim, maxWidth: 320, margin: '10px auto 0', lineHeight: 1.5 }}>
+            Cancella definitivamente account, dati di salute, foto e abbonamento. Operazione irreversibile.
+          </div>
+        </div>
       </div>
+
+      {/* Modal di conferma cancellazione */}
+      {deleteOpen && (
+        <div onClick={() => !deleting && setDeleteOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 16 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: Q.bg2 || '#1F140C', border: `1px solid #C99A7A`, padding: '24px 22px', maxWidth: 420, width: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ fontFamily: fCinzel, fontSize: 12, letterSpacing: '0.4em', color: '#C99A7A', textAlign: 'center', marginBottom: 14, textTransform: 'uppercase' }}>⚠ Conferma cancellazione</div>
+
+            <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 14, color: Q.cream, lineHeight: 1.6, marginBottom: 16 }}>
+              Stai per cancellare <strong style={{ color: '#C99A7A' }}>definitivamente</strong> il tuo account e tutti i dati associati. Saranno eliminati:
+            </div>
+
+            <ul style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 13, color: Q.cream, lineHeight: 1.8, marginBottom: 18, paddingLeft: 22 }}>
+              <li>Profilo, peso, alimentazione, sonno, integratori, allenamenti</li>
+              <li>Foto dei pasti caricate</li>
+              <li>Eventuale abbonamento Stripe attivo</li>
+              <li>Note del diario e obiettivi personali</li>
+            </ul>
+
+            <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 13, color: Q.goldDim, marginBottom: 18, lineHeight: 1.5, padding: '10px 12px', background: `${Q.gold}11`, border: `1px solid ${Q.gold}33` }}>
+              L'operazione è <strong>irreversibile</strong>. Non potrai recuperare i dati né riattivare lo stesso account. Le eventuali fatture emesse saranno conservate per 10 anni come previsto dalla legge fiscale.
+            </div>
+
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontFamily: fCinzel, fontSize: 9, letterSpacing: '0.35em', color: Q.goldDim, marginBottom: 6, textTransform: 'uppercase' }}>per confermare, scrivi <span style={{ color: '#C99A7A' }}>ELIMINA</span></div>
+              <input type="text" value={deleteConfirmText} onChange={e => setDeleteConfirmText(e.target.value)} disabled={deleting}
+                placeholder="ELIMINA"
+                style={{ width: '100%', boxSizing: 'border-box', background: 'transparent', border: `1px solid ${Q.gold}66`, color: Q.cream, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 16, padding: '10px 14px', textAlign: 'center', outline: 'none', letterSpacing: '0.2em' }} />
+            </div>
+
+            {deleteError && (
+              <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 13, color: '#C99A7A', textAlign: 'center', marginBottom: 12 }}>{deleteError}</div>
+            )}
+
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'space-between', flexWrap: 'wrap' }}>
+              <button onClick={() => setDeleteOpen(false)} disabled={deleting}
+                style={{ flex: 1, background: 'transparent', color: Q.gold, border: `1px solid ${Q.gold}66`, fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.3em', padding: '11px 16px', cursor: deleting ? 'default' : 'pointer', textTransform: 'uppercase', opacity: deleting ? 0.5 : 1 }}>
+                annulla
+              </button>
+              <button onClick={deleteAccount} disabled={deleting || deleteConfirmText.trim().toUpperCase() !== 'ELIMINA'}
+                style={{ flex: 1, background: (deleting || deleteConfirmText.trim().toUpperCase() !== 'ELIMINA') ? 'transparent' : '#C99A7A', color: (deleting || deleteConfirmText.trim().toUpperCase() !== 'ELIMINA') ? '#C99A7A' : '#1F140C', border: `1px solid #C99A7A`, fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.3em', padding: '11px 16px', cursor: (deleting || deleteConfirmText.trim().toUpperCase() !== 'ELIMINA') ? 'default' : 'pointer', textTransform: 'uppercase', opacity: (deleting || deleteConfirmText.trim().toUpperCase() !== 'ELIMINA') ? 0.5 : 1 }}>
+                {deleting ? '⋯ cancellazione' : 'elimina'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
