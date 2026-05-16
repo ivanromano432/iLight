@@ -804,8 +804,8 @@ export default function StatistichePage({
                   fontFamily: fGaramond,
                   fontSize: 20,
                   lineHeight: 1,
-                  width: 36,
-                  height: 36,
+                  width: 44,
+                  height: 44,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -813,6 +813,10 @@ export default function StatistichePage({
                   borderRadius: 4,
                   cursor: enabled ? 'pointer' : 'default',
                   opacity: enabled ? 1 : 0.3,
+                  WebkitAppearance: 'none',
+                  WebkitTapHighlightColor: 'transparent',
+                  touchAction: 'manipulation',
+                  userSelect: 'none',
                 });
                 const goPrev = () => { if (canPrev) { setCalMonth(new Date(year, month - 1, 1)); setSelectedDay(null); } };
                 const goNext = () => { if (canNext) { setCalMonth(new Date(year, month + 1, 1)); setSelectedDay(null); } };
@@ -821,11 +825,11 @@ export default function StatistichePage({
                   <div>
                     {/* Header navigazione mesi */}
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-                      <button onClick={goPrev} disabled={!canPrev} aria-label="mese precedente" style={navBtnStyle(canPrev)}>‹</button>
+                      <button type="button" onClick={goPrev} aria-label="mese precedente" style={navBtnStyle(canPrev)}>‹</button>
                       <div style={{ flex: 1, textAlign: 'center', fontFamily: fGaramond, fontStyle: 'italic', fontSize: 14, color: Q.gold || Q.cream, opacity: 0.85, textTransform: 'capitalize' }}>
                         {monthLabel}
                       </div>
-                      <button onClick={goNext} disabled={!canNext} aria-label="mese successivo" style={navBtnStyle(canNext)}>›</button>
+                      <button type="button" onClick={goNext} aria-label="mese successivo" style={navBtnStyle(canNext)}>›</button>
                     </div>
 
                     {/* Header giorni settimana */}
