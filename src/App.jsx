@@ -482,7 +482,7 @@ const PAGES = [
   { id:'pasti', label:'pasti', roman:'III' },
   { id:'digiuno', label:'digiuno', roman:'IV' },
   { id:'integra', label:'rituale', roman:'V' },
-  { id:'respiro', label:'respiro', roman:'VI' },
+  { id:'respiro', label:'corpo', roman:'VI' },
   { id:'sonno', label:'sonno', roman:'VII' },
   { id:'sera', label:'sera', roman:'VIII' },
 ];
@@ -3878,7 +3878,7 @@ function RespiroPage({ theme, loaded, sessions, updSessions, workouts, types, up
       <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${M.gold}40`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
       <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${M.gold}1A`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
       <div style={{position:'relative',zIndex:2,padding:'32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
-        <Header q="RESPIRO" sub="VI" color={M.gold} dim={M.goldDim} mark="✦" font={fCormorant} />
+        <Header q="CORPO" sub="VI" color={M.gold} dim={M.goldDim} mark="✦" font={fCormorant} />
 
         {!loaded && <Loading color={M.dim} />}
 
