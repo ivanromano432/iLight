@@ -8,7 +8,6 @@ import StatistichePage from './Statistiche.jsx';
 import SubscriptionPage from './SubscriptionPage.jsx';
 import Onboarding, { hasSeenOnboarding, markOnboardingSeen } from './Onboarding.jsx';
 import ProfileSetup from './ProfileSetup.jsx';
-import AppleHealthImport from './AppleHealthImport.jsx';
 import GuidaPage from './GuidaPage.jsx';
 import ProfilePage from './ProfilePage.jsx';
 import LayoutPage from './LayoutPage.jsx';
@@ -515,7 +514,6 @@ export default function App({ user, onLogout }){
   const [showAccountMenu, setShowAccountMenu] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showProfileSetup, setShowProfileSetup] = useState(false);
-  const [showAppleHealth, setShowAppleHealth] = useState(false);
   const [profile, setProfile] = useState(null);
   const [loaded, setLoaded] = useState(false);
   const [weights, setWeights] = useState([]);
@@ -824,20 +822,6 @@ export default function App({ user, onLogout }){
     );
   }
 
-  if (showAppleHealth) {
-    return (
-      <AppleHealthImport
-        profile={profile}
-        existingWeights={weights}
-        onImport={async (newWeights) => {
-          // Solo aggiornamento state locale: AppleHealthImport ha gia' salvato su Supabase
-          setWeights(prev => [...(prev || []), ...newWeights]);
-        }}
-        onClose={() => setShowAppleHealth(false)}
-      />
-    );
-  }
-
   if (showGuida) {
     return <GuidaPage profile={profile} onClose={() => setShowGuida(false)} />;
   }
@@ -902,13 +886,6 @@ export default function App({ user, onLogout }){
                 style={{ background: 'transparent', color: '#3C3329', border: '1px solid rgba(60,51,41,0.25)', fontFamily: "'Cardo',serif", fontStyle: 'italic', fontSize: 14, padding: '8px 12px', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
                 ✦ guida
               </button>
-              {/* TEMPORANEAMENTE DISABILITATO: l'import di file zip grandi crasha la PWA su iOS. Ricarica nel prossimo commit. */}
-              {false && (
-                <button onClick={() => { setShowAccountMenu(false); setShowAppleHealth(true); }}
-                  style={{ background: 'transparent', color: '#3C3329', border: '1px solid rgba(60,51,41,0.25)', fontFamily: "'Cardo',serif", fontStyle: 'italic', fontSize: 14, padding: '8px 12px', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
-                  ☆ importa da apple salute
-                </button>
-              )}
               <button onClick={() => { setShowAccountMenu(false); setShowSub(true); }}
                 style={{
                   background: subState.ctaPrimary ? '#C9A876' : 'transparent',
