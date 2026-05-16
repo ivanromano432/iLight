@@ -498,11 +498,12 @@ const PAGES = [
   { id:'oggi', label:'oggi', roman:'✦' },
   { id:'peso', label:'peso', roman:'I' },
   { id:'pasti', label:'pasti', roman:'II' },
-  { id:'digiuno', label:'digiuno', roman:'III' },
-  { id:'integra', label:'rituale', roman:'IV' },
-  { id:'respiro', label:'corpo', roman:'V' },
-  { id:'sonno', label:'sonno', roman:'VI' },
-  { id:'sera', label:'sera', roman:'VII' },
+  { id:'menu', label:'menù', roman:'III' },
+  { id:'digiuno', label:'digiuno', roman:'IV' },
+  { id:'integra', label:'rituale', roman:'V' },
+  { id:'respiro', label:'corpo', roman:'VI' },
+  { id:'sonno', label:'sonno', roman:'VII' },
+  { id:'sera', label:'sera', roman:'VIII' },
 ];
 const DEF_TYPES = [
   { id:'corsa', name:'Corsa', unit:'km' },
@@ -967,6 +968,7 @@ export default function App({ user, onLogout }){
         {page==='oggi' && <OggiPage theme={__theme} loaded={loaded} profile={profile} weights={weights} goal={goal} meals={meals} notes={foodNotes} water={waterByDay} waterGoal={waterGoal} workouts={workouts} sleeps={sleeps} fasts={fasts} supps={supplements} taken={suppTaken} updWater={updWater} setPage={setPageIdx} />}
         {page==='peso' && <PesoPage theme={__theme} loaded={loaded} weights={weights} goal={goal} updWeights={updWeights} updGoal={updGoal} meals={meals} updMeals={updMeals} openStats={() => setShowStats(true)} profile={profile} openSub={() => setShowSub(true)} />}
         {page==='pasti' && <PastiPage user={user} theme={__theme} loaded={loaded} meals={meals} updMeals={updMeals} notes={foodNotes} weights={weights} goal={goal} />}
+        {page==='menu' && <MenuPage theme={__theme} loaded={loaded} meals={meals} updMeals={updMeals} weights={weights} goal={goal} profile={profile} />}
         {page==='integra' && <IntegraPage theme={__theme} loaded={loaded} supps={supplements} taken={suppTaken} updSupps={updSupps} updTaken={updTaken} />}
         {page==='digiuno' && <DigiunoPage theme={__theme} loaded={loaded} fasts={fasts} updFasts={updFasts} />}
         {page==='respiro' && <RespiroPage theme={__theme} loaded={loaded} sessions={mindfulSessions} updSessions={updMindful} workouts={workouts} types={workoutTypes} updWorkouts={updWorkouts} updTypes={updWorkoutTypes} />}
@@ -2193,43 +2195,6 @@ function PastiPage({ user, theme, loaded, meals, updMeals, notes, weights, goal 
       setPreparingPhoto(false);
     }
   }
-  const [suggestions, setSuggestions] = useState(null);
-  const [suggestLoading, setSuggestLoading] = useState(false);
-  const [suggestError, setSuggestError] = useState('');
-  const [previousSuggested, setPreviousSuggested] = useState([]);
-
-  async function loadSuggestions(){
-    setSuggestLoading(true); setSuggestError(''); setSuggestions(null);
-    try {
-      const summary = buildEatingHabitsSummary({ meals, weights, goal });
-      const r = await suggestMeals(summary, previousSuggested);
-      if (r.error) setSuggestError('IA: '+(r.error||'errore sconosciuto'));
-      else if (!r.meals || r.meals.length === 0) setSuggestError('Nessun suggerimento ricevuto.');
-      else {
-        setSuggestions(r.meals);
-        // Memorizza le descrizioni per evitare ripetizioni alle prossime richieste
-        setPreviousSuggested(prev => [...prev, ...r.meals.map(m=>m.description)].slice(-40));
-      }
-    } catch(e){ setSuggestError('Errore'); }
-    finally { setSuggestLoading(false); }
-  }
-
-  const [recentlyConfirmed, setRecentlyConfirmed] = useState(null);
-
-  async function addSuggestion(m){
-    const ts = isToday ? new Date() : (()=>{const d=parseDayKey(selectedDay); d.setHours(12,0); return d;})();
-    await updMeals([...meals,{id:newId(),ts:ts.toISOString(),type:m.type,description:m.description,qty_g:m.qty_g,kcal:m.kcal,p:m.p,c:m.c,g:m.g,photo:null,status:'planned'}]);
-    // Flash verde sulla riga, poi rimuovi
-    setRecentlyConfirmed(m);
-    setTimeout(()=>{
-      setSuggestions(prev => prev ? prev.filter(s=>s!==m) : prev);
-      setRecentlyConfirmed(null);
-    }, 600);
-  }
-
-  async function markAsEaten(mealId){
-    await updMeals(meals.map(m=>m.id===mealId?{...m,status:'eaten',ts:isToday?new Date().toISOString():m.ts}:m));
-  }
 
   const isToday = selectedDay===dayKey(new Date());
   // Stima bulk dei nutrienti per i pasti del giorno corrente che hanno descrizione o foto ma mancano kcal
@@ -2317,8 +2282,6 @@ function PastiPage({ user, theme, loaded, meals, updMeals, notes, weights, goal 
     }
   }
 
-  const [activeTab, setActiveTab] = useState('fatti');
-
   const dayMeals = useMemo(()=>{
     const date=parseDayKey(selectedDay);
     const list=meals.filter(m=>sameDay(new Date(m.ts),date));
@@ -2367,10 +2330,10 @@ function PastiPage({ user, theme, loaded, meals, updMeals, notes, weights, goal 
 
     if(editing==='new'){
       const ts = selectedDay===dayKey(new Date()) ? new Date() : (()=>{const d=parseDayKey(selectedDay); d.setHours(12,0); return d;})();
-      const defaultStatus = activeTab==='menu' ? 'planned' : 'eaten';
+      // Pasti in PastiPage sono sempre 'eaten' (i 'planned' si gestiscono nella pagina Menù)
       // Rimuovi il flag tsOverride che non e' una colonna DB
       const { tsOverride: _ignored, ...mealForDb } = finalMeal;
-      await updMeals([...meals,{id:mealId,ts:ts.toISOString(),status:defaultStatus,...mealForDb}]);
+      await updMeals([...meals,{id:mealId,ts:ts.toISOString(),status:'eaten',...mealForDb}]);
     } else {
       // Pasto esistente: applica tsOverride se l'utente ha cambiato data nel modal
       const { tsOverride, ...mealForDb } = finalMeal;
@@ -2409,24 +2372,8 @@ function PastiPage({ user, theme, loaded, meals, updMeals, notes, weights, goal 
             <Totale label="gras." value={fmt0(totals.g)} unit="g" dark={J.dark} sage={J.sage} font={fMarcellus} big={fGaramond} />
           </div>
 
-          {/* === 3 TABS === */}
-          <div style={{display:'flex',gap:0,marginTop:18,borderBottom:`1px solid ${J.sage}44`}}>
-            {[
-              {id:'consigliati', label:'consigliati', color:'#C8763C', count:(suggestions||[]).length},
-              {id:'menu', label:'menù', color:'#B89548', count:plannedMeals.length},
-              {id:'fatti', label:'fatti', color:J.sage, count:eatenMeals.length},
-            ].map(t => {
-              const active = activeTab===t.id;
-              return (
-                <button key={t.id} onClick={()=>setActiveTab(t.id)} style={{flex:1,padding:'10px 4px',background:'transparent',border:'none',borderBottom:`2px solid ${active?t.color:'transparent'}`,marginBottom:-1,fontFamily:fMarcellus,fontSize:10,letterSpacing:'0.25em',textTransform:'uppercase',color:active?t.color:J.sage,cursor:'pointer',fontWeight:active?500:400}}>
-                  {t.label}{t.count>0?` · ${t.count}`:''}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* === TAB: FATTI === */}
-          {activeTab==='fatti' && (
+          {/* PastiPage ora mostra solo i pasti EFFETTIVAMENTE FATTI di oggi (i pianificati stanno nella pagina Menù) */}
+          {true && (
             <div style={{marginTop:14}}>
               {MEAL_TYPES.map(type => {
                 const mealsOfType = eatenMeals.filter(m => m.type === type.id);
@@ -2501,106 +2448,230 @@ function PastiPage({ user, theme, loaded, meals, updMeals, notes, weights, goal 
             </div>
           )}
 
-          {/* === TAB: MENÙ === */}
-          {activeTab==='menu' && (
-            <div style={{marginTop:14}}>
-              <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:12,color:'#8A7028',textAlign:'center',marginBottom:6,lineHeight:1.4}}>
-                in ambra = da mangiare (non contati nei totali) · tocca per segnare come fatto
-              </div>
-              {plannedTotalKcal>0 && (
-                <div style={{textAlign:'center',fontFamily:fMarcellus,fontSize:10,letterSpacing:'0.3em',color:'#8A7028',marginBottom:10,textTransform:'uppercase'}}>+{fmt0(plannedTotalKcal)} kcal pianificati</div>
-              )}
-              {MEAL_TYPES.map(type => {
-                const mealsOfType = plannedMeals.filter(m => m.type === type.id);
-                const amber = '#B89548';
-                const amberBg = '#F2E8D0';
-                return (
-                  <div key={type.id} style={{marginTop:14}}>
-                    <div style={{padding:'6px 0',borderBottom:`1px solid ${amber}55`}}>
-                      <span style={{fontFamily:fMarcellus,fontSize:11,letterSpacing:'0.35em',color:amber,textTransform:'uppercase'}}>{type.name}</span>
-                    </div>
-                    {mealsOfType.length === 0 ? (
-                      <div style={{padding:'10px 4px',fontFamily:fGaramond,fontStyle:'italic',fontSize:13,color:J.sage,opacity:0.4}}>—</div>
-                    ) : mealsOfType.map(m=>(
-                      <button key={m.id} onClick={()=>markAsEaten(m.id)} style={{width:'100%',display:'flex',gap:10,alignItems:'flex-start',padding:'12px 14px',marginTop:8,background:amberBg,border:`1px solid ${amber}`,borderLeft:`3px solid ${amber}`,color:amber,cursor:'pointer',textAlign:'left',borderRadius:0,transition:'background 0.25s ease'}}>
-                        <div style={{flex:1,minWidth:0}}>
-                          <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:15,color:J.dark,lineHeight:1.25}}>{m.description||'(senza descrizione)'}</div>
-                          <div style={{fontFamily:fMarcellus,fontSize:9,letterSpacing:'0.2em',marginTop:4,textTransform:'uppercase',opacity:0.9}}>{m.qty_g?`${fmt0(m.qty_g)}g · `:''}{fmt0(m.kcal)} kcal · P {fmt0(m.p)} · C {fmt0(m.c)} · G {fmt0(m.g)}</div>
-                          <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:11,marginTop:4,opacity:0.8}}>↳ tocca quando l'hai mangiato</div>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                );
-              })}
-              <div style={{textAlign:'center',marginTop:18}}>
-                <button onClick={()=>setEditing('new')} style={{background:'transparent',color:'#B89548',border:`1px solid #B89548`,fontFamily:fMarcellus,fontSize:10,letterSpacing:'0.3em',padding:'10px 20px',cursor:'pointer',textTransform:'uppercase'}}>+ aggiungi al menù</button>
-              </div>
-              {plannedMeals.length===0 && (
-                <div style={{marginTop:18,padding:14,background:`#B895481A`,border:`1px solid #B8954844`,textAlign:'center',fontFamily:fGaramond,fontStyle:'italic',fontSize:13,color:J.sage}}>
-                  Nessun pasto pianificato. Vai su <b>Consigliati</b> per ricevere proposte dall'IA, o aggiungi manualmente.
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* === TAB: CONSIGLIATI === */}
-          {activeTab==='consigliati' && (
-            <div style={{marginTop:14}}>
-              <div style={{textAlign:'center',marginBottom:14}}>
-                <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:13,color:J.sage,lineHeight:1.5}}>L'IA studia le tue abitudini alimentari e propone pasti bilanciati per dimagrire.</div>
-              </div>
-              {!suggestions && !suggestLoading && !suggestError && (
-                <div style={{textAlign:'center'}}>
-                  <button onClick={loadSuggestions} style={{background:'transparent',color:'#C8763C',border:`1px solid #C8763C`,fontFamily:fMarcellus,fontSize:10,letterSpacing:'0.35em',padding:'10px 22px',cursor:'pointer',textTransform:'uppercase'}}>chiedi suggerimenti</button>
-                </div>
-              )}
-              {suggestLoading && <div style={{textAlign:'center',padding:'14px 0',fontFamily:fGaramond,fontStyle:'italic',fontSize:14,color:J.sage}}>⋯ sto pensando ai tuoi pasti</div>}
-              {suggestError && !suggestLoading && (
-                <div style={{textAlign:'center'}}>
-                  <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:13,color:'#A04848',marginBottom:8}}>{suggestError}</div>
-                  <button onClick={loadSuggestions} style={{background:'transparent',color:J.sage,border:`1px solid ${J.sage}66`,fontFamily:fGaramond,fontStyle:'italic',fontSize:13,padding:'6px 16px',cursor:'pointer'}}>riprova</button>
-                </div>
-              )}
-              {suggestions && suggestions.length > 0 && (
-                <>
-                  <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:12,color:'#A8623E',textAlign:'center',marginBottom:10}}>tocca per spostare nel menù della giornata</div>
-                  <div>
-                    {suggestions.map((m,i)=>{
-                      const tName = MEAL_TYPES.find(t=>t.id===m.type)?.name || m.type;
-                      const isConfirmed = recentlyConfirmed === m;
-                      const orange='#C8763C', orangeBg='#F2E0CC', amber='#B89548', amberBg='#F2E8D0';
-                      return (
-                        <button key={i} onClick={()=>{ if(!isConfirmed) addSuggestion(m); }} disabled={isConfirmed}
-                          style={{width:'100%',display:'flex',gap:10,alignItems:'flex-start',padding:'12px 14px',marginBottom:8,background:isConfirmed?amberBg:orangeBg,border:`1px solid ${isConfirmed?amber:orange}`,borderLeft:`3px solid ${isConfirmed?amber:orange}`,color:isConfirmed?amber:orange,cursor:isConfirmed?'default':'pointer',textAlign:'left',borderRadius:0,transition:'background 0.25s ease, color 0.25s ease, border-color 0.25s ease'}}>
-                          <div style={{flex:1,minWidth:0}}>
-                            <div style={{fontFamily:fMarcellus,fontSize:9,letterSpacing:'0.35em',textTransform:'uppercase',opacity:0.9}}>
-                              {isConfirmed?'↳ spostato nel menù · ':''}{tName}{m.qty_g?` · ${fmt0(m.qty_g)}g`:''}
-                            </div>
-                            <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:15,marginTop:3,lineHeight:1.25,color:J.dark}}>{m.description}</div>
-                            <div style={{fontFamily:fMarcellus,fontSize:9,letterSpacing:'0.2em',marginTop:3,textTransform:'uppercase',opacity:0.85}}>{fmt0(m.kcal)} kcal · P {fmt0(m.p)} · C {fmt0(m.c)} · G {fmt0(m.g)}</div>
-                            {m.perche && <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:12,marginTop:4,lineHeight:1.4,opacity:0.85}}>· {m.perche}</div>}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <div style={{textAlign:'center',marginTop:12}}>
-                    <button onClick={loadSuggestions} style={{background:'transparent',color:J.sage,border:`1px solid ${J.sage}66`,fontFamily:fGaramond,fontStyle:'italic',fontSize:12,padding:'6px 14px',cursor:'pointer'}}>nuovi suggerimenti</button>
-                  </div>
-                </>
-              )}
-              {suggestions && suggestions.length === 0 && (
-                <div style={{textAlign:'center'}}>
-                  <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:13,color:J.sage,marginBottom:10}}>✓ Tutti i suggerimenti spostati al menù</div>
-                  <button onClick={loadSuggestions} style={{background:'transparent',color:J.sage,border:`1px solid ${J.sage}66`,fontFamily:fGaramond,fontStyle:'italic',fontSize:12,padding:'6px 14px',cursor:'pointer'}}>altri suggerimenti</button>
-                </div>
-              )}
-            </div>
-          )}
         </>)}
       </div>
       {editing && <MealModal J={J} existing={editingMeal} seedPhoto={editing==='new'?photoIaSeed:null} onClose={()=>{setEditing(null); setPhotoIaSeed(null);}} onSave={saveMeal} onDelete={editing!=='new'?delMeal:null} />}
+    </div>
+  );
+}
+
+// === MenuPage: pianificazione del menù giornaliero con proposte IA cliccabili e progress su kcal/macro target ===
+function MenuPage({ theme, loaded, meals, updMeals, weights, goal, profile }) {
+  const J = theme || { bg: '#E5E3D5', dark: '#2D3A2E', sage: '#5C6B4E', light: '#8FA288' };
+  const [suggestions, setSuggestions] = useState(null);
+  const [suggestLoading, setSuggestLoading] = useState(false);
+  const [suggestError, setSuggestError] = useState('');
+  const [previousSuggested, setPreviousSuggested] = useState([]);
+  const [editingMealId, setEditingMealId] = useState(null);
+
+  // Target giornalieri di kcal e macronutrienti
+  // Stima: usiamo il profilo se presente, altrimenti default ragionevoli per dimagrimento
+  const target = useMemo(() => {
+    const sortedW = [...(weights||[])].sort((a,b)=>new Date(b.ts)-new Date(a.ts));
+    const latestW = sortedW[0]?.weight || 70; // peso corrente o default
+    // Profilo personalizzato sovrascrive
+    const kcal = profile?.daily_kcal_goal != null ? Number(profile.daily_kcal_goal) : 1800;
+    const protein = profile?.daily_protein_g != null ? Number(profile.daily_protein_g) : Math.round(latestW * 1.6);
+    const fat = profile?.daily_fat_g != null ? Number(profile.daily_fat_g) : Math.round((kcal * 0.30) / 9);
+    const carbs = profile?.daily_carbs_g != null ? Number(profile.daily_carbs_g) : Math.round((kcal - protein*4 - fat*9) / 4);
+    return { kcal, protein, carbs, fat };
+  }, [profile, weights]);
+
+  // Pasti pianificati di OGGI
+  const todayK = dayKey(new Date());
+  const plannedMeals = useMemo(() =>
+    (meals||[]).filter(m => m.status === 'planned' && sameDay(new Date(m.ts), new Date())),
+    [meals]
+  );
+
+  // Totali correnti dal menu pianificato
+  const totals = useMemo(() => plannedMeals.reduce((acc, m) => ({
+    kcal: acc.kcal + (m.kcal||0),
+    protein: acc.protein + (m.p||0),
+    carbs: acc.carbs + (m.c||0),
+    fat: acc.fat + (m.g||0),
+  }), { kcal: 0, protein: 0, carbs: 0, fat: 0 }), [plannedMeals]);
+
+  // Quanto manca al target (negativo = superato)
+  const remaining = {
+    kcal: target.kcal - totals.kcal,
+    protein: target.protein - totals.protein,
+    carbs: target.carbs - totals.carbs,
+    fat: target.fat - totals.fat,
+  };
+  const targetReached = totals.kcal >= target.kcal * 0.95 && totals.kcal <= target.kcal * 1.05;
+
+  async function loadSuggestions(){
+    setSuggestLoading(true); setSuggestError('');
+    try {
+      const summary = buildEatingHabitsSummary({ meals, weights, goal });
+      const r = await suggestMeals(summary, previousSuggested);
+      if (r.error) setSuggestError('IA: ' + (r.error || 'errore sconosciuto'));
+      else if (!r.meals || r.meals.length === 0) setSuggestError('Nessun suggerimento ricevuto.');
+      else {
+        setSuggestions(r.meals);
+        setPreviousSuggested(prev => [...prev, ...r.meals.map(m=>m.description)].slice(-40));
+      }
+    } catch (e) { setSuggestError('Errore'); }
+    finally { setSuggestLoading(false); }
+  }
+
+  async function addSuggestion(m){
+    const ts = new Date();
+    await updMeals([...(meals||[]), {
+      id: newId(),
+      ts: ts.toISOString(),
+      type: m.type,
+      description: m.description,
+      qty_g: m.qty_g,
+      kcal: m.kcal,
+      p: m.p, c: m.c, g: m.g,
+      photo: null,
+      status: 'planned',
+    }]);
+    // Lascio la proposta nella lista (Ivan vuole le proposte sempre visibili e cliccabili più volte)
+  }
+
+  async function markAsEaten(mealId){
+    await updMeals((meals||[]).map(m => m.id===mealId ? { ...m, status: 'eaten', ts: new Date().toISOString() } : m));
+  }
+
+  async function removeFromMenu(mealId){
+    await updMeals((meals||[]).filter(m => m.id !== mealId));
+    setEditingMealId(null);
+  }
+
+  // Componenti helper per progress bar
+  function ProgressRow({ label, current, target, unit, color }) {
+    const pct = target > 0 ? Math.min(150, (current / target) * 100) : 0;
+    const over = pct > 105;
+    const ok = pct >= 95 && pct <= 105;
+    const barColor = over ? '#C8763C' : (ok ? '#A5B889' : color || J.sage);
+    return (
+      <div style={{marginBottom:10}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:4}}>
+          <span style={{fontFamily:fMarcellus,fontSize:10,letterSpacing:'0.3em',color:J.dark,textTransform:'uppercase'}}>{label}</span>
+          <span style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:14,color:over?'#C8763C':(ok?'#6B8060':J.dark)}}>
+            {fmt0(current)}<span style={{fontSize:11,color:J.sage,opacity:0.7}}> / {fmt0(target)} {unit}</span>
+          </span>
+        </div>
+        <div style={{height:5,background:`${J.sage}22`,borderRadius:2,overflow:'hidden'}}>
+          <div style={{height:'100%',width:`${Math.min(100,pct)}%`,background:barColor,transition:'width 0.3s ease'}} />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{minHeight:'100vh',background:`radial-gradient(ellipse at top, ${J.bg||'#E5E3D5'} 0%, ${J.bg2||'#CFCDB7'} 100%)`,color:J.dark,fontFamily:fGaramond,position:'relative',overflow:'hidden'}}>
+      <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${J.dark}25`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
+      <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${J.dark}10`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
+      <div style={{position:'relative',zIndex:2,padding:'32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
+        <Header q="MENÙ" sub="III" color={J.dark} dim={J.sage} mark="✦" />
+
+        {!loaded && <Loading color={J.sage} />}
+
+        {loaded && (<>
+          {/* === SEZIONE TOTALI / TARGET === */}
+          <div style={{marginTop:22,padding:'14px 14px 8px',background:`${J.sage}10`,border:`1px solid ${J.sage}33`}}>
+            <div style={{fontFamily:fMarcellus,fontSize:10,letterSpacing:'0.4em',color:J.sage,textTransform:'uppercase',marginBottom:10,textAlign:'center'}}>obiettivo del giorno</div>
+            <ProgressRow label="calorie" current={totals.kcal} target={target.kcal} unit="kcal" />
+            <ProgressRow label="proteine" current={totals.protein} target={target.protein} unit="g" />
+            <ProgressRow label="carboidrati" current={totals.carbs} target={target.carbs} unit="g" />
+            <ProgressRow label="grassi" current={totals.fat} target={target.fat} unit="g" />
+            {targetReached && (
+              <div style={{marginTop:6,padding:'8px 10px',background:`#A5B88922`,border:`1px solid #A5B889`,fontFamily:fGaramond,fontStyle:'italic',fontSize:12,color:'#6B8060',textAlign:'center'}}>
+                ✓ obiettivo del giorno raggiunto
+              </div>
+            )}
+          </div>
+
+          {/* === IL MIO MENÙ === */}
+          <div style={{marginTop:24}}>
+            <div style={{display:'flex',alignItems:'center',gap:14,marginBottom:14}}>
+              <div style={{flex:1,height:1,background:`linear-gradient(90deg, transparent, ${J.dark}55)`}} />
+              <span style={{fontFamily:fMarcellus,fontSize:10,letterSpacing:'0.4em',color:J.dark,textTransform:'uppercase'}}>il mio menù</span>
+              <div style={{flex:1,height:1,background:`linear-gradient(90deg, ${J.dark}55, transparent)`}} />
+            </div>
+            {plannedMeals.length === 0 ? (
+              <div style={{textAlign:'center',fontFamily:fGaramond,fontStyle:'italic',fontSize:13,color:J.sage,padding:'10px 4px 0',lineHeight:1.5,opacity:0.85}}>
+                Nessun pasto pianificato. Tocca un suggerimento qui sotto per aggiungerlo.
+              </div>
+            ) : MEAL_TYPES.map(type => {
+              const mealsOfType = plannedMeals.filter(m => m.type === type.id);
+              if (mealsOfType.length === 0) return null;
+              const amber = '#B89548', amberBg = '#F2E8D0';
+              return (
+                <div key={type.id} style={{marginTop:14}}>
+                  <div style={{padding:'6px 0',borderBottom:`1px solid ${amber}55`}}>
+                    <span style={{fontFamily:fMarcellus,fontSize:11,letterSpacing:'0.35em',color:amber,textTransform:'uppercase'}}>{type.name}</span>
+                  </div>
+                  {mealsOfType.map(m => (
+                    <div key={m.id} style={{display:'flex',gap:8,alignItems:'stretch',marginTop:8}}>
+                      <button onClick={()=>markAsEaten(m.id)} style={{flex:1,display:'flex',gap:10,alignItems:'flex-start',padding:'12px 14px',background:amberBg,border:`1px solid ${amber}`,borderLeft:`3px solid ${amber}`,color:amber,cursor:'pointer',textAlign:'left',borderRadius:0}}>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:15,color:J.dark,lineHeight:1.25}}>{m.description||'(senza descrizione)'}</div>
+                          <div style={{fontFamily:fMarcellus,fontSize:9,letterSpacing:'0.2em',marginTop:4,textTransform:'uppercase',opacity:0.9}}>{m.qty_g?`${fmt0(m.qty_g)}g · `:''}{fmt0(m.kcal)} kcal · P {fmt0(m.p)} · C {fmt0(m.c)} · G {fmt0(m.g)}</div>
+                          <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:11,marginTop:4,opacity:0.7}}>↳ tocca quando l'hai mangiato</div>
+                        </div>
+                      </button>
+                      <button onClick={()=>removeFromMenu(m.id)} style={{padding:'0 12px',background:'transparent',border:`1px solid ${amber}55`,color:amber,fontFamily:fMarcellus,fontSize:14,cursor:'pointer'}} title="rimuovi dal menù">×</button>
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* === PROPOSTE IA — sempre visibili e cliccabili === */}
+          <div style={{marginTop:30}}>
+            <div style={{display:'flex',alignItems:'center',gap:14,marginBottom:14}}>
+              <div style={{flex:1,height:1,background:`linear-gradient(90deg, transparent, #C8763C66)`}} />
+              <span style={{fontFamily:fMarcellus,fontSize:10,letterSpacing:'0.4em',color:'#C8763C',textTransform:'uppercase'}}>proposte ia</span>
+              <div style={{flex:1,height:1,background:`linear-gradient(90deg, #C8763C66, transparent)`}} />
+            </div>
+
+            {!suggestions && !suggestLoading && !suggestError && (
+              <div style={{textAlign:'center'}}>
+                <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:13,color:J.sage,marginBottom:12,lineHeight:1.5,maxWidth:340,margin:'0 auto 12px'}}>L'IA studia le tue abitudini e propone pasti bilanciati. Tocca per aggiungere al menù.</div>
+                <button onClick={loadSuggestions} style={{background:'transparent',color:'#C8763C',border:`1px solid #C8763C`,fontFamily:fMarcellus,fontSize:10,letterSpacing:'0.35em',padding:'12px 24px',cursor:'pointer',textTransform:'uppercase'}}>chiedi suggerimenti</button>
+              </div>
+            )}
+            {suggestLoading && <div style={{textAlign:'center',padding:'14px 0',fontFamily:fGaramond,fontStyle:'italic',fontSize:14,color:J.sage}}>⋯ sto pensando ai tuoi pasti</div>}
+            {suggestError && !suggestLoading && (
+              <div style={{textAlign:'center'}}>
+                <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:13,color:'#A04848',marginBottom:8}}>{suggestError}</div>
+                <button onClick={loadSuggestions} style={{background:'transparent',color:J.sage,border:`1px solid ${J.sage}66`,fontFamily:fGaramond,fontStyle:'italic',fontSize:13,padding:'6px 16px',cursor:'pointer'}}>riprova</button>
+              </div>
+            )}
+            {suggestions && suggestions.length > 0 && (
+              <>
+                <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:12,color:'#A8623E',textAlign:'center',marginBottom:10}}>tocca un piatto per aggiungerlo al menù · i totali si aggiornano</div>
+                <div>
+                  {suggestions.map((m, i) => {
+                    const tName = MEAL_TYPES.find(t=>t.id===m.type)?.name || m.type;
+                    const orange = '#C8763C', orangeBg = '#F2E0CC';
+                    return (
+                      <button key={i} onClick={()=>addSuggestion(m)} style={{width:'100%',display:'flex',gap:10,alignItems:'flex-start',padding:'12px 14px',marginBottom:8,background:orangeBg,border:`1px solid ${orange}`,borderLeft:`3px solid ${orange}`,color:orange,cursor:'pointer',textAlign:'left',borderRadius:0}}>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontFamily:fMarcellus,fontSize:9,letterSpacing:'0.35em',textTransform:'uppercase',opacity:0.9}}>{tName}{m.qty_g?` · ${fmt0(m.qty_g)}g`:''}</div>
+                          <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:15,marginTop:3,lineHeight:1.25,color:J.dark}}>{m.description}</div>
+                          <div style={{fontFamily:fMarcellus,fontSize:9,letterSpacing:'0.2em',marginTop:3,textTransform:'uppercase',opacity:0.85}}>{fmt0(m.kcal)} kcal · P {fmt0(m.p)} · C {fmt0(m.c)} · G {fmt0(m.g)}</div>
+                          {m.perche && <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:12,marginTop:4,lineHeight:1.4,opacity:0.85}}>· {m.perche}</div>}
+                        </div>
+                        <span style={{fontFamily:fMarcellus,fontSize:18,opacity:0.7,marginLeft:8}}>+</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div style={{textAlign:'center',marginTop:12}}>
+                  <button onClick={loadSuggestions} style={{background:'transparent',color:J.sage,border:`1px solid ${J.sage}66`,fontFamily:fGaramond,fontStyle:'italic',fontSize:12,padding:'6px 14px',cursor:'pointer'}}>altri suggerimenti</button>
+                </div>
+              </>
+            )}
+          </div>
+        </>)}
+      </div>
     </div>
   );
 }
@@ -3035,7 +3106,7 @@ function IntegraPage({ theme, loaded, supps, taken, updSupps, updTaken }){
       <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${T.gold}40`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
       <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${T.gold}1A`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
       <div style={{position:'relative',zIndex:2,padding:'32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
-        <Header q="INTEGRA" sub="IV" color={T.gold} dim={T.goldDim} mark="✦" font={fCormorant} />
+        <Header q="INTEGRA" sub="V" color={T.gold} dim={T.goldDim} mark="✦" font={fCormorant} />
 
         {!loaded && <Loading color={T.dim} />}
 
@@ -3183,7 +3254,7 @@ function SonnoPage({ theme, loaded, sleeps, updSleeps }){
       <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${S.gold}40`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
       <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${S.gold}1A`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
       <div style={{position:'relative',zIndex:2,padding:'32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
-        <Header q="SONNO" sub="VI" color={S.gold} dim={S.goldDim} mark="✦" font={fFraunces} />
+        <Header q="SONNO" sub="VII" color={S.gold} dim={S.goldDim} mark="✦" font={fFraunces} />
 
         {!loaded && <Loading color={S.dim} />}
 
@@ -3379,7 +3450,7 @@ function SeraPage({ theme, loaded, weights, goal, notes, water, waterGoal, meals
       <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${N.gold}40`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
       <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${N.gold}1A`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
       <div style={{position:'relative',zIndex:2,padding:'32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
-        <Header q="SERA" sub="VII" color={N.gold} dim={N.goldDim} mark="✦" font={fFraunces} />
+        <Header q="SERA" sub="VIII" color={N.gold} dim={N.goldDim} mark="✦" font={fFraunces} />
 
         {!loaded && <Loading color={N.dim} />}
 
@@ -3698,7 +3769,7 @@ function DigiunoPage({ theme, loaded, fasts, updFasts }){
       <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${D.gold}40`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
       <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${D.gold}1A`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
       <div style={{position:'relative',zIndex:2,padding:'32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
-        <Header q="DIGIUNO" sub="III" color={D.gold} dim={D.goldDim} mark="✦" font={fBodoni} />
+        <Header q="DIGIUNO" sub="IV" color={D.gold} dim={D.goldDim} mark="✦" font={fBodoni} />
 
         {!loaded && <Loading color={D.dim} />}
 
@@ -3932,7 +4003,7 @@ function RespiroPage({ theme, loaded, sessions, updSessions, workouts, types, up
       <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${M.gold}40`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
       <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${M.gold}1A`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
       <div style={{position:'relative',zIndex:2,padding:'32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
-        <Header q="CORPO" sub="V" color={M.gold} dim={M.goldDim} mark="✦" font={fCormorant} />
+        <Header q="CORPO" sub="VI" color={M.gold} dim={M.goldDim} mark="✦" font={fCormorant} />
 
         {!loaded && <Loading color={M.dim} />}
 
