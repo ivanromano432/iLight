@@ -2467,7 +2467,11 @@ function MenuPage({ theme, loaded, meals, updMeals, weights, goal, profile, updP
 
   // Target giornalieri di kcal e macronutrienti.
   // LOGICA DIETA A ZONA (per dimagrimento): bilanciamento 40% carboidrati · 30% proteine · 30% grassi.
-  // I valori personalizzati nel profilo prevalgono; altrimenti calcolo da peso corrente (≈25 kcal/kg per leggera ipocalorica).
+  // KCAL DEFAULT con priorità:
+  //   1. profilo personalizzato (l'utente ha modificato a mano)
+  //   2. Mifflin-St Jeor (peso/altezza/età/sesso) - deficit 500 kcal/giorno
+  //   3. peso obiettivo × 27 (mantenimento del peso target = dimagrimento progressivo)
+  //   4. peso corrente × 20 (deficit aggressivo, ultimo fallback)
   const target = useMemo(() => {
     if (profile?.daily_kcal_goal != null) {
       const kcal = Number(profile.daily_kcal_goal);
@@ -2478,17 +2482,43 @@ function MenuPage({ theme, loaded, meals, updMeals, weights, goal, profile, updP
         fat:     profile.daily_fat_g     != null ? Number(profile.daily_fat_g)     : Math.round((kcal * 0.30) / 9),
       };
     }
-    // Stima da peso corrente in regime ipocalorico (Zona 40/30/30)
     const sortedW = [...(weights||[])].sort((a,b)=>new Date(b.ts)-new Date(a.ts));
     const latestW = sortedW[0]?.weight || 70;
-    const kcal = Math.round(latestW * 25); // deficit calorico moderato per dimagrimento
+    const goalW = goal != null ? Number(goal) : null;
+    const height = profile?.height_cm != null ? Number(profile.height_cm) : null;
+    const birth = profile?.birth_year != null ? Number(profile.birth_year) : null;
+    const age = birth ? (new Date().getFullYear() - birth) : null;
+    const sex = profile?.sex || null;
+
+    let kcal;
+    if (height && age && sex) {
+      // Mifflin-St Jeor con peso CORRENTE per il BMR (più realistico)
+      const bmr = sex === 'm'
+        ? 10*latestW + 6.25*height - 5*age + 5
+        : 10*latestW + 6.25*height - 5*age - 161;
+      const tdee = bmr * 1.4; // sedentario/leggermente attivo
+      kcal = Math.round(tdee - 500); // deficit moderato (≈0.5 kg/sett)
+      // Limiti di sicurezza: mai sotto 1200 (donne) / 1400 (uomini)
+      const floor = sex === 'm' ? 1400 : 1200;
+      if (kcal < floor) kcal = floor;
+    } else if (goalW) {
+      // Fallback 1: kcal = peso obiettivo × 27 (mantenimento del peso target → dimagrimento progressivo)
+      kcal = Math.round(goalW * 27);
+    } else {
+      // Fallback 2: peso corrente × 20 (deficit aggressivo)
+      kcal = Math.round(latestW * 20);
+    }
+    // Clamping ragionevole
+    if (kcal < 1200) kcal = 1200;
+    if (kcal > 3000) kcal = 3000;
+
     return {
       kcal,
       protein: Math.round((kcal * 0.30) / 4),
       carbs:   Math.round((kcal * 0.40) / 4),
       fat:     Math.round((kcal * 0.30) / 9),
     };
-  }, [profile, weights]);
+  }, [profile, weights, goal]);
 
   // Pasti pianificati di OGGI
   const todayK = dayKey(new Date());
