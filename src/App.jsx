@@ -3941,7 +3941,7 @@ function RespiroPage({ theme, loaded, sessions, updSessions, workouts, types, up
           <div style={{textAlign:'center',marginTop:6,padding:'18px 14px',background:`${M.accent}1A`,border:`1px solid ${M.accent}33`}}>
             <div style={{fontFamily:fDmSans,fontSize:9,letterSpacing:'0.4em',color:M.accent,textTransform:'uppercase',marginBottom:8}}>respira ora</div>
             <div style={{fontFamily:fCormorant,fontStyle:'italic',fontSize:14,color:M.ink,lineHeight:1.5,marginBottom:14}}>respirazione quadrata · 4 secondi per fase<br/><span style={{fontSize:12,color:M.dim}}>per calmare la mente, anche solo 1 minuto</span></div>
-            <button onClick={()=>setBreathingOpen(true)} style={{background:M.ink,color:M.cream,border:`1px solid ${M.ink}`,fontFamily:fDmSans,fontSize:10,letterSpacing:'0.4em',padding:'12px 24px',cursor:'pointer',textTransform:'uppercase'}}>inizia</button>
+            <button onClick={()=>setBreathingOpen(true)} style={{background:M.gold||M.ink,color:M.bg1||M.cream,border:`1px solid ${M.gold||M.ink}`,fontFamily:fDmSans,fontSize:10,letterSpacing:'0.4em',padding:'12px 24px',cursor:'pointer',textTransform:'uppercase'}}>inizia</button>
           </div>
 
           {/* Registra sessione */}
