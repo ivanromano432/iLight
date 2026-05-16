@@ -7,7 +7,9 @@ import { getTheme } from './themes.js';
 // Fallback Refettorio per sotto-componenti definiti a livello modulo
 // (StatRow, Section, GoalModal). Il componente principale StatistichePage
 // usa invece Q dinamico via shadow.
-const Q = { bg1: '#3A2818', bg2: '#1F140C', gold: '#C9A876', goldDim: '#8B7355', cream: '#E8D8B8', ink: '#1F140C' };
+// Nota: il tema Q non e' piu' definito a livello modulo (era hardcoded sul tema refettorio
+// e causava problemi di contrasto sui temi chiari). Ora ogni sotto-componente riceve Q come prop
+// da StatistichePage, dove Q = getTheme(profile?.theme).
 const fGaramond = '"Cormorant Garamond", serif';
 const fCinzel = '"Cinzel", serif';
 
@@ -197,7 +199,7 @@ function linearRegression(weights) {
   return { slope, intercept, lastX: xs[xs.length - 1], lastY: ys[ys.length - 1] };
 }
 
-function StatRow({ label, value, sub, color }) {
+function StatRow({ Q, label, value, sub, color }) {
   return (
     <div style={{ textAlign: 'center', flex: 1, minWidth: 0 }}>
       <div style={{ fontFamily: fCinzel, fontSize: 9, letterSpacing: '0.35em', color: Q.goldDim, textTransform: 'uppercase' }}>{label}</div>
@@ -207,7 +209,7 @@ function StatRow({ label, value, sub, color }) {
   );
 }
 
-function Section({ title, sub, children }) {
+function Section({ Q, title, sub, children }) {
   return (
     <div style={{ marginTop: 28, paddingTop: 18, borderTop: `1px solid ${Q.gold}33` }}>
       <div style={{ textAlign: 'center', marginBottom: 16 }}>
@@ -304,7 +306,7 @@ function newGoalId() {
   return (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : (Date.now()+Math.random()).toString();
 }
 
-function GoalModal({ existing, alreadyUsed, onClose, onSave, onDelete }) {
+function GoalModal({ Q, existing, alreadyUsed, onClose, onSave, onDelete }) {
   const editMode = !!existing;
   const [type, setType] = useState(existing?.goal_type || null);
   const [target, setTarget] = useState(existing?.target_value != null ? String(existing.target_value).replace('.', ',') : '');
@@ -742,7 +744,7 @@ export default function StatistichePage({
         {stats && (
           <>
             {/* Calendario del mese: a colpo d'occhio quali giorni hai registrato qualcosa */}
-            <Section title="CALENDARIO" sub="i giorni con almeno un dato registrato">
+            <Section Q={Q} title="CALENDARIO" sub="i giorni con almeno un dato registrato">
               {(() => {
                 const today = new Date();
                 const year = calMonth.getFullYear();
@@ -882,11 +884,11 @@ export default function StatistichePage({
             </Section>
 
             {/* Sezione 1: TREND PESO */}
-            <Section title="TREND PESO" sub={periodObj?.label.toLowerCase() === 'sempre' ? 'da quando hai iniziato' : `ultimi ${periodObj.days} giorni`}>
+            <Section Q={Q} title="TREND PESO" sub={periodObj?.label.toLowerCase() === 'sempre' ? 'da quando hai iniziato' : `ultimi ${periodObj.days} giorni`}>
               <div style={{ display: 'flex', justifyContent: 'space-around', marginBottom: 16 }}>
-                <StatRow label="peso medio" value={fmt(stats.avgW)} sub="kg" />
-                <StatRow label="delta" value={stats.delta != null ? `${stats.delta < 0 ? '−' : '+'}${fmt(Math.abs(stats.delta))}` : '—'} sub="kg" color={stats.delta != null ? (stats.delta < 0 ? '#A5B889' : '#C99A7A') : Q.cream} />
-                <StatRow label="registrazioni" value={stats.daysRegistered} sub="giorni" />
+                <StatRow Q={Q} label="peso medio" value={fmt(stats.avgW)} sub="kg" />
+                <StatRow Q={Q} label="delta" value={stats.delta != null ? `${stats.delta < 0 ? '−' : '+'}${fmt(Math.abs(stats.delta))}` : '—'} sub="kg" color={stats.delta != null ? (stats.delta < 0 ? '#A5B889' : '#C99A7A') : Q.cream} />
+                <StatRow Q={Q} label="registrazioni" value={stats.daysRegistered} sub="giorni" />
               </div>
               <svg viewBox={`0 0 ${chartW} ${chartH}`} width="100%" height={chartH} style={{ display: 'block' }}>
                 <defs>
@@ -919,7 +921,7 @@ export default function StatistichePage({
             </Section>
 
             {/* Sezione: OBIETTIVI MULTIPLI */}
-            <Section title="OBIETTIVI" sub="i tuoi traguardi su sonno, idratazione, allenamento…">
+            <Section Q={Q} title="OBIETTIVI" sub="i tuoi traguardi su sonno, idratazione, allenamento…">
               {goalsActive.length === 0 && (
                 <div style={{ textAlign: 'center', fontFamily: fGaramond, fontStyle: 'italic', fontSize: 13, color: Q.goldDim, padding: '8px 8px 14px' }}>
                   Nessun obiettivo impostato. Tocca <span style={{ color: Q.gold }}>+ NUOVO</span> per iniziare.
@@ -968,20 +970,20 @@ export default function StatistichePage({
 
             {/* Sezione 2: COMPOSIZIONE CORPOREA */}
             {(compStats.bf || compStats.mu || compStats.wa) && (
-              <Section title="COMPOSIZIONE CORPOREA" sub="grasso · muscolo · acqua">
+              <Section Q={Q} title="COMPOSIZIONE CORPOREA" sub="grasso · muscolo · acqua">
                 <div style={{ display: 'flex', justifyContent: 'space-around', gap: 8 }}>
                   {compStats.bf && (
-                    <StatRow label="% grasso" value={fmt(compStats.bf.last)}
+                    <StatRow Q={Q} label="% grasso" value={fmt(compStats.bf.last)}
                       sub={compStats.bf.delta != null ? `${compStats.bf.delta < 0 ? '−' : '+'}${fmt(Math.abs(compStats.bf.delta))}%` : 'unico dato'}
                       color={compStats.bf.delta != null ? (compStats.bf.delta < 0 ? '#A5B889' : '#C99A7A') : Q.cream} />
                   )}
                   {compStats.mu && (
-                    <StatRow label="% muscolo" value={fmt(compStats.mu.last)}
+                    <StatRow Q={Q} label="% muscolo" value={fmt(compStats.mu.last)}
                       sub={compStats.mu.delta != null ? `${compStats.mu.delta < 0 ? '−' : '+'}${fmt(Math.abs(compStats.mu.delta))}%` : 'unico dato'}
                       color={compStats.mu.delta != null ? (compStats.mu.delta < 0 ? '#C99A7A' : '#A5B889') : Q.cream} />
                   )}
                   {compStats.wa && (
-                    <StatRow label="% acqua" value={fmt(compStats.wa.last)}
+                    <StatRow Q={Q} label="% acqua" value={fmt(compStats.wa.last)}
                       sub={compStats.wa.delta != null ? `${compStats.wa.delta < 0 ? '−' : '+'}${fmt(Math.abs(compStats.wa.delta))}%` : 'unico dato'}
                       color={Q.cream} />
                   )}
@@ -996,7 +998,7 @@ export default function StatistichePage({
 
             {/* Sezione 3: PATTERN SETTIMANALI */}
             {dowPattern && (
-              <Section title="PATTERN SETTIMANALI" sub="peso medio per giorno della settimana">
+              <Section Q={Q} title="PATTERN SETTIMANALI" sub="peso medio per giorno della settimana">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', height: 100, padding: '0 4px' }}>
                   {dowPattern.avgs.map((avg, i) => {
                     if (avg == null) return (
@@ -1027,21 +1029,21 @@ export default function StatistichePage({
             )}
 
             {/* Sezione 4: ALTRE ABITUDINI */}
-            <Section title="ALTRE ABITUDINI" sub="nel periodo selezionato">
+            <Section Q={Q} title="ALTRE ABITUDINI" sub="nel periodo selezionato">
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-                <StatRow label="pasti registrati" value={otherAgg.mealsCount} sub={otherAgg.photosCount > 0 ? `di cui ${otherAgg.photosCount} con foto` : ''} />
-                <StatRow label="sonno medio" value={otherAgg.avgSleepHours != null ? fmt(otherAgg.avgSleepHours) : '—'} sub={otherAgg.avgSleepHours != null ? 'ore/notte' : ''} />
-                <StatRow label="acqua media" value={otherAgg.avgWaterGlasses != null ? fmt(otherAgg.avgWaterGlasses, 1) : '—'} sub={otherAgg.avgWaterGlasses != null ? 'bicchieri/giorno' : ''} />
-                <StatRow label="allenamenti" value={otherAgg.workoutsCount} sub="sessioni" />
-                <StatRow label="digiuni" value={otherAgg.fastsCount} sub="completati" />
-                <StatRow label="mindful" value={otherAgg.mindfulCount} sub="sessioni" />
+                <StatRow Q={Q} label="pasti registrati" value={otherAgg.mealsCount} sub={otherAgg.photosCount > 0 ? `di cui ${otherAgg.photosCount} con foto` : ''} />
+                <StatRow Q={Q} label="sonno medio" value={otherAgg.avgSleepHours != null ? fmt(otherAgg.avgSleepHours) : '—'} sub={otherAgg.avgSleepHours != null ? 'ore/notte' : ''} />
+                <StatRow Q={Q} label="acqua media" value={otherAgg.avgWaterGlasses != null ? fmt(otherAgg.avgWaterGlasses, 1) : '—'} sub={otherAgg.avgWaterGlasses != null ? 'bicchieri/giorno' : ''} />
+                <StatRow Q={Q} label="allenamenti" value={otherAgg.workoutsCount} sub="sessioni" />
+                <StatRow Q={Q} label="digiuni" value={otherAgg.fastsCount} sub="completati" />
+                <StatRow Q={Q} label="mindful" value={otherAgg.mindfulCount} sub="sessioni" />
               </div>
             </Section>
           </>
         )}
 
         {/* Sezione: CORRELAZIONI (IA) */}
-        <Section title="CORRELAZIONI" sub="pattern tra le tue abitudini · generati con IA">
+        <Section Q={Q} title="CORRELAZIONI" sub="pattern tra le tue abitudini · generati con IA">
           {!insights && !insightsLoading && !insightsError && (
             <div style={{ textAlign: 'center' }}>
               <button onClick={() => generateInsights(false)}
@@ -1096,20 +1098,20 @@ export default function StatistichePage({
 
         {/* Sezione: RIASSUNTO MENSILE (IA) */}
         {currentMonth && (
-          <Section title="RIASSUNTO MENSILE" sub={new Date(currentMonth.mese + '-01').toLocaleDateString('it-IT', { month: 'long', year: 'numeric' })}>
+          <Section Q={Q} title="RIASSUNTO MENSILE" sub={new Date(currentMonth.mese + '-01').toLocaleDateString('it-IT', { month: 'long', year: 'numeric' })}>
             {/* Numeri base sempre visibili */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 16 }}>
               {currentMonth.peso_inizio != null && (
-                <StatRow label="peso inizio" value={fmt(currentMonth.peso_inizio)} sub="kg" />
+                <StatRow Q={Q} label="peso inizio" value={fmt(currentMonth.peso_inizio)} sub="kg" />
               )}
               {currentMonth.peso_fine != null && (
-                <StatRow label="peso fine" value={fmt(currentMonth.peso_fine)} sub="kg"
+                <StatRow Q={Q} label="peso fine" value={fmt(currentMonth.peso_fine)} sub="kg"
                   color={currentMonth.peso_inizio != null && currentMonth.peso_fine < currentMonth.peso_inizio ? '#A5B889' : currentMonth.peso_inizio != null && currentMonth.peso_fine > currentMonth.peso_inizio ? '#C99A7A' : Q.cream} />
               )}
-              <StatRow label="pasti" value={currentMonth.pasti_registrati} sub="registrati" />
-              <StatRow label="sonno medio" value={currentMonth.sonno_medio_ore != null ? fmt(currentMonth.sonno_medio_ore) : '—'} sub="ore" />
-              <StatRow label="allenamenti" value={currentMonth.allenamenti} sub="sessioni" />
-              <StatRow label="digiuni" value={currentMonth.digiuni} sub="completati" />
+              <StatRow Q={Q} label="pasti" value={currentMonth.pasti_registrati} sub="registrati" />
+              <StatRow Q={Q} label="sonno medio" value={currentMonth.sonno_medio_ore != null ? fmt(currentMonth.sonno_medio_ore) : '—'} sub="ore" />
+              <StatRow Q={Q} label="allenamenti" value={currentMonth.allenamenti} sub="sessioni" />
+              <StatRow Q={Q} label="digiuni" value={currentMonth.digiuni} sub="completati" />
             </div>
             {/* Narrazione IA */}
             {!monthlySummary && !monthlyLoading && !monthlyError && (
@@ -1150,7 +1152,7 @@ export default function StatistichePage({
         )}
 
         {/* Sezione 5: EXPORT */}
-        <Section title="ESPORTA" sub="scarica tutti i tuoi dati in CSV">
+        <Section Q={Q} title="ESPORTA" sub="scarica tutti i tuoi dati in CSV">
           <div style={{ textAlign: 'center' }}>
             <button onClick={() => exportAllCSV({ weights, meals, sleeps, water, workouts, workoutTypes, supplements, suppTaken, mindful, fasts, diaryNotes })}
               style={{ background: Q.gold, color: Q.ink, border: 'none', fontFamily: fCinzel, fontSize: 11, letterSpacing: '0.35em', padding: '12px 26px', cursor: 'pointer', textTransform: 'uppercase' }}>
