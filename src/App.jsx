@@ -462,20 +462,19 @@ export default function App({ user, onLogout }){
 
     // Mostra onboarding al primo accesso. Controllo sia il flag persistente
     // su Supabase (profile.onboarded) sia il fallback in localStorage.
-    // Dopo l'onboarding, se setup_completed=false oppure mancano i 3 dati chiave
-    // (sex/height_cm/birth_year) necessari per il calcolo nutrizionale, mostra ProfileSetup.
+    // Dopo l'onboarding, mostro ProfileSetup SOLO se non è mai stato completato.
+    // I dati mancanti (sex/height_cm/birth_year) si compilano liberamente dal Profilo,
+    // non vogliamo forzare gli utenti esistenti a rifare il questionario.
     const isOnboardedServer = !!profile?.onboarded;
     const isOnboardedLocal = hasSeenOnboarding(user.id);
     const setupDone = !!profile?.setup_completed;
-    const hasCoreData = !!(profile?.sex && profile?.height_cm && profile?.birth_year);
-    const needsSetup = !setupDone || !hasCoreData;
     if (!isOnboardedServer && !isOnboardedLocal) {
       setShowOnboarding(true);
     } else {
       if (isOnboardedServer && !isOnboardedLocal) {
         try { markOnboardingSeen(user.id); } catch (_) {}
       }
-      if (needsSetup) {
+      if (!setupDone) {
         setShowProfileSetup(true);
       }
     }
@@ -647,9 +646,8 @@ export default function App({ user, onLogout }){
         updProfile={updProfile}
         onDone={() => {
           setShowOnboarding(false);
-          // Dopo l'onboarding, se non è completato il setup OPPURE mancano i dati chiave, mostra il form
-          const hasCoreData = !!(profile?.sex && profile?.height_cm && profile?.birth_year);
-          if (!profile?.setup_completed || !hasCoreData) setShowProfileSetup(true);
+          // Dopo l'onboarding, mostra il setup solo se non è mai stato completato
+          if (!profile?.setup_completed) setShowProfileSetup(true);
         }}
       />
     );
