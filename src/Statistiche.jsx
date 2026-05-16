@@ -688,6 +688,9 @@ export default function StatistichePage({
 
   // === Obiettivi multipli ===
   const [goalModal, setGoalModal] = useState(null); // null | 'new' | goalObject
+
+  // Mese attualmente visualizzato nel calendario (default: oggi)
+  const [calMonth, setCalMonth] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); });
   const goalsActive = useMemo(() => userGoals.filter(g => g.active !== false), [userGoals]);
   const goalsAlreadyUsed = useMemo(() => new Set(goalsActive.map(g => g.goal_type)), [goalsActive]);
   const dataForGoals = { sleeps, water, meals, workouts, fasts, mindful, weights };
@@ -742,14 +745,26 @@ export default function StatistichePage({
             <Section title="CALENDARIO" sub="i giorni con almeno un dato registrato">
               {(() => {
                 const today = new Date();
-                const monthLabel = today.toLocaleDateString('it-IT', { month: 'long', year: 'numeric' });
-                const year = today.getFullYear();
-                const month = today.getMonth();
+                const year = calMonth.getFullYear();
+                const month = calMonth.getMonth();
+                const monthLabel = calMonth.toLocaleDateString('it-IT', { month: 'long', year: 'numeric' });
                 const firstDay = new Date(year, month, 1);
                 const lastDay = new Date(year, month + 1, 0);
                 const daysInMonth = lastDay.getDate();
                 // Lunedi = 0, domenica = 6 (ISO settimana europea)
                 const firstDayOfWeek = (firstDay.getDay() + 6) % 7;
+
+                // Limiti navigazione: si puo' andare indietro fino al mese della prima pesata,
+                // o se non ce ne sono ancora, fino a 12 mesi fa. Avanti: non oltre il mese corrente.
+                const earliestTs = (weights || []).reduce((min, w) => {
+                  const t = new Date(w.ts).getTime();
+                  return (min == null || t < min) ? t : min;
+                }, null);
+                const earliestDate = earliestTs != null ? new Date(earliestTs) : new Date(today.getFullYear(), today.getMonth() - 12, 1);
+                const earliestMonth = new Date(earliestDate.getFullYear(), earliestDate.getMonth(), 1);
+                const currentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+                const canPrev = calMonth.getTime() > earliestMonth.getTime();
+                const canNext = calMonth.getTime() < currentMonth.getTime();
 
                 // Per ogni giorno del mese, calcola un "punteggio" di completezza
                 const dayDataMap = {};
@@ -757,7 +772,6 @@ export default function StatistichePage({
 
                 for (let d = 1; d <= daysInMonth; d++) {
                   const day = new Date(year, month, d);
-                  const dayKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
                   const dayKeyAppFmt = `${year}-${month}-${d}`; // come il dayKey() dell'app
 
                   const hasWeight = (weights || []).some(w => sameDayLocal(new Date(w.ts), day));
@@ -784,10 +798,29 @@ export default function StatistichePage({
                 const dayLabels = ['L', 'M', 'M', 'G', 'V', 'S', 'D'];
 
                 const cellSize = 36;
+                const navBtnStyle = (enabled) => ({
+                  background: 'transparent',
+                  border: 'none',
+                  color: Q.gold || Q.cream,
+                  fontFamily: fGaramond,
+                  fontSize: 22,
+                  lineHeight: 1,
+                  padding: '4px 12px',
+                  cursor: enabled ? 'pointer' : 'default',
+                  opacity: enabled ? 1 : 0.2,
+                });
+                const goPrev = () => { if (canPrev) setCalMonth(new Date(year, month - 1, 1)); };
+                const goNext = () => { if (canNext) setCalMonth(new Date(year, month + 1, 1)); };
+
                 return (
                   <div>
-                    <div style={{ textAlign: 'center', fontFamily: fGaramond, fontStyle: 'italic', fontSize: 14, color: Q.gold || Q.cream, opacity: 0.85, marginBottom: 14, textTransform: 'capitalize' }}>
-                      {monthLabel}
+                    {/* Header navigazione mesi */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                      <button onClick={goPrev} disabled={!canPrev} aria-label="mese precedente" style={navBtnStyle(canPrev)}>‹</button>
+                      <div style={{ flex: 1, textAlign: 'center', fontFamily: fGaramond, fontStyle: 'italic', fontSize: 14, color: Q.gold || Q.cream, opacity: 0.85, textTransform: 'capitalize' }}>
+                        {monthLabel}
+                      </div>
+                      <button onClick={goNext} disabled={!canNext} aria-label="mese successivo" style={navBtnStyle(canNext)}>›</button>
                     </div>
 
                     {/* Header giorni settimana */}
