@@ -14,6 +14,7 @@
 import { useState } from 'react';
 import JSZip from 'jszip';
 import { getTheme } from './themes.js';
+import { supabase } from './supabase.js';
 
 const fGaramond = '"Cormorant Garamond", serif';
 const fCinzel = '"Cinzel", serif';
@@ -195,19 +196,63 @@ export default function AppleHealthImport({ profile, existingWeights, onImport, 
     }
   }
 
+  const [progress, setProgress] = useState({ done: 0, total: 0 });
+
   async function doImport() {
     setStage('importing');
+    setProgress({ done: 0, total: parsed.newOnes.length });
     try {
-      const toAdd = parsed.newOnes.map(x => ({
+      if (!profile?.id) throw new Error('Profilo non disponibile. Riprova dopo aver effettuato di nuovo l\'accesso.');
+
+      // Costruisco le righe direttamente nel formato DB
+      const allRows = parsed.newOnes.map(x => ({
         id: newId(),
+        user_id: profile.id,
         ts: x.ts,
         weight: Math.round(x.weight * 10) / 10,
-        bodyFat: x.bodyFat != null ? Math.round(x.bodyFat * 10) / 10 : null,
+        body_fat: x.bodyFat != null ? Math.round(x.bodyFat * 10) / 10 : null,
         muscle: x.muscle != null ? Math.round(x.muscle * 10) / 10 : null,
-        water: null,
+        body_water: null,
       }));
-      await onImport(toAdd);
-      setStage('done');
+
+      // Insert a batch di 100 righe per evitare payload enormi
+      const CHUNK_SIZE = 100;
+      const errors = [];
+      let inserted = 0;
+      for (let i = 0; i < allRows.length; i += CHUNK_SIZE) {
+        const chunk = allRows.slice(i, i + CHUNK_SIZE);
+        const { error } = await supabase.from('weights').insert(chunk);
+        if (error) {
+          console.error('[apple health import] chunk error', i, error);
+          errors.push(`batch ${Math.floor(i / CHUNK_SIZE) + 1}: ${error.message || 'errore sconosciuto'}`);
+          // Fermo dopo 3 errori per non spammare
+          if (errors.length >= 3) {
+            errors.push(`(altri batch saltati dopo ${errors.length} errori)`);
+            break;
+          }
+        } else {
+          inserted += chunk.length;
+        }
+        setProgress({ done: inserted, total: allRows.length });
+      }
+
+      if (errors.length > 0 && inserted === 0) {
+        throw new Error(`Nessuna pesata salvata. Primo errore: ${errors[0]}`);
+      }
+
+      // Aggiorno lo state locale dell'app con quelle effettivamente salvate
+      const savedAppFormat = allRows.slice(0, inserted).map(r => ({
+        id: r.id, ts: r.ts, weight: r.weight, bodyFat: r.body_fat, muscle: r.muscle, water: r.body_water,
+      }));
+      if (onImport) await onImport(savedAppFormat);
+
+      setProgress({ done: inserted, total: allRows.length });
+      if (errors.length > 0) {
+        setError(`${inserted} pesate salvate, ${allRows.length - inserted} fallite.\n\nDettagli:\n${errors.join('\n')}`);
+        setStage('error');
+      } else {
+        setStage('done');
+      }
     } catch (e) {
       console.error('[apple health import] save', e);
       setError('Errore nel salvataggio: ' + (e.message || 'sconosciuto'));
@@ -420,6 +465,16 @@ export default function AppleHealthImport({ profile, existingWeights, onImport, 
             <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 18, color: Q.gold }}>
               salvataggio in corso...
             </div>
+            {progress.total > 0 && (
+              <>
+                <div style={{ marginTop: 14, fontFamily: fCinzel, fontSize: 11, letterSpacing: '0.3em', color: Q.goldDim }}>
+                  {progress.done} / {progress.total}
+                </div>
+                <div style={{ marginTop: 12, width: '80%', maxWidth: 320, margin: '12px auto 0', height: 4, background: `${Q.gold}22`, borderRadius: 2, overflow: 'hidden' }}>
+                  <div style={{ width: `${Math.round((progress.done / progress.total) * 100)}%`, height: '100%', background: Q.gold, transition: 'width 0.2s' }} />
+                </div>
+              </>
+            )}
           </div>
         )}
 

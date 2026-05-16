@@ -758,16 +758,11 @@ export default function StatistichePage({
                 // Lunedi = 0, domenica = 6 (ISO settimana europea)
                 const firstDayOfWeek = (firstDay.getDay() + 6) % 7;
 
-                // Limiti navigazione: si puo' andare indietro fino al mese della prima pesata,
-                // o se non ce ne sono ancora, fino a 12 mesi fa. Avanti: non oltre il mese corrente.
-                const earliestTs = (weights || []).reduce((min, w) => {
-                  const t = new Date(w.ts).getTime();
-                  return (min == null || t < min) ? t : min;
-                }, null);
-                const earliestDate = earliestTs != null ? new Date(earliestTs) : new Date(today.getFullYear(), today.getMonth() - 12, 1);
-                const earliestMonth = new Date(earliestDate.getFullYear(), earliestDate.getMonth(), 1);
+                // Limiti navigazione: si puo' andare indietro fino a 10 anni fa, avanti solo fino al mese corrente.
+                // (Non limitiamo per "prima pesata" perche' l'utente potrebbe avere dati di altre tabelle nei mesi precedenti.)
+                const tenYearsAgo = new Date(today.getFullYear() - 10, today.getMonth(), 1);
                 const currentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-                const canPrev = calMonth.getTime() > earliestMonth.getTime();
+                const canPrev = calMonth.getTime() > tenYearsAgo.getTime();
                 const canNext = calMonth.getTime() < currentMonth.getTime();
 
                 // Per ogni giorno del mese, calcola un "punteggio" di completezza

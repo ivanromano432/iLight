@@ -830,7 +830,8 @@ export default function App({ user, onLogout }){
         profile={profile}
         existingWeights={weights}
         onImport={async (newWeights) => {
-          await updWeights([...(weights || []), ...newWeights]);
+          // Solo aggiornamento state locale: AppleHealthImport ha gia' salvato su Supabase
+          setWeights(prev => [...(prev || []), ...newWeights]);
         }}
         onClose={() => setShowAppleHealth(false)}
       />
@@ -1570,22 +1571,52 @@ function PesoPage({ theme, loaded, weights, goal, updWeights, updGoal, meals, up
               </div>
             );
           })()}
-          {todayEntries.length>0 && (
-            <div style={{marginTop:22}}>
-              <div style={{fontFamily:fCinzel,fontSize:9,letterSpacing:'0.4em',color:Q.goldDim,textAlign:'center',textTransform:'uppercase',marginBottom:10}}>REGISTRAZIONI DI OGGI</div>
-              <div style={{display:'flex',flexDirection:'column',gap:8}}>
-                {todayEntries.slice().reverse().map(e=>{const d=new Date(e.ts); return (
-                  <button key={e.id} onClick={()=>openEdit(e)} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 14px',background:`${Q.gold}0D`,border:`1px solid ${Q.gold}1F`,cursor:'pointer',textAlign:'left',width:'100%',borderRadius:0}}>
-                    <div>
-                      <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:18,color:Q.cream}}>{fmt(e.weight)} <span style={{fontSize:11,color:Q.goldDim,fontFamily:fCinzel,letterSpacing:'0.2em',fontStyle:'normal'}}>KG</span></div>
-                      <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:12,color:Q.goldDim,marginTop:2}}>{d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})} · {timeOfDay(d)}</div>
+          {(() => {
+            // Pesate degli ultimi 7 giorni, raggruppate per giorno (piu' recente in alto)
+            const now = new Date();
+            const cutoff = new Date(now); cutoff.setDate(cutoff.getDate() - 6); cutoff.setHours(0,0,0,0);
+            const recent = (weights || []).filter(e => new Date(e.ts) >= cutoff).slice().sort((a,b)=>new Date(b.ts)-new Date(a.ts));
+            if (recent.length === 0) return null;
+            // Raggruppa per dayKey
+            const groups = [];
+            const seen = new Map();
+            for (const e of recent) {
+              const d = new Date(e.ts);
+              const k = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+              if (!seen.has(k)) { seen.set(k, groups.length); groups.push({ date: d, entries: [] }); }
+              groups[seen.get(k)].entries.push(e);
+            }
+            const today = new Date();
+            const yest = new Date(); yest.setDate(yest.getDate()-1);
+            const dayLabel = (d) => {
+              if (sameDay(d, today)) return 'OGGI';
+              if (sameDay(d, yest)) return 'IERI';
+              return d.toLocaleDateString('it-IT',{weekday:'long', day:'numeric', month:'short'}).toUpperCase();
+            };
+            return (
+              <div style={{marginTop:22}}>
+                <div style={{fontFamily:fCinzel,fontSize:9,letterSpacing:'0.4em',color:Q.goldDim,textAlign:'center',textTransform:'uppercase',marginBottom:10}}>ULTIME PESATE</div>
+                <div style={{display:'flex',flexDirection:'column',gap:14}}>
+                  {groups.map((g,gi) => (
+                    <div key={gi}>
+                      <div style={{fontFamily:fCinzel,fontSize:9,letterSpacing:'0.3em',color:Q.gold,marginBottom:6,paddingLeft:2}}>{dayLabel(g.date)}</div>
+                      <div style={{display:'flex',flexDirection:'column',gap:6}}>
+                        {g.entries.map(e=>{const d=new Date(e.ts); return (
+                          <button key={e.id} onClick={()=>openEdit(e)} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 14px',background:`${Q.gold}0D`,border:`1px solid ${Q.gold}1F`,cursor:'pointer',textAlign:'left',width:'100%',borderRadius:0}}>
+                            <div>
+                              <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:18,color:Q.cream}}>{fmt(e.weight)} <span style={{fontSize:11,color:Q.goldDim,fontFamily:fCinzel,letterSpacing:'0.2em',fontStyle:'normal'}}>KG</span>{e.bodyFat!=null && <span style={{fontSize:12,color:Q.goldDim,marginLeft:10}}>· {fmt(e.bodyFat)}% grasso</span>}</div>
+                              <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:12,color:Q.goldDim,marginTop:2}}>{d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})} · {timeOfDay(d)}</div>
+                            </div>
+                            <span style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:12,color:Q.goldDim}}>modifica ›</span>
+                          </button>
+                        );})}
+                      </div>
                     </div>
-                    <span style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:12,color:Q.goldDim}}>modifica ›</span>
-                  </button>
-                );})}
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
           <div style={{textAlign:'center',marginTop:24}}>
             <button onClick={openNew} style={btnSolid(Q.gold,Q.ink)}>+ REGISTRA PESO</button>
           </div>
@@ -2383,9 +2414,14 @@ function PastiPage({ user, theme, loaded, meals, updMeals, notes, weights, goal 
     if(editing==='new'){
       const ts = selectedDay===dayKey(new Date()) ? new Date() : (()=>{const d=parseDayKey(selectedDay); d.setHours(12,0); return d;})();
       const defaultStatus = activeTab==='menu' ? 'planned' : 'eaten';
-      await updMeals([...meals,{id:mealId,ts:ts.toISOString(),status:defaultStatus,...finalMeal}]);
+      // Rimuovi il flag tsOverride che non e' una colonna DB
+      const { tsOverride: _ignored, ...mealForDb } = finalMeal;
+      await updMeals([...meals,{id:mealId,ts:ts.toISOString(),status:defaultStatus,...mealForDb}]);
     } else {
-      await updMeals(meals.map(m=>m.id===editing?{...m,...finalMeal}:m));
+      // Pasto esistente: applica tsOverride se l'utente ha cambiato data nel modal
+      const { tsOverride, ...mealForDb } = finalMeal;
+      const patch = tsOverride ? { ...mealForDb, ts: tsOverride } : mealForDb;
+      await updMeals(meals.map(m=>m.id===editing?{...m,...patch}:m));
     }
     setEditing(null);
   }
@@ -2708,10 +2744,16 @@ function MealModal({ existing, onClose, onSave, onDelete, J }){
   const [type, setType] = useState(existing?.type || 'colazione');
   const [description, setDescription] = useState(existing?.description || '');
   const [qty, setQty] = useState(existing?.qty_g!=null ? String(existing.qty_g) : '');
+  // Unita' di misura per la quantita': 'g' (default) o 'ml'. E' cosmetica: il valore va sempre in qty_g.
+  const [qtyUnit, setQtyUnit] = useState('g');
   const [kcal, setKcal] = useState(existing?.kcal!=null ? String(existing.kcal) : '');
   const [p, setP] = useState(existing?.p!=null ? String(existing.p) : '');
   const [c, setC] = useState(existing?.c!=null ? String(existing.c) : '');
   const [g, setG] = useState(existing?.g!=null ? String(existing.g) : '');
+  // Scelta data: solo per modifica di pasto esistente. null = mantieni, 'oggi' o 'ieri' = sposta a quel giorno (ora preservata)
+  const isExistingToday = existing?.ts ? sameDay(new Date(existing.ts), new Date()) : false;
+  const isExistingYesterday = existing?.ts ? sameDay(new Date(existing.ts), new Date(Date.now() - 86400000)) : false;
+  const [dateChoice, setDateChoice] = useState(isExistingToday ? 'oggi' : (isExistingYesterday ? 'ieri' : null));
   // photo (base64) = nuova foto appena scelta; photoUrl = url Storage esistente
   // se l'utente carica nuova foto, photo viene riempito e photoUrl ignorato
   const [photo, setPhoto] = useState(null);
@@ -2745,6 +2787,20 @@ function MealModal({ existing, onClose, onSave, onDelete, J }){
   }
 
   function save(){
+    // Se l'utente ha scelto una data diversa da quella esistente, calcolo il nuovo ts
+    // mantenendo l'ora del ts esistente (o ora corrente se nuovo).
+    let tsOverride = null;
+    if (dateChoice && existing?.ts) {
+      const wasToday = sameDay(new Date(existing.ts), new Date());
+      const wasYesterday = sameDay(new Date(existing.ts), new Date(Date.now() - 86400000));
+      const changed = (dateChoice === 'oggi' && !wasToday) || (dateChoice === 'ieri' && !wasYesterday);
+      if (changed) {
+        const base = dateChoice === 'oggi' ? new Date() : new Date(Date.now() - 86400000);
+        const existingDate = new Date(existing.ts);
+        base.setHours(existingDate.getHours(), existingDate.getMinutes(), existingDate.getSeconds(), 0);
+        tsOverride = base.toISOString();
+      }
+    }
     // Passa al parent: nuova foto base64 (se caricata), oppure URL esistente, oppure null
     onSave({
       type,
@@ -2757,6 +2813,7 @@ function MealModal({ existing, onClose, onSave, onDelete, J }){
       photo: photo || null,                  // base64 nuovo (da caricare)
       photo_url: photo ? null : photoUrl,    // url esistente da preservare
       photo_legacy: photo || photoUrl ? null : legacyPhoto,  // base64 legacy da migrare
+      tsOverride,
     });
   }
 
@@ -2803,9 +2860,29 @@ function MealModal({ existing, onClose, onSave, onDelete, J }){
         <input type="text" value={description} onChange={e=>setDescription(e.target.value)} placeholder="es. pasta al pomodoro" autoFocus style={fieldInput(J)} />
       </div>
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginTop:14}}>
-        <div><FieldLabel>quantità (g)</FieldLabel><input type="text" inputMode="numeric" value={qty} onChange={e=>setQty(e.target.value)} placeholder="250" style={fieldInput(J)} /></div>
+        <div>
+          <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',marginBottom:4}}>
+            <FieldLabel>quantità</FieldLabel>
+            <div style={{display:'flex',gap:0}}>
+              <button type="button" onClick={()=>setQtyUnit('g')} style={{padding:'2px 8px',fontFamily:fMarcellus,fontSize:9,letterSpacing:'0.15em',background:qtyUnit==='g'?J.dark:'transparent',color:qtyUnit==='g'?J.bg:J.sage,border:`1px solid ${J.dark}66`,cursor:'pointer',borderRadius:0}}>G</button>
+              <button type="button" onClick={()=>setQtyUnit('ml')} style={{padding:'2px 8px',fontFamily:fMarcellus,fontSize:9,letterSpacing:'0.15em',background:qtyUnit==='ml'?J.dark:'transparent',color:qtyUnit==='ml'?J.bg:J.sage,border:`1px solid ${J.dark}66`,borderLeft:'none',cursor:'pointer',borderRadius:0}}>ML</button>
+            </div>
+          </div>
+          <input type="text" inputMode="numeric" value={qty} onChange={e=>setQty(e.target.value)} placeholder={qtyUnit==='ml'?'330':'250'} style={fieldInput(J)} />
+        </div>
         <div><FieldLabel>kcal</FieldLabel><input type="text" inputMode="numeric" value={kcal} onChange={e=>setKcal(e.target.value)} placeholder="450" style={fieldInput(J)} /></div>
       </div>
+
+      {/* Selettore data: solo per modifica di pasto esistente di oggi o ieri */}
+      {existing && (isExistingToday || isExistingYesterday) && (
+        <div style={{marginTop:14}}>
+          <FieldLabel>data</FieldLabel>
+          <div style={{display:'flex',gap:6,marginTop:6}}>
+            <button type="button" onClick={()=>setDateChoice('oggi')} style={{flex:1,padding:'8px 12px',fontFamily:fMarcellus,fontSize:10,letterSpacing:'0.2em',textTransform:'uppercase',background:dateChoice==='oggi'?J.dark:'transparent',color:dateChoice==='oggi'?J.bg:J.dark,border:`1px solid ${J.dark}`,cursor:'pointer',borderRadius:0}}>OGGI</button>
+            <button type="button" onClick={()=>setDateChoice('ieri')} style={{flex:1,padding:'8px 12px',fontFamily:fMarcellus,fontSize:10,letterSpacing:'0.2em',textTransform:'uppercase',background:dateChoice==='ieri'?J.dark:'transparent',color:dateChoice==='ieri'?J.bg:J.dark,border:`1px solid ${J.dark}`,cursor:'pointer',borderRadius:0}}>IERI</button>
+          </div>
+        </div>
+      )}
 
       {/* Stima nutrienti con IA */}
       <div style={{marginTop:14,padding:'12px 14px',border:`1px dashed ${J.sage}66`,background:`${J.sage}0A`}}>
