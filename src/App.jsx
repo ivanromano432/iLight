@@ -902,10 +902,13 @@ export default function App({ user, onLogout }){
                 style={{ background: 'transparent', color: '#3C3329', border: '1px solid rgba(60,51,41,0.25)', fontFamily: "'Cardo',serif", fontStyle: 'italic', fontSize: 14, padding: '8px 12px', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
                 ✦ guida
               </button>
-              <button onClick={() => { setShowAccountMenu(false); setShowAppleHealth(true); }}
-                style={{ background: 'transparent', color: '#3C3329', border: '1px solid rgba(60,51,41,0.25)', fontFamily: "'Cardo',serif", fontStyle: 'italic', fontSize: 14, padding: '8px 12px', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
-                ☆ importa da apple salute
-              </button>
+              {/* TEMPORANEAMENTE DISABILITATO: l'import di file zip grandi crasha la PWA su iOS. Ricarica nel prossimo commit. */}
+              {false && (
+                <button onClick={() => { setShowAccountMenu(false); setShowAppleHealth(true); }}
+                  style={{ background: 'transparent', color: '#3C3329', border: '1px solid rgba(60,51,41,0.25)', fontFamily: "'Cardo',serif", fontStyle: 'italic', fontSize: 14, padding: '8px 12px', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
+                  ☆ importa da apple salute
+                </button>
+              )}
               <button onClick={() => { setShowAccountMenu(false); setShowSub(true); }}
                 style={{
                   background: subState.ctaPrimary ? '#C9A876' : 'transparent',
