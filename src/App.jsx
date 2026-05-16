@@ -973,7 +973,7 @@ export default function App({ user, onLogout }){
         {page==='digiuno' && <DigiunoPage theme={__theme} loaded={loaded} fasts={fasts} updFasts={updFasts} />}
         {page==='respiro' && <RespiroPage theme={__theme} loaded={loaded} sessions={mindfulSessions} updSessions={updMindful} workouts={workouts} types={workoutTypes} updWorkouts={updWorkouts} updTypes={updWorkoutTypes} />}
         {page==='sonno' && <SonnoPage theme={__theme} loaded={loaded} sleeps={sleeps} updSleeps={updSleeps} />}
-        {page==='sera' && <SeraPage theme={__theme} loaded={loaded} weights={weights} goal={goal} notes={foodNotes} water={waterByDay} waterGoal={waterGoal} meals={meals} workouts={workouts} workoutTypes={workoutTypes} supps={supplements} taken={suppTaken} sleeps={sleeps} mindful={mindfulSessions} updNotes={updFoodNotes} />}
+        {page==='sera' && <SeraPage theme={__theme} loaded={loaded} weights={weights} goal={goal} notes={foodNotes} water={waterByDay} waterGoal={waterGoal} meals={meals} workouts={workouts} workoutTypes={workoutTypes} supps={supplements} taken={suppTaken} sleeps={sleeps} mindful={mindfulSessions} updNotes={updFoodNotes} profile={profile} />}
         </>); })()}
       </div>
       <BottomNav theme={getTheme(profile?.theme)} currentIdx={pageIdx} onChange={setPageIdx} />
@@ -2455,6 +2455,55 @@ function PastiPage({ user, theme, loaded, meals, updMeals, notes, weights, goal 
   );
 }
 
+// === Utility: calcolo dei target nutrizionali (Zona 40/30/30 per dimagrimento) ===
+// Priorità: 1) profilo personalizzato · 2) Mifflin-St Jeor con deficit · 3) peso obiettivo×27 · 4) peso corrente×20
+function computeNutritionTarget(profile, weights, goal) {
+  if (profile?.daily_kcal_goal != null) {
+    const kcal = Number(profile.daily_kcal_goal);
+    return {
+      kcal,
+      protein: profile.daily_protein_g != null ? Number(profile.daily_protein_g) : Math.round((kcal * 0.30) / 4),
+      carbs:   profile.daily_carbs_g   != null ? Number(profile.daily_carbs_g)   : Math.round((kcal * 0.40) / 4),
+      fat:     profile.daily_fat_g     != null ? Number(profile.daily_fat_g)     : Math.round((kcal * 0.30) / 9),
+      source: 'custom',
+    };
+  }
+  const sortedW = [...(weights||[])].sort((a,b)=>new Date(b.ts)-new Date(a.ts));
+  const latestW = sortedW[0]?.weight || 70;
+  const goalW = goal != null ? Number(goal) : null;
+  const height = profile?.height_cm != null ? Number(profile.height_cm) : null;
+  const birth = profile?.birth_year != null ? Number(profile.birth_year) : null;
+  const age = birth ? (new Date().getFullYear() - birth) : null;
+  const sex = profile?.sex || null;
+
+  let kcal, source;
+  if (height && age && sex) {
+    const bmr = sex === 'm'
+      ? 10*latestW + 6.25*height - 5*age + 5
+      : 10*latestW + 6.25*height - 5*age - 161;
+    const tdee = bmr * 1.4;
+    kcal = Math.round(tdee - 500);
+    const floor = sex === 'm' ? 1400 : 1200;
+    if (kcal < floor) kcal = floor;
+    source = 'mifflin';
+  } else if (goalW) {
+    kcal = Math.round(goalW * 27);
+    source = 'goal';
+  } else {
+    kcal = Math.round(latestW * 20);
+    source = 'weight';
+  }
+  if (kcal < 1200) kcal = 1200;
+  if (kcal > 3000) kcal = 3000;
+  return {
+    kcal,
+    protein: Math.round((kcal * 0.30) / 4),
+    carbs:   Math.round((kcal * 0.40) / 4),
+    fat:     Math.round((kcal * 0.30) / 9),
+    source,
+  };
+}
+
 // === MenuPage: pianificazione del menù giornaliero con proposte IA cliccabili e progress su kcal/macro target ===
 function MenuPage({ theme, loaded, meals, updMeals, weights, goal, profile, updProfile }) {
   const J = theme || { bg: '#E5E3D5', dark: '#2D3A2E', sage: '#5C6B4E', light: '#8FA288' };
@@ -2465,60 +2514,8 @@ function MenuPage({ theme, loaded, meals, updMeals, weights, goal, profile, updP
   // Modal di modifica target nutrizionali
   const [editingTargets, setEditingTargets] = useState(false);
 
-  // Target giornalieri di kcal e macronutrienti.
-  // LOGICA DIETA A ZONA (per dimagrimento): bilanciamento 40% carboidrati · 30% proteine · 30% grassi.
-  // KCAL DEFAULT con priorità:
-  //   1. profilo personalizzato (l'utente ha modificato a mano)
-  //   2. Mifflin-St Jeor (peso/altezza/età/sesso) - deficit 500 kcal/giorno
-  //   3. peso obiettivo × 27 (mantenimento del peso target = dimagrimento progressivo)
-  //   4. peso corrente × 20 (deficit aggressivo, ultimo fallback)
-  const target = useMemo(() => {
-    if (profile?.daily_kcal_goal != null) {
-      const kcal = Number(profile.daily_kcal_goal);
-      return {
-        kcal,
-        protein: profile.daily_protein_g != null ? Number(profile.daily_protein_g) : Math.round((kcal * 0.30) / 4),
-        carbs:   profile.daily_carbs_g   != null ? Number(profile.daily_carbs_g)   : Math.round((kcal * 0.40) / 4),
-        fat:     profile.daily_fat_g     != null ? Number(profile.daily_fat_g)     : Math.round((kcal * 0.30) / 9),
-      };
-    }
-    const sortedW = [...(weights||[])].sort((a,b)=>new Date(b.ts)-new Date(a.ts));
-    const latestW = sortedW[0]?.weight || 70;
-    const goalW = goal != null ? Number(goal) : null;
-    const height = profile?.height_cm != null ? Number(profile.height_cm) : null;
-    const birth = profile?.birth_year != null ? Number(profile.birth_year) : null;
-    const age = birth ? (new Date().getFullYear() - birth) : null;
-    const sex = profile?.sex || null;
-
-    let kcal;
-    if (height && age && sex) {
-      // Mifflin-St Jeor con peso CORRENTE per il BMR (più realistico)
-      const bmr = sex === 'm'
-        ? 10*latestW + 6.25*height - 5*age + 5
-        : 10*latestW + 6.25*height - 5*age - 161;
-      const tdee = bmr * 1.4; // sedentario/leggermente attivo
-      kcal = Math.round(tdee - 500); // deficit moderato (≈0.5 kg/sett)
-      // Limiti di sicurezza: mai sotto 1200 (donne) / 1400 (uomini)
-      const floor = sex === 'm' ? 1400 : 1200;
-      if (kcal < floor) kcal = floor;
-    } else if (goalW) {
-      // Fallback 1: kcal = peso obiettivo × 27 (mantenimento del peso target → dimagrimento progressivo)
-      kcal = Math.round(goalW * 27);
-    } else {
-      // Fallback 2: peso corrente × 20 (deficit aggressivo)
-      kcal = Math.round(latestW * 20);
-    }
-    // Clamping ragionevole
-    if (kcal < 1200) kcal = 1200;
-    if (kcal > 3000) kcal = 3000;
-
-    return {
-      kcal,
-      protein: Math.round((kcal * 0.30) / 4),
-      carbs:   Math.round((kcal * 0.40) / 4),
-      fat:     Math.round((kcal * 0.30) / 9),
-    };
-  }, [profile, weights, goal]);
+  // Target giornalieri di kcal e macronutrienti (Zona 40/30/30 per dimagrimento)
+  const target = useMemo(() => computeNutritionTarget(profile, weights, goal), [profile, weights, goal]);
 
   // Pasti pianificati di OGGI
   const todayK = dayKey(new Date());
@@ -3512,7 +3509,7 @@ function SleepModal({ existing, todayK, onClose, onSave, onDelete }){
   );
 }
 
-function SeraPage({ theme, loaded, weights, goal, notes, water, waterGoal, meals, workouts, workoutTypes, supps, taken, sleeps, mindful, updNotes }){
+function SeraPage({ theme, loaded, weights, goal, notes, water, waterGoal, meals, workouts, workoutTypes, supps, taken, sleeps, mindful, updNotes, profile }){
   // Sera usa N internamente (palette Notte blu era originaria). Shadow.
   const N = theme || { bg1: '#2C3340', bg2: '#14171F', cream: '#F2E8D0', dim: '#8A8270', gold: '#C9A876', body: '#DDD3C2' };
   const [aiAnalyzing, setAiAnalyzing] = useState(false);
@@ -3597,6 +3594,9 @@ function SeraPage({ theme, loaded, weights, goal, notes, water, waterGoal, meals
     finally { setAiAnalyzing(false); }
   }
 
+  // Target calorico del giorno (Zona 40/30/30 — stessa logica della pagina Menù)
+  const kcalTarget = useMemo(() => computeNutritionTarget(profile, weights, goal).kcal, [profile, weights, goal]);
+
   return (
     <div style={{minHeight:'100vh',background:`radial-gradient(ellipse at top, ${N.bg1} 0%, ${N.bg2} 100%)`,color:N.cream,fontFamily:fFraunces,position:'relative',overflow:'hidden'}}>
       <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${N.gold}40`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
@@ -3611,126 +3611,66 @@ function SeraPage({ theme, loaded, weights, goal, notes, water, waterGoal, meals
             <Row theme={N} label="sonno notte scorsa" value={lastNightDur!=null?fmtDur(lastNightDur):'—'} />
             <Row theme={N} label="peso · mattina" value={morning?fmt(morning.weight):'—'} unit="kg" />
             <Row theme={N} label="peso · sera" value={evening&&evening!==morning?fmt(evening.weight):'—'} unit="kg" />
-            <Row theme={N} label="calorie" value={totalKcal>0?fmt0(totalKcal):'—'} unit="kcal" />
+            <Row theme={N} label="calorie" value={`${fmt0(totalKcal)} / ${fmt0(kcalTarget)}`} unit="kcal" />
             <Row theme={N} label="acqua" value={todayWater} unit={`/ ${waterGoal}`} />
             <Row theme={N} label="allenamenti" value={todayWorkouts.length||'—'} details={workoutDetails} />
             <Row theme={N} label="meditazione" value={totalMindfulMin>0?fmt0(totalMindfulMin):'—'} unit={totalMindfulMin>0?'min':''} details={todayMindful.length>1?`${todayMindful.length} sessioni`:null} />
             <Row theme={N} label="integratori" value={supps.length>0?`${suppsTakenToday} / ${supps.length}`:'—'} details={suppDetails} />
           </div>
 
-          {/* === SEZIONE DIARIO: timeline cronologica auto-popolata dai dati del giorno + note manuali === */}
-          {(() => {
-            // Costruisco la timeline degli eventi di oggi da tutte le aree dell'app
-            const events = [];
-            // Pesate
-            todayWeights.forEach(w => {
-              events.push({ ts: new Date(w.ts), kind: 'weight', icon: '⚖', label: 'pesata', text: `${fmt(w.weight)} kg` });
-            });
-            // Pasti registrati
-            todayMeals.forEach(m => {
-              const typeName = MEAL_TYPES.find(t => t.id === m.type)?.name || m.type;
-              const parts = [];
-              if (m.description) parts.push(m.description);
-              const meta = [];
-              if (m.qty_g) meta.push(`${fmt0(m.qty_g)}g`);
-              if (m.kcal) meta.push(`${fmt0(m.kcal)} kcal`);
-              events.push({ ts: new Date(m.ts), kind: 'meal', icon: '✿', label: typeName.toLowerCase(), text: parts.join(' · ') || '(senza descrizione)', meta: meta.join(' · ') });
-            });
-            // Allenamenti
-            todayWorkouts.forEach(w => {
-              const t = (workoutTypes||[]).find(x => x.id === w.typeId);
-              const name = t ? t.name : 'Allenamento';
-              const unit = t ? t.unit : '';
-              events.push({ ts: new Date(w.ts), kind: 'workout', icon: '✦', label: 'movimento', text: `${name}${w.qty?` · ${fmt0(w.qty)}${unit}`:''}` });
-            });
-            // Sessioni mindful/respiro
-            todayMindful.forEach(s => {
-              const noteTxt = s.note ? ` · ${s.note}` : '';
-              events.push({ ts: new Date(s.ts), kind: 'mindful', icon: '∞', label: 'respiro', text: `${fmt0(s.duration_min||0)} min${noteTxt}` });
-            });
-            // Note manuali (gestione modifica/elimina speciale)
-            todayNotesSorted.forEach(n => {
-              events.push({ ts: new Date(n.ts), kind: 'note', icon: '⟡', label: 'nota', text: n.text, id: n.id });
-            });
-            // Ordino cronologicamente
-            events.sort((a, b) => a.ts - b.ts);
+          {/* === SEZIONE NOTE: solo note manuali (cronologia automatica rimossa) === */}
+          <div style={{marginTop:30}}>
+            <div style={{display:'flex',alignItems:'center',gap:14,marginBottom:14}}>
+              <div style={{flex:1,height:1,background:`linear-gradient(90deg, transparent, ${N.gold}55)`}} />
+              <span style={{fontFamily:fFraunces,fontSize:10,letterSpacing:'0.45em',color:N.gold,textTransform:'uppercase'}}>note</span>
+              <div style={{flex:1,height:1,background:`linear-gradient(90deg, ${N.gold}55, transparent)`}} />
+            </div>
 
-            return (
-              <div style={{marginTop:30}}>
-                <div style={{display:'flex',alignItems:'center',gap:14,marginBottom:14}}>
-                  <div style={{flex:1,height:1,background:`linear-gradient(90deg, transparent, ${N.gold}55)`}} />
-                  <span style={{fontFamily:fFraunces,fontSize:10,letterSpacing:'0.45em',color:N.gold,textTransform:'uppercase'}}>diario</span>
-                  <div style={{flex:1,height:1,background:`linear-gradient(90deg, ${N.gold}55, transparent)`}} />
-                </div>
-                <div style={{textAlign:'center',fontFamily:fFraunces,fontStyle:'italic',fontSize:12,color:N.dim||N.goldDim,marginBottom:14,opacity:0.85}}>
-                  cronologia automatica della giornata
-                </div>
-
-                {events.length === 0 ? (
-                  <div style={{textAlign:'center',fontFamily:fFraunces,fontStyle:'italic',fontSize:13,color:N.dim||N.goldDim,padding:'14px 0 18px'}}>
-                    Niente registrato oggi. Aggiungi pesate, pasti, allenamenti o una nota qui sotto.
-                  </div>
-                ) : (
-                  <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:14}}>
-                    {events.map((ev, i) => {
-                      const time = ev.ts.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
-                      // Le note manuali sono cliccabili per modifica/elimina
-                      if (ev.kind === 'note') {
-                        const isEditing = editingNote === ev.id;
-                        if (isEditing) {
-                          return (
-                            <div key={`note-${ev.id}`} style={{padding:'10px 12px',background:`${N.gold}0A`,border:`1px solid ${N.gold}44`}}>
-                              <textarea value={editNoteText} onChange={e=>setEditNoteText(e.target.value)} rows={3} style={{width:'100%',background:'transparent',border:'none',color:N.cream||N.body,fontFamily:fFraunces,fontStyle:'italic',fontSize:14,resize:'vertical',outline:'none'}} />
-                              <div style={{display:'flex',gap:8,justifyContent:'flex-end',marginTop:8}}>
-                                <button onClick={()=>{setEditingNote(null);setEditNoteText('');}} style={{background:'transparent',color:N.dim||N.goldDim,border:`1px solid ${N.dim||N.goldDim}66`,fontFamily:fFraunces,fontSize:10,letterSpacing:'0.2em',padding:'6px 12px',cursor:'pointer',textTransform:'uppercase'}}>annulla</button>
-                                <button onClick={()=>deleteNote(ev.id)} style={{background:'transparent',color:'#C99A7A',border:`1px solid #C99A7A66`,fontFamily:fFraunces,fontSize:10,letterSpacing:'0.2em',padding:'6px 12px',cursor:'pointer',textTransform:'uppercase'}}>elimina</button>
-                                <button onClick={saveEditNote} style={{background:N.gold,color:N.bg2||'#14171F',border:'none',fontFamily:fFraunces,fontSize:10,letterSpacing:'0.2em',padding:'6px 12px',cursor:'pointer',textTransform:'uppercase'}}>salva</button>
-                              </div>
-                            </div>
-                          );
-                        }
-                        return (
-                          <div key={`note-${ev.id}`} onClick={()=>{setEditingNote(ev.id);setEditNoteText(ev.text);}} style={{display:'flex',gap:12,padding:'10px 12px',background:`${N.gold}08`,border:`1px solid ${N.gold}33`,cursor:'pointer'}}>
-                            <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:3,minWidth:46,flexShrink:0}}>
-                              <span style={{fontSize:14,color:N.gold,lineHeight:1}}>{ev.icon}</span>
-                              <span style={{fontFamily:fFraunces,fontSize:9,letterSpacing:'0.2em',color:N.dim||N.goldDim}}>{time}</span>
-                            </div>
-                            <div style={{flex:1,minWidth:0}}>
-                              <div style={{fontFamily:fFraunces,fontSize:9,letterSpacing:'0.3em',color:N.gold,textTransform:'uppercase',marginBottom:3,opacity:0.8}}>{ev.label} · tocca per modificare</div>
-                              <div style={{fontFamily:fFraunces,fontStyle:'italic',fontSize:14,color:N.cream||N.body,lineHeight:1.5,whiteSpace:'pre-wrap'}}>{ev.text}</div>
-                            </div>
-                          </div>
-                        );
-                      }
-                      // Eventi automatici (read-only)
-                      return (
-                        <div key={`${ev.kind}-${i}`} style={{display:'flex',gap:12,padding:'8px 12px',borderBottom:`1px solid ${N.gold}1A`}}>
-                          <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:3,minWidth:46,flexShrink:0}}>
-                            <span style={{fontSize:14,color:N.gold,opacity:0.75,lineHeight:1}}>{ev.icon}</span>
-                            <span style={{fontFamily:fFraunces,fontSize:9,letterSpacing:'0.2em',color:N.dim||N.goldDim}}>{time}</span>
-                          </div>
-                          <div style={{flex:1,minWidth:0}}>
-                            <div style={{fontFamily:fFraunces,fontSize:9,letterSpacing:'0.3em',color:N.dim||N.goldDim,textTransform:'uppercase',marginBottom:2,opacity:0.85}}>{ev.label}</div>
-                            <div style={{fontFamily:fFraunces,fontStyle:'italic',fontSize:14,color:N.cream||N.body,lineHeight:1.4,whiteSpace:'pre-wrap'}}>{ev.text}</div>
-                            {ev.meta && <div style={{fontFamily:fFraunces,fontSize:11,color:N.dim||N.goldDim,marginTop:2,opacity:0.75}}>{ev.meta}</div>}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* Input nuova nota */}
-                <div style={{marginTop:14}}>
-                  <textarea value={noteInput} onChange={e=>setNoteInput(e.target.value)} rows={2} placeholder="Aggiungi una nota a mano (un pensiero, un dettaglio)…" style={{width:'100%',background:`${N.gold}06`,border:`1px solid ${N.gold}33`,color:N.cream||N.body,fontFamily:fFraunces,fontStyle:'italic',fontSize:14,padding:'10px 12px',outline:'none',resize:'vertical',boxSizing:'border-box'}} />
-                  <div style={{textAlign:'right',marginTop:8}}>
-                    <button onClick={addNote} disabled={!noteInput.trim()} style={{background:noteInput.trim()?N.gold:'transparent',color:noteInput.trim()?(N.bg2||'#14171F'):N.dim,border:`1px solid ${noteInput.trim()?N.gold:N.dim+'66'}`,fontFamily:fFraunces,fontSize:10,letterSpacing:'0.3em',padding:'8px 18px',cursor:noteInput.trim()?'pointer':'not-allowed',textTransform:'uppercase'}}>aggiungi nota</button>
-                  </div>
-                </div>
+            {todayNotesSorted.length === 0 ? (
+              <div style={{textAlign:'center',fontFamily:fFraunces,fontStyle:'italic',fontSize:13,color:N.dim||N.goldDim,padding:'4px 0 14px',opacity:0.8}}>
+                Nessuna nota oggi. Scrivi un pensiero qui sotto.
               </div>
-            );
-          })()}
-          {/* === FINE SEZIONE DIARIO === */}
+            ) : (
+              <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:14}}>
+                {todayNotesSorted.map(n => {
+                  const time = new Date(n.ts).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+                  const isEditing = editingNote === n.id;
+                  if (isEditing) {
+                    return (
+                      <div key={`note-${n.id}`} style={{padding:'10px 12px',background:`${N.gold}0A`,border:`1px solid ${N.gold}44`}}>
+                        <textarea value={editNoteText} onChange={e=>setEditNoteText(e.target.value)} rows={3} style={{width:'100%',background:'transparent',border:'none',color:N.cream||N.body,fontFamily:fFraunces,fontStyle:'italic',fontSize:14,resize:'vertical',outline:'none'}} />
+                        <div style={{display:'flex',gap:8,justifyContent:'flex-end',marginTop:8}}>
+                          <button onClick={()=>{setEditingNote(null);setEditNoteText('');}} style={{background:'transparent',color:N.dim||N.goldDim,border:`1px solid ${N.dim||N.goldDim}66`,fontFamily:fFraunces,fontSize:10,letterSpacing:'0.2em',padding:'6px 12px',cursor:'pointer',textTransform:'uppercase'}}>annulla</button>
+                          <button onClick={()=>deleteNote(n.id)} style={{background:'transparent',color:'#C99A7A',border:`1px solid #C99A7A66`,fontFamily:fFraunces,fontSize:10,letterSpacing:'0.2em',padding:'6px 12px',cursor:'pointer',textTransform:'uppercase'}}>elimina</button>
+                          <button onClick={saveEditNote} style={{background:N.gold,color:N.bg2||'#14171F',border:'none',fontFamily:fFraunces,fontSize:10,letterSpacing:'0.2em',padding:'6px 12px',cursor:'pointer',textTransform:'uppercase'}}>salva</button>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div key={`note-${n.id}`} onClick={()=>{setEditingNote(n.id);setEditNoteText(n.text);}} style={{display:'flex',gap:12,padding:'10px 12px',background:`${N.gold}08`,border:`1px solid ${N.gold}33`,cursor:'pointer'}}>
+                      <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:3,minWidth:46,flexShrink:0}}>
+                        <span style={{fontSize:14,color:N.gold,lineHeight:1}}>⟡</span>
+                        <span style={{fontFamily:fFraunces,fontSize:9,letterSpacing:'0.2em',color:N.dim||N.goldDim}}>{time}</span>
+                      </div>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontFamily:fFraunces,fontStyle:'italic',fontSize:14,color:N.cream||N.body,lineHeight:1.5,whiteSpace:'pre-wrap'}}>{n.text}</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Input nuova nota */}
+            <div style={{marginTop:14}}>
+              <textarea value={noteInput} onChange={e=>setNoteInput(e.target.value)} rows={2} placeholder="Un pensiero, un dettaglio, qualcosa da ricordare…" style={{width:'100%',background:`${N.gold}06`,border:`1px solid ${N.gold}33`,color:N.cream||N.body,fontFamily:fFraunces,fontStyle:'italic',fontSize:14,padding:'10px 12px',outline:'none',resize:'vertical',boxSizing:'border-box'}} />
+              <div style={{textAlign:'right',marginTop:8}}>
+                <button onClick={addNote} disabled={!noteInput.trim()} style={{background:noteInput.trim()?N.gold:'transparent',color:noteInput.trim()?(N.bg2||'#14171F'):N.dim,border:`1px solid ${noteInput.trim()?N.gold:N.dim+'66'}`,fontFamily:fFraunces,fontSize:10,letterSpacing:'0.3em',padding:'8px 18px',cursor:noteInput.trim()?'pointer':'not-allowed',textTransform:'uppercase'}}>aggiungi nota</button>
+              </div>
+            </div>
+          </div>
+          {/* === FINE SEZIONE NOTE === */}
           <div style={{marginTop:22,padding:14,background:`${N.gold}0F`,border:`1px solid ${N.gold}33`,borderRadius:2,textAlign:'left'}}>
             <div style={{fontFamily:fFraunces,fontSize:9,letterSpacing:'0.4em',color:N.gold,textTransform:'uppercase'}}>⟡ riflessione</div>
             <div style={{fontFamily:fFraunces,fontStyle:'italic',fontSize:14,color:N.body,marginTop:6,lineHeight:1.5}}>
