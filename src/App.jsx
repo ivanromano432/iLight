@@ -312,6 +312,67 @@ function buildWeightLossSummary({ weights, goal, meals, workouts, workoutTypes, 
   return out;
 }
 
+// Analizza i dati dell'utente e ritorna un piano d'azione strutturato per il dimagrimento.
+// Input: summary testuale generato da buildWeightLossSummary().
+// Output: { stato, focus, azioni[], attenzione } oppure { error }.
+async function analyzeWeightLoss(summary) {
+  const prompt = `Sei un coach italiano esperto di dimagrimento sano, alimentazione (Dieta a Zona 40/30/30), sonno e movimento. Analizza il riepilogo dei dati dell'utente qui sotto e proponi una valutazione concreta + un piano di azioni semplici e fattibili in italiano.
+
+RIEPILOGO DATI:
+${summary}
+
+Devi rispondere SOLO con un JSON valido in questa forma esatta (niente testo prima o dopo, niente Markdown, niente backtick):
+{
+  "stato": "<frase di 1-2 righe sulla valutazione generale del momento: il peso sta calando/stabile/sale, cosa funziona, cosa no — tono empatico ma onesto, max 200 caratteri>",
+  "focus": "<l'UNICA priorità su cui concentrarsi nei prossimi 7 giorni, frase breve di max 100 caratteri>",
+  "azioni": ["<azione concreta 1>", "<azione concreta 2>", "<azione concreta 3>"],
+  "attenzione": "<eventuale warning se vedi qualcosa di rischioso (es. calorie troppo basse, sonno cronicamente <6h, nessuna attività). Stringa vuota se tutto ok>"
+}
+
+LINEE GUIDA per le azioni:
+- Sempre 3 azioni, mai più mai meno.
+- Concrete e misurabili (es. "Bere 2 bicchieri d'acqua in più al giorno", "Camminata 30 min 4 volte a settimana"), NON generiche (es. "Mangia meglio").
+- Basate sui dati reali del riepilogo: se l'utente mangia poche proteine, suggerisci di aumentarle; se dorme poco, suggerisci di anticipare l'ora di andare a letto.
+- Per la Dieta a Zona target è 30% proteine, 40% carboidrati, 30% grassi.
+- Tono caldo, motivante, mai giudicante.
+
+ATTENZIONE: se i dati sono scarsi (es. meno di 3 giorni con dati), nello "stato" segnala che servono più dati per un'analisi affidabile, ma proponi comunque 3 azioni di partenza utili.`;
+
+  try {
+    const res = await fetch('/api/anthropic', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1200,
+        system: 'Sei un coach nutrizionale italiano. Rispondi SEMPRE e SOLO con JSON valido, niente testo prima o dopo.',
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+    if (!res.ok) {
+      let detail = '';
+      try {
+        const j = await res.json();
+        detail = j?.error?.message || (typeof j?.error === 'string' ? j.error : null) || j?.message || JSON.stringify(j);
+      } catch (_) { detail = await res.text().catch(() => ''); }
+      throw new Error('HTTP ' + res.status + ' ' + (detail || 'unknown'));
+    }
+    const data = await res.json();
+    const txt = data.content?.find(c => c.type === 'text')?.text || '';
+    const a = txt.indexOf('{'), b = txt.lastIndexOf('}');
+    if (a === -1 || b === -1) throw new Error('Risposta IA non valida (JSON mancante)');
+    const p = JSON.parse(txt.slice(a, b + 1));
+    return {
+      stato: typeof p.stato === 'string' ? p.stato : '',
+      focus: typeof p.focus === 'string' ? p.focus : '',
+      azioni: Array.isArray(p.azioni) ? p.azioni.map(x => String(x)).filter(Boolean) : [],
+      attenzione: typeof p.attenzione === 'string' && p.attenzione.trim() ? p.attenzione : null,
+    };
+  } catch (e) {
+    return { error: e.message || 'Errore sconosciuto' };
+  }
+}
+
 const PAGES = [
   { id:'oggi', label:'oggi', roman:'✦' },
   { id:'peso', label:'peso', roman:'I' },
