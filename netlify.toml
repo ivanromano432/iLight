@@ -12,3 +12,26 @@
   from = "/*"
   to = "/index.html"
   status = 200
+
+# Cache-Control: index.html e manifest mai cache (cosi' dopo ogni deploy il browser
+# vede subito la nuova versione e carica il nuovo bundle JS con hash).
+# Gli asset hashati in /assets/ invece sono cache per sempre (l'hash cambia ad ogni deploy).
+[[headers]]
+  for = "/"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/manifest.webmanifest"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
