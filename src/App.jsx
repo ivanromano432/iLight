@@ -855,8 +855,20 @@ function OggiPage({ theme, loaded, profile, weights, goal, meals, notes, water, 
   const lastWeight = todayWeights[todayWeights.length - 1];
   const todayMeals = (meals || []).filter(m => sameDay(new Date(m.ts), now) && m.status !== 'planned');
   const todayKcal = todayMeals.reduce((a, m) => a + (m.kcal || 0), 0);
-  // Target kcal del giorno (Zona 40/30/30, stessa formula di MenuPage e SeraPage)
-  const kcalTarget = computeNutritionTarget(profile, weights, goal).kcal;
+  const todayP = todayMeals.reduce((a, m) => a + (m.p || 0), 0);
+  const todayC = todayMeals.reduce((a, m) => a + (m.c || 0), 0);
+  const todayG = todayMeals.reduce((a, m) => a + (m.g || 0), 0);
+  // Target completo del giorno (Zona 40/30/30, stessa formula di MenuPage e SeraPage)
+  const target = computeNutritionTarget(profile, weights, goal);
+  const kcalTarget = target.kcal;
+  // Percentuali correnti dei macro sulle kcal di oggi (in cal per grammo: P=4, C=4, G=9)
+  // Servono per capire se l'equilibrio è coerente con la Zona 40/30/30, indipendentemente dal totale kcal.
+  const totalMacroKcal = todayP * 4 + todayC * 4 + todayG * 9;
+  const pctP = totalMacroKcal > 0 ? Math.round((todayP * 4 / totalMacroKcal) * 100) : 0;
+  const pctC = totalMacroKcal > 0 ? Math.round((todayC * 4 / totalMacroKcal) * 100) : 0;
+  const pctG = totalMacroKcal > 0 ? Math.round((todayG * 9 / totalMacroKcal) * 100) : 0;
+  // In linea con la Zona se ciascun macro è entro ±5 punti dal target (30/40/30)
+  const inZone = totalMacroKcal > 0 && Math.abs(pctP - 30) <= 5 && Math.abs(pctC - 40) <= 5 && Math.abs(pctG - 30) <= 5;
   const todayNotes = (notes || []).filter(n => sameDay(new Date(n.ts), now));
   const todayWater = water?.[todayKey] || 0;
   const todayWorkouts = (workouts || []).filter(w => sameDay(new Date(w.ts), now));
@@ -965,7 +977,7 @@ function OggiPage({ theme, loaded, profile, weights, goal, meals, notes, water, 
             </div>
           </div>
 
-          {/* Pasti — mostra kcal consumate / obiettivo invece del conteggio */}
+          {/* Pasti — mostra kcal consumate / obiettivo + equilibrio macro (Zona 40/30/30) */}
           <div style={card({ marginBottom: 10 })}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div style={{ flex: 1 }}>
@@ -983,6 +995,47 @@ function OggiPage({ theme, loaded, profile, weights, goal, meals, notes, water, 
               </div>
               <button onClick={() => go('pasti')} style={miniBtn}>+ pasto</button>
             </div>
+
+            {/* Equilibrio macronutrienti — visibile solo se ci sono pasti con macro registrati */}
+            {totalMacroKcal > 0 && (
+              <div style={{ marginTop: 12, paddingTop: 10, borderTop: `1px solid ${Q.gold}1A` }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+                  <div style={{ fontFamily: fCinzel, fontSize: 9, letterSpacing: '0.3em', color: Q.goldDim, textTransform: 'uppercase' }}>equilibrio · zona 40/30/30</div>
+                  <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 12, color: inZone ? '#9CC73A' : '#C99A7A' }}>
+                    {inZone ? '✓ in linea' : '⟡ fuori zona'}
+                  </div>
+                </div>
+                {/* Barra orizzontale a 3 segmenti: carb (40%) - prot (30%) - gras (30%) */}
+                <div style={{ display: 'flex', height: 6, width: '100%', overflow: 'hidden', marginBottom: 6 }}>
+                  <div title={`Carboidrati ${pctC}%`} style={{ width: `${pctC}%`, background: '#9CC73A', minWidth: pctC > 0 ? 2 : 0 }} />
+                  <div title={`Proteine ${pctP}%`} style={{ width: `${pctP}%`, background: '#C99A7A', minWidth: pctP > 0 ? 2 : 0 }} />
+                  <div title={`Grassi ${pctG}%`} style={{ width: `${pctG}%`, background: '#D4B86A', minWidth: pctG > 0 ? 2 : 0 }} />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: fGaramond, fontStyle: 'italic', fontSize: 11, color: Q.goldDim }}>
+                  <span><span style={{ color: '#9CC73A' }}>●</span> carb {pctC}% <span style={{ opacity: 0.5 }}>· t. 40</span></span>
+                  <span><span style={{ color: '#C99A7A' }}>●</span> prot {pctP}% <span style={{ opacity: 0.5 }}>· t. 30</span></span>
+                  <span><span style={{ color: '#D4B86A' }}>●</span> gras {pctG}% <span style={{ opacity: 0.5 }}>· t. 30</span></span>
+                </div>
+                {!inZone && (
+                  <div style={{ marginTop: 8, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 11, color: Q.goldDim, lineHeight: 1.5, opacity: 0.85 }}>
+                    {(() => {
+                      // Suggerimento concreto: cosa è in eccesso e cosa manca rispetto alla Zona
+                      const dev = [
+                        { name: 'carboidrati', cur: pctC, tgt: 40 },
+                        { name: 'proteine', cur: pctP, tgt: 30 },
+                        { name: 'grassi', cur: pctG, tgt: 30 },
+                      ].map(m => ({ ...m, delta: m.cur - m.tgt }));
+                      const tooHigh = dev.filter(m => m.delta > 5).sort((a, b) => b.delta - a.delta)[0];
+                      const tooLow = dev.filter(m => m.delta < -5).sort((a, b) => a.delta - b.delta)[0];
+                      if (tooHigh && tooLow) return `troppi ${tooHigh.name}, pochi ${tooLow.name}`;
+                      if (tooHigh) return `troppi ${tooHigh.name}`;
+                      if (tooLow) return `pochi ${tooLow.name}`;
+                      return '';
+                    })()}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Acqua + Sonno + Allenamento (riga compatta a 3 colonne) */}
