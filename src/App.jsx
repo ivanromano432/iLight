@@ -2233,13 +2233,16 @@ function PastiPage({ user, theme, loaded, meals, updMeals, notes, weights, goal 
     const dayDate = parseDayKey(selectedDay);
     const candidates = meals.filter(m => {
       if (!sameDay(new Date(m.ts), dayDate)) return false;
-      if (m.kcal != null) return false; // ha già kcal → skip
+      const hasPhoto = !!(m.photo || m.photo_url);
       const hasDesc = (m.description||'').trim().length > 0;
-      const hasPhoto = m.photo || m.photo_url;
-      return hasDesc || hasPhoto;
+      // Candidate se ha foto e manca almeno uno tra: descrizione, quantità, kcal
+      if (hasPhoto && (!hasDesc || m.qty_g == null || m.kcal == null)) return true;
+      // Oppure: ha solo descrizione (senza foto) ma senza nutrienti — vecchio comportamento
+      if (!hasPhoto && hasDesc && m.kcal == null) return true;
+      return false;
     });
     if (candidates.length === 0) {
-      setBulkError('Nessun pasto da stimare. Tutti hanno già i nutrienti o non hanno né descrizione né foto.');
+      setBulkError('Nessun pasto da analizzare. Tutti hanno già nome, peso e nutrienti.');
       setTimeout(()=>setBulkError(''), 4000);
       return;
     }
@@ -2270,12 +2273,20 @@ function PastiPage({ user, theme, loaded, meals, updMeals, notes, weights, goal 
         } else if (meal.photo_url) {
           try { photoData = await urlToDataUrl(meal.photo_url); } catch (_) { photoData = null; }
         }
-        const r = await estimateMealNutrition({ description: meal.description, qty_g: meal.qty_g, photo: photoData });
+        const hasDesc = (meal.description||'').trim().length > 0;
+        // Se manca descrizione (caso "solo foto"), passo description vuota: l'AI identificherà il piatto
+        const r = await estimateMealNutrition({
+          description: hasDesc ? meal.description : '',
+          qty_g: meal.qty_g,
+          photo: photoData,
+        });
         if (!r.error) {
           const idx = updated.findIndex(m => m.id === meal.id);
           if (idx >= 0) {
             updated[idx] = {
               ...updated[idx],
+              description: (!hasDesc && r.name) ? r.name : updated[idx].description,
+              qty_g: (updated[idx].qty_g == null && r.qty_g != null) ? r.qty_g : updated[idx].qty_g,
               kcal: r.kcal != null ? r.kcal : updated[idx].kcal,
               p: r.p != null ? r.p : updated[idx].p,
               c: r.c != null ? r.c : updated[idx].c,
@@ -2444,24 +2455,30 @@ function PastiPage({ user, theme, loaded, meals, updMeals, notes, weights, goal 
                   <button onClick={()=>photoIaRef.current?.click()} disabled={preparingPhoto} style={{background:J.sage,color:J.bg,border:`1px solid ${J.sage}`,fontFamily:fMarcellus,fontSize:11,letterSpacing:'0.4em',padding:'14px 30px',cursor:preparingPhoto?'default':'pointer',opacity:preparingPhoto?0.6:1,textTransform:'uppercase'}}>{preparingPhoto?'⋯ apro foto':'✦ IA · pasto da foto'}</button>
                   <button onClick={()=>setEditing('new')} style={{background:'transparent',color:J.dark,border:`1px solid ${J.dark}66`,fontFamily:fMarcellus,fontSize:10,letterSpacing:'0.35em',padding:'10px 22px',cursor:'pointer',textTransform:'uppercase'}}>+ nuovo pasto a mano</button>
                 </div>
-                {/* Bulk stima nutrienti per i pasti del giorno senza kcal */}
+                {/* Bulk: analizza con IA i pasti del giorno che hanno foto ma campi incompleti (nome / peso / nutrienti) */}
                 {(() => {
-                  const missing = eatenMeals.filter(m => m.kcal == null && ((m.description||'').trim() || m.photo || m.photo_url));
+                  const missing = eatenMeals.filter(m => {
+                    const hasPhoto = !!(m.photo || m.photo_url);
+                    const hasDesc = (m.description||'').trim().length > 0;
+                    if (hasPhoto && (!hasDesc || m.qty_g == null || m.kcal == null)) return true;
+                    if (!hasPhoto && hasDesc && m.kcal == null) return true;
+                    return false;
+                  });
                   if (missing.length === 0 && !bulkEstimating && !bulkError) return null;
                   return (
                     <div style={{marginTop:22,paddingTop:14,borderTop:`1px dashed ${J.sage}33`}}>
                       <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:13,color:J.sage,marginBottom:10,lineHeight:1.4}}>
                         {bulkEstimating
-                          ? `Stimando nutrienti... ${bulkProgress.done}/${bulkProgress.total}`
-                          : `${missing.length} ${missing.length===1?'pasto':'pasti'} di ${isToday?'oggi':'questo giorno'} ${missing.length===1?'è':'sono'} senza nutrienti.`}
+                          ? `Analizzando... ${bulkProgress.done}/${bulkProgress.total}`
+                          : `${missing.length} ${missing.length===1?'pasto':'pasti'} di ${isToday?'oggi':'questo giorno'} ${missing.length===1?'ha':'hanno'} la foto ma ${missing.length===1?'manca':'mancano'} nome, peso o nutrienti.`}
                       </div>
                       <button
                         onClick={bulkEstimateNutrients}
                         disabled={bulkEstimating || missing.length === 0}
                         style={{
-                          background:'transparent',
-                          color:J.dark,
-                          border:`1px solid ${J.dark}`,
+                          background:bulkEstimating||missing.length===0?'transparent':J.sage,
+                          color:bulkEstimating||missing.length===0?J.dark:J.bg,
+                          border:`1px solid ${J.sage}`,
                           fontFamily:fMarcellus,
                           fontSize:11,
                           letterSpacing:'0.3em',
@@ -2470,7 +2487,7 @@ function PastiPage({ user, theme, loaded, meals, updMeals, notes, weights, goal 
                           opacity:bulkEstimating||missing.length===0?0.5:1,
                           textTransform:'uppercase',
                         }}>
-                        {bulkEstimating ? `⋯ ${bulkProgress.done}/${bulkProgress.total}` : '✦ STIMA NUTRIENTI MANCANTI'}
+                        {bulkEstimating ? `⋯ ${bulkProgress.done}/${bulkProgress.total}` : '✦ analizza foto con ia'}
                       </button>
                       {bulkError && <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:13,color:'#A04848',marginTop:10}}>{bulkError}</div>}
                     </div>
