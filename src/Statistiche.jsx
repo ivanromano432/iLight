@@ -693,6 +693,8 @@ export default function StatistichePage({
 
   // Mese attualmente visualizzato nel calendario (default: oggi)
   const [calMonth, setCalMonth] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); });
+  // Giorno selezionato nel calendario (1..31) o null
+  const [selectedDay, setSelectedDay] = useState(null);
   const goalsActive = useMemo(() => userGoals.filter(g => g.active !== false), [userGoals]);
   const goalsAlreadyUsed = useMemo(() => new Set(goalsActive.map(g => g.goal_type)), [goalsActive]);
   const dataForGoals = { sleeps, water, meals, workouts, fasts, mindful, weights };
@@ -801,18 +803,24 @@ export default function StatistichePage({
 
                 const cellSize = 36;
                 const navBtnStyle = (enabled) => ({
-                  background: 'transparent',
-                  border: 'none',
+                  background: enabled ? `${Q.gold}1A` : 'transparent',
+                  border: `1px solid ${Q.gold}${enabled ? '88' : '33'}`,
                   color: Q.gold || Q.cream,
                   fontFamily: fGaramond,
-                  fontSize: 22,
+                  fontSize: 20,
                   lineHeight: 1,
-                  padding: '4px 12px',
+                  width: 36,
+                  height: 36,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 0,
+                  borderRadius: 4,
                   cursor: enabled ? 'pointer' : 'default',
-                  opacity: enabled ? 1 : 0.2,
+                  opacity: enabled ? 1 : 0.3,
                 });
-                const goPrev = () => { if (canPrev) setCalMonth(new Date(year, month - 1, 1)); };
-                const goNext = () => { if (canNext) setCalMonth(new Date(year, month + 1, 1)); };
+                const goPrev = () => { if (canPrev) { setCalMonth(new Date(year, month - 1, 1)); setSelectedDay(null); } };
+                const goNext = () => { if (canNext) { setCalMonth(new Date(year, month + 1, 1)); setSelectedDay(null); } };
 
                 return (
                   <div>
@@ -839,6 +847,7 @@ export default function StatistichePage({
                       {cells.map((d, i) => {
                         if (d == null) return <div key={`pad-${i}`} style={{ height: cellSize }} />;
                         const info = dayDataMap[d];
+                        const isSelected = selectedDay === d;
                         // Intensità dello score: 0..6 attività -> opacity tra 0.12 e 1.0
                         const intensity = info.isFuture ? 0 : Math.min(1, info.score / 4);
                         const bg = info.isFuture
@@ -847,21 +856,27 @@ export default function StatistichePage({
                             ? `${Q.cream || '#E8D8B8'}11`
                             : `${Q.gold || '#C9A876'}${Math.round(intensity * 255).toString(16).padStart(2, '0').toUpperCase()}`;
                         return (
-                          <div key={d} style={{
-                            height: cellSize,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            background: bg,
-                            border: info.isToday ? `2px solid ${Q.gold || '#C9A876'}` : `1px solid ${Q.cream || '#E8D8B8'}15`,
-                            borderRadius: 2,
-                            fontFamily: fGaramond,
-                            fontStyle: info.isFuture ? 'italic' : 'normal',
-                            fontSize: 12,
-                            color: info.score >= 2 ? Q.ink || '#1F140C' : (info.isFuture ? Q.cream + '55' : Q.cream),
-                            opacity: info.isFuture ? 0.3 : 1,
-                            fontWeight: info.isToday ? 700 : 400,
-                          }}>
+                          <div key={d}
+                            onClick={info.isFuture ? undefined : () => setSelectedDay(isSelected ? null : d)}
+                            style={{
+                              height: cellSize,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              background: bg,
+                              border: isSelected
+                                ? `2px solid ${Q.ink || '#1F140C'}`
+                                : info.isToday ? `2px solid ${Q.gold || '#C9A876'}` : `1px solid ${Q.cream || '#E8D8B8'}15`,
+                              borderRadius: 2,
+                              fontFamily: fGaramond,
+                              fontStyle: info.isFuture ? 'italic' : 'normal',
+                              fontSize: 12,
+                              color: info.score >= 2 ? Q.ink || '#1F140C' : (info.isFuture ? Q.cream + '55' : Q.cream),
+                              opacity: info.isFuture ? 0.3 : 1,
+                              fontWeight: info.isToday || isSelected ? 700 : 400,
+                              cursor: info.isFuture ? 'default' : 'pointer',
+                              userSelect: 'none',
+                            }}>
                             {d}
                           </div>
                         );
@@ -878,6 +893,106 @@ export default function StatistichePage({
                         <span style={{ fontSize: 10, letterSpacing: '0.15em', textTransform: 'uppercase', fontFamily: fCinzel, fontStyle: 'normal', opacity: 0.8 }}>poco → molto</span>
                       </span>
                     </div>
+
+                    {/* Hint quando non c'è selezione */}
+                    {!selectedDay && (
+                      <div style={{ marginTop: 12, textAlign: 'center', fontFamily: fGaramond, fontStyle: 'italic', fontSize: 12, color: Q.cream, opacity: 0.55 }}>
+                        tocca un giorno per vedere i dettagli
+                      </div>
+                    )}
+
+                    {/* Dettaglio giorno selezionato */}
+                    {selectedDay && (() => {
+                      const day = new Date(year, month, selectedDay);
+                      const dayKeyAppFmt = `${year}-${month}-${selectedDay}`;
+                      const sameDayL = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+                      const ws = (weights || []).filter(w => sameDayL(new Date(w.ts), day)).sort((a, b) => new Date(a.ts) - new Date(b.ts));
+                      const ms = (meals || []).filter(m => sameDayL(new Date(m.ts), day) && m.status !== 'planned');
+                      const sl = (sleeps || []).find(s => s.wakeDate === dayKeyAppFmt);
+                      const wk = (workouts || []).filter(w => sameDayL(new Date(w.ts), day));
+                      const wg = water?.[dayKeyAppFmt] || 0; // grams
+                      const mn = (mindful || []).filter(m => sameDayL(new Date(m.ts), day));
+                      const fs = (fasts || []).filter(f => f.ended_ts && sameDayL(new Date(f.started_ts), day));
+                      const dn = (diaryNotes || []).filter(n => sameDayL(new Date(n.ts), day));
+                      const isEmpty = ws.length === 0 && ms.length === 0 && !sl && wk.length === 0 && wg === 0 && mn.length === 0 && fs.length === 0 && dn.length === 0;
+                      const rowStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '6px 0', borderBottom: `1px solid ${Q.gold}1A`, fontFamily: fGaramond, fontSize: 14, color: Q.cream };
+                      const labelStyle = { fontFamily: fCinzel, fontSize: 9, letterSpacing: '0.3em', color: Q.goldDim, textTransform: 'uppercase' };
+                      return (
+                        <div style={{ marginTop: 18, padding: '14px 14px', background: `${Q.gold}10`, border: `1px solid ${Q.gold}33` }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                            <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 16, color: Q.gold, textTransform: 'capitalize' }}>
+                              {day.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                            </div>
+                            <button onClick={() => setSelectedDay(null)} aria-label="chiudi"
+                              style={{ background: 'transparent', border: 'none', color: Q.goldDim, fontSize: 22, lineHeight: 1, padding: '0 4px', cursor: 'pointer' }}>×</button>
+                          </div>
+                          {isEmpty ? (
+                            <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 13, color: Q.goldDim, textAlign: 'center', padding: '8px 0' }}>
+                              nessun dato registrato in questo giorno
+                            </div>
+                          ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                              {ws.map((w, idx) => (
+                                <div key={`w${idx}`} style={rowStyle}>
+                                  <span style={labelStyle}>peso{ws.length > 1 ? ` (${idx + 1})` : ''}</span>
+                                  <span style={{ fontStyle: 'italic' }}>
+                                    {fmt(w.weight)} kg
+                                    {w.bodyFat != null && <span style={{ color: Q.goldDim, fontSize: 12, marginLeft: 8 }}>· {fmt(w.bodyFat)}% grasso</span>}
+                                    {w.muscle != null && <span style={{ color: Q.goldDim, fontSize: 12, marginLeft: 8 }}>· {fmt(w.muscle)} muscolo</span>}
+                                  </span>
+                                </div>
+                              ))}
+                              {ms.length > 0 && (
+                                <div style={rowStyle}>
+                                  <span style={labelStyle}>pasti</span>
+                                  <span style={{ fontStyle: 'italic' }}>{ms.length}{ms.some(m => m.photo || m.photo_url) ? ` · ${ms.filter(m => m.photo || m.photo_url).length} con foto` : ''}</span>
+                                </div>
+                              )}
+                              {sl && (
+                                <div style={rowStyle}>
+                                  <span style={labelStyle}>sonno</span>
+                                  <span style={{ fontStyle: 'italic' }}>{sl.hours != null ? `${fmt(sl.hours)} ore` : '—'}{sl.quality ? ` · qualità ${sl.quality}/5` : ''}</span>
+                                </div>
+                              )}
+                              {wg > 0 && (
+                                <div style={rowStyle}>
+                                  <span style={labelStyle}>acqua</span>
+                                  <span style={{ fontStyle: 'italic' }}>{(wg / 250).toFixed(1).replace('.', ',')} bicchieri ({wg} ml)</span>
+                                </div>
+                              )}
+                              {wk.length > 0 && (
+                                <div style={rowStyle}>
+                                  <span style={labelStyle}>allenamenti</span>
+                                  <span style={{ fontStyle: 'italic' }}>{wk.length}</span>
+                                </div>
+                              )}
+                              {fs.length > 0 && (
+                                <div style={rowStyle}>
+                                  <span style={labelStyle}>digiuni</span>
+                                  <span style={{ fontStyle: 'italic' }}>{fs.length} completati</span>
+                                </div>
+                              )}
+                              {mn.length > 0 && (
+                                <div style={rowStyle}>
+                                  <span style={labelStyle}>mindful</span>
+                                  <span style={{ fontStyle: 'italic' }}>{mn.length} sessioni</span>
+                                </div>
+                              )}
+                              {dn.length > 0 && (
+                                <div style={{ ...rowStyle, borderBottom: 'none', flexDirection: 'column', alignItems: 'stretch', gap: 6 }}>
+                                  <span style={labelStyle}>note diario</span>
+                                  {dn.map((n, idx) => (
+                                    <div key={`n${idx}`} style={{ fontStyle: 'italic', fontSize: 13, color: Q.cream, lineHeight: 1.4, opacity: 0.9 }}>
+                                      {n.text || n.body || '—'}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 );
               })()}
