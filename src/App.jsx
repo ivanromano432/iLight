@@ -3225,59 +3225,119 @@ function SeraPage({ theme, loaded, weights, goal, notes, water, waterGoal, meals
             <Row theme={N} dot={suppDot} label="integratori" value={supps.length>0?`${suppsTakenToday} / ${supps.length}`:'—'} details={suppDetails} />
           </div>
 
-          {/* === SEZIONE NOTE: solo note manuali (cronologia automatica rimossa) === */}
-          <div style={{marginTop:30}}>
-            <div style={{display:'flex',alignItems:'center',gap:14,marginBottom:14}}>
-              <div style={{flex:1,height:1,background:`linear-gradient(90deg, transparent, ${N.gold}55)`}} />
-              <span style={{fontFamily:fFraunces,fontSize:10,letterSpacing:'0.45em',color:N.gold,textTransform:'uppercase'}}>note</span>
-              <div style={{flex:1,height:1,background:`linear-gradient(90deg, ${N.gold}55, transparent)`}} />
-            </div>
+          {/* === SEZIONE DIARIO: timeline cronologica auto-popolata dai dati del giorno + note manuali === */}
+          {(() => {
+            // Costruisco la timeline degli eventi di oggi da tutte le aree dell'app
+            const events = [];
+            // Pesate
+            todayWeights.forEach(w => {
+              events.push({ ts: new Date(w.ts), kind: 'weight', icon: '⚖', label: 'pesata', text: `${fmt(w.weight)} kg` });
+            });
+            // Pasti registrati
+            todayMeals.forEach(m => {
+              const typeName = MEAL_TYPES.find(t => t.id === m.type)?.name || m.type;
+              const parts = [];
+              if (m.description) parts.push(m.description);
+              const meta = [];
+              if (m.qty_g) meta.push(`${fmt0(m.qty_g)}g`);
+              if (m.kcal) meta.push(`${fmt0(m.kcal)} kcal`);
+              events.push({ ts: new Date(m.ts), kind: 'meal', icon: '✿', label: typeName.toLowerCase(), text: parts.join(' · ') || '(senza descrizione)', meta: meta.join(' · ') });
+            });
+            // Allenamenti
+            todayWorkouts.forEach(w => {
+              const t = (workoutTypes||[]).find(x => x.id === w.typeId);
+              const name = t ? t.name : 'Allenamento';
+              const unit = t ? t.unit : '';
+              events.push({ ts: new Date(w.ts), kind: 'workout', icon: '✦', label: 'movimento', text: `${name}${w.qty?` · ${fmt0(w.qty)}${unit}`:''}` });
+            });
+            // Sessioni mindful/respiro
+            todayMindful.forEach(s => {
+              const noteTxt = s.note ? ` · ${s.note}` : '';
+              events.push({ ts: new Date(s.ts), kind: 'mindful', icon: '∞', label: 'respiro', text: `${fmt0(s.duration_min||0)} min${noteTxt}` });
+            });
+            // Note manuali (gestione modifica/elimina speciale)
+            todayNotesSorted.forEach(n => {
+              events.push({ ts: new Date(n.ts), kind: 'note', icon: '⟡', label: 'nota', text: n.text, id: n.id });
+            });
+            // Ordino cronologicamente
+            events.sort((a, b) => a.ts - b.ts);
 
-            {todayNotesSorted.length === 0 ? (
-              <div style={{textAlign:'center',fontFamily:fFraunces,fontStyle:'italic',fontSize:13,color:N.dim||N.goldDim,padding:'4px 0 14px',opacity:0.8}}>
-                Nessuna nota oggi. Scrivi un pensiero qui sotto.
-              </div>
-            ) : (
-              <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:14}}>
-                {todayNotesSorted.map(n => {
-                  const time = new Date(n.ts).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
-                  const isEditing = editingNote === n.id;
-                  if (isEditing) {
-                    return (
-                      <div key={`note-${n.id}`} style={{padding:'10px 12px',background:`${N.gold}0A`,border:`1px solid ${N.gold}44`}}>
-                        <textarea value={editNoteText} onChange={e=>setEditNoteText(e.target.value)} rows={3} style={{width:'100%',background:'transparent',border:'none',color:N.cream||N.body,fontFamily:fFraunces,fontStyle:'italic',fontSize:14,resize:'vertical',outline:'none'}} />
-                        <div style={{display:'flex',gap:8,justifyContent:'flex-end',marginTop:8}}>
-                          <button onClick={()=>{setEditingNote(null);setEditNoteText('');}} style={{background:'transparent',color:N.dim||N.goldDim,border:`1px solid ${N.dim||N.goldDim}66`,fontFamily:fFraunces,fontSize:10,letterSpacing:'0.2em',padding:'6px 12px',cursor:'pointer',textTransform:'uppercase'}}>annulla</button>
-                          <button onClick={()=>deleteNote(n.id)} style={{background:'transparent',color:'#C99A7A',border:`1px solid #C99A7A66`,fontFamily:fFraunces,fontSize:10,letterSpacing:'0.2em',padding:'6px 12px',cursor:'pointer',textTransform:'uppercase'}}>elimina</button>
-                          <button onClick={saveEditNote} style={{background:N.gold,color:N.bg2||'#14171F',border:'none',fontFamily:fFraunces,fontSize:10,letterSpacing:'0.2em',padding:'6px 12px',cursor:'pointer',textTransform:'uppercase'}}>salva</button>
+            return (
+              <div style={{marginTop:30}}>
+                <div style={{display:'flex',alignItems:'center',gap:14,marginBottom:14}}>
+                  <div style={{flex:1,height:1,background:`linear-gradient(90deg, transparent, ${N.gold}55)`}} />
+                  <span style={{fontFamily:fFraunces,fontSize:10,letterSpacing:'0.45em',color:N.gold,textTransform:'uppercase'}}>diario</span>
+                  <div style={{flex:1,height:1,background:`linear-gradient(90deg, ${N.gold}55, transparent)`}} />
+                </div>
+                <div style={{textAlign:'center',fontFamily:fFraunces,fontStyle:'italic',fontSize:12,color:N.dim||N.goldDim,marginBottom:14,opacity:0.85}}>
+                  cronologia automatica della giornata
+                </div>
+
+                {events.length === 0 ? (
+                  <div style={{textAlign:'center',fontFamily:fFraunces,fontStyle:'italic',fontSize:13,color:N.dim||N.goldDim,padding:'14px 0 18px'}}>
+                    Niente registrato oggi. Aggiungi pesate, pasti, allenamenti o una nota qui sotto.
+                  </div>
+                ) : (
+                  <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:14}}>
+                    {events.map((ev, i) => {
+                      const time = ev.ts.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+                      // Le note manuali sono cliccabili per modifica/elimina
+                      if (ev.kind === 'note') {
+                        const isEditing = editingNote === ev.id;
+                        if (isEditing) {
+                          return (
+                            <div key={`note-${ev.id}`} style={{padding:'10px 12px',background:`${N.gold}0A`,border:`1px solid ${N.gold}44`}}>
+                              <textarea value={editNoteText} onChange={e=>setEditNoteText(e.target.value)} rows={3} style={{width:'100%',background:'transparent',border:'none',color:N.cream||N.body,fontFamily:fFraunces,fontStyle:'italic',fontSize:14,resize:'vertical',outline:'none'}} />
+                              <div style={{display:'flex',gap:8,justifyContent:'flex-end',marginTop:8}}>
+                                <button onClick={()=>{setEditingNote(null);setEditNoteText('');}} style={{background:'transparent',color:N.dim||N.goldDim,border:`1px solid ${N.dim||N.goldDim}66`,fontFamily:fFraunces,fontSize:10,letterSpacing:'0.2em',padding:'6px 12px',cursor:'pointer',textTransform:'uppercase'}}>annulla</button>
+                                <button onClick={()=>deleteNote(ev.id)} style={{background:'transparent',color:'#C99A7A',border:`1px solid #C99A7A66`,fontFamily:fFraunces,fontSize:10,letterSpacing:'0.2em',padding:'6px 12px',cursor:'pointer',textTransform:'uppercase'}}>elimina</button>
+                                <button onClick={saveEditNote} style={{background:N.gold,color:N.bg2||'#14171F',border:'none',fontFamily:fFraunces,fontSize:10,letterSpacing:'0.2em',padding:'6px 12px',cursor:'pointer',textTransform:'uppercase'}}>salva</button>
+                              </div>
+                            </div>
+                          );
+                        }
+                        return (
+                          <div key={`note-${ev.id}`} onClick={()=>{setEditingNote(ev.id);setEditNoteText(ev.text);}} style={{display:'flex',gap:12,padding:'10px 12px',background:`${N.gold}08`,border:`1px solid ${N.gold}33`,cursor:'pointer'}}>
+                            <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:3,minWidth:46,flexShrink:0}}>
+                              <span style={{fontSize:14,color:N.gold,lineHeight:1}}>{ev.icon}</span>
+                              <span style={{fontFamily:fFraunces,fontSize:9,letterSpacing:'0.2em',color:N.dim||N.goldDim}}>{time}</span>
+                            </div>
+                            <div style={{flex:1,minWidth:0}}>
+                              <div style={{fontFamily:fFraunces,fontSize:9,letterSpacing:'0.3em',color:N.gold,textTransform:'uppercase',marginBottom:3,opacity:0.8}}>{ev.label} · tocca per modificare</div>
+                              <div style={{fontFamily:fFraunces,fontStyle:'italic',fontSize:14,color:N.cream||N.body,lineHeight:1.5,whiteSpace:'pre-wrap'}}>{ev.text}</div>
+                            </div>
+                          </div>
+                        );
+                      }
+                      // Eventi automatici (read-only): pesate, pasti, allenamenti, mindful
+                      return (
+                        <div key={`${ev.kind}-${i}`} style={{display:'flex',gap:12,padding:'8px 12px',borderBottom:`1px solid ${N.gold}1A`}}>
+                          <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:3,minWidth:46,flexShrink:0}}>
+                            <span style={{fontSize:14,color:N.gold,opacity:0.75,lineHeight:1}}>{ev.icon}</span>
+                            <span style={{fontFamily:fFraunces,fontSize:9,letterSpacing:'0.2em',color:N.dim||N.goldDim}}>{time}</span>
+                          </div>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{fontFamily:fFraunces,fontSize:9,letterSpacing:'0.3em',color:N.dim||N.goldDim,textTransform:'uppercase',marginBottom:2,opacity:0.85}}>{ev.label}</div>
+                            <div style={{fontFamily:fFraunces,fontStyle:'italic',fontSize:14,color:N.cream||N.body,lineHeight:1.4,whiteSpace:'pre-wrap'}}>{ev.text}</div>
+                            {ev.meta && <div style={{fontFamily:fFraunces,fontSize:11,color:N.dim||N.goldDim,marginTop:2,opacity:0.75}}>{ev.meta}</div>}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  }
-                  return (
-                    <div key={`note-${n.id}`} onClick={()=>{setEditingNote(n.id);setEditNoteText(n.text);}} style={{display:'flex',gap:12,padding:'10px 12px',background:`${N.gold}08`,border:`1px solid ${N.gold}33`,cursor:'pointer'}}>
-                      <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:3,minWidth:46,flexShrink:0}}>
-                        <span style={{fontSize:14,color:N.gold,lineHeight:1}}>⟡</span>
-                        <span style={{fontFamily:fFraunces,fontSize:9,letterSpacing:'0.2em',color:N.dim||N.goldDim}}>{time}</span>
-                      </div>
-                      <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontFamily:fFraunces,fontStyle:'italic',fontSize:14,color:N.cream||N.body,lineHeight:1.5,whiteSpace:'pre-wrap'}}>{n.text}</div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+                      );
+                    })}
+                  </div>
+                )}
 
-            {/* Input nuova nota */}
-            <div style={{marginTop:14}}>
-              <textarea value={noteInput} onChange={e=>setNoteInput(e.target.value)} rows={2} placeholder="Un pensiero, un dettaglio, qualcosa da ricordare…" style={{width:'100%',background:`${N.gold}06`,border:`1px solid ${N.gold}33`,color:N.cream||N.body,fontFamily:fFraunces,fontStyle:'italic',fontSize:14,padding:'10px 12px',outline:'none',resize:'vertical',boxSizing:'border-box'}} />
-              <div style={{textAlign:'right',marginTop:8}}>
-                <button onClick={addNote} disabled={!noteInput.trim()} style={{background:noteInput.trim()?N.gold:'transparent',color:noteInput.trim()?(N.bg2||'#14171F'):N.dim,border:`1px solid ${noteInput.trim()?N.gold:N.dim+'66'}`,fontFamily:fFraunces,fontSize:10,letterSpacing:'0.3em',padding:'8px 18px',cursor:noteInput.trim()?'pointer':'not-allowed',textTransform:'uppercase'}}>aggiungi nota</button>
+                {/* Input nuova nota */}
+                <div style={{marginTop:14}}>
+                  <textarea value={noteInput} onChange={e=>setNoteInput(e.target.value)} rows={2} placeholder="Aggiungi una nota a mano (un pensiero, un dettaglio)…" style={{width:'100%',background:`${N.gold}06`,border:`1px solid ${N.gold}33`,color:N.cream||N.body,fontFamily:fFraunces,fontStyle:'italic',fontSize:14,padding:'10px 12px',outline:'none',resize:'vertical',boxSizing:'border-box'}} />
+                  <div style={{textAlign:'right',marginTop:8}}>
+                    <button onClick={addNote} disabled={!noteInput.trim()} style={{background:noteInput.trim()?N.gold:'transparent',color:noteInput.trim()?(N.bg2||'#14171F'):N.dim,border:`1px solid ${noteInput.trim()?N.gold:N.dim+'66'}`,fontFamily:fFraunces,fontSize:10,letterSpacing:'0.3em',padding:'8px 18px',cursor:noteInput.trim()?'pointer':'not-allowed',textTransform:'uppercase'}}>aggiungi nota</button>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-          {/* === FINE SEZIONE NOTE === */}
+            );
+          })()}
+          {/* === FINE SEZIONE DIARIO === */}
           <div style={{marginTop:22,padding:14,background:`${N.gold}0F`,border:`1px solid ${N.gold}33`,borderRadius:2,textAlign:'left'}}>
             <div style={{fontFamily:fFraunces,fontSize:9,letterSpacing:'0.4em',color:N.gold,textTransform:'uppercase'}}>⟡ riflessione</div>
             <div style={{fontFamily:fFraunces,fontStyle:'italic',fontSize:14,color:N.body,marginTop:6,lineHeight:1.5}}>
