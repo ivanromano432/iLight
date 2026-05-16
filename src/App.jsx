@@ -2164,10 +2164,31 @@ function PastiPage({ user, theme, loaded, meals, updMeals, notes, weights, goal 
   const J = theme || { bg: '#E5E3D5', dark: '#2D3A2E', sage: '#5C6B4E', light: '#8FA288' };
   const [selectedDay, setSelectedDay] = useState(dayKey(new Date()));
   const [editing, setEditing] = useState(null);
+  // Foto pre-caricata da bottone top-level "IA da foto": viene passata al MealModal che la analizza in automatico
+  const [photoIaSeed, setPhotoIaSeed] = useState(null);
+  const [preparingPhoto, setPreparingPhoto] = useState(false);
+  const photoIaRef = useRef(null);
   // Bulk stima nutrienti
   const [bulkEstimating, setBulkEstimating] = useState(false);
   const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0 });
   const [bulkError, setBulkError] = useState('');
+
+  async function onPhotoIaPick(e){
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setPreparingPhoto(true);
+    try {
+      const b64 = await resizeImage(file, 480, 0.7);
+      setPhotoIaSeed(b64);
+      setEditing('new'); // apre MealModal in modalità "nuovo"
+    } catch (_) {
+      // se la lettura fallisce, apriamo comunque il modal vuoto
+      setEditing('new');
+    } finally {
+      setPreparingPhoto(false);
+    }
+  }
   const [suggestions, setSuggestions] = useState(null);
   const [suggestLoading, setSuggestLoading] = useState(false);
   const [suggestError, setSuggestError] = useState('');
@@ -2417,8 +2438,12 @@ function PastiPage({ user, theme, loaded, meals, updMeals, notes, weights, goal 
               })}
 
               <div style={{marginTop:28,paddingTop:18,borderTop:`1px solid ${J.sage}33`,textAlign:'center'}}>
-                <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:13,color:J.sage,marginBottom:14,lineHeight:1.5,maxWidth:340,margin:'0 auto 14px'}}>Aggiungi un pasto. Dopo aver caricato una foto, l'IA può identificare il piatto, stimare quantità e macronutrienti.</div>
-                <button onClick={()=>setEditing('new')} style={{background:J.dark,color:J.bg,border:`1px solid ${J.dark}`,fontFamily:fMarcellus,fontSize:11,letterSpacing:'0.4em',padding:'12px 28px',cursor:'pointer'}}>+ NUOVO PASTO</button>
+                <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:13,color:J.sage,marginBottom:14,lineHeight:1.5,maxWidth:340,margin:'0 auto 14px'}}>Scatta o carica una foto del piatto: l'IA identifica cosa è, stima la porzione e calcola i macronutrienti.</div>
+                <input ref={photoIaRef} type="file" accept="image/*" onChange={onPhotoIaPick} style={{display:'none'}} />
+                <div style={{display:'flex',flexDirection:'column',gap:10,alignItems:'center'}}>
+                  <button onClick={()=>photoIaRef.current?.click()} disabled={preparingPhoto} style={{background:J.sage,color:J.bg,border:`1px solid ${J.sage}`,fontFamily:fMarcellus,fontSize:11,letterSpacing:'0.4em',padding:'14px 30px',cursor:preparingPhoto?'default':'pointer',opacity:preparingPhoto?0.6:1,textTransform:'uppercase'}}>{preparingPhoto?'⋯ apro foto':'✦ IA · pasto da foto'}</button>
+                  <button onClick={()=>setEditing('new')} style={{background:'transparent',color:J.dark,border:`1px solid ${J.dark}66`,fontFamily:fMarcellus,fontSize:10,letterSpacing:'0.35em',padding:'10px 22px',cursor:'pointer',textTransform:'uppercase'}}>+ nuovo pasto a mano</button>
+                </div>
                 {/* Bulk stima nutrienti per i pasti del giorno senza kcal */}
                 {(() => {
                   const missing = eatenMeals.filter(m => m.kcal == null && ((m.description||'').trim() || m.photo || m.photo_url));
@@ -2554,12 +2579,12 @@ function PastiPage({ user, theme, loaded, meals, updMeals, notes, weights, goal 
           )}
         </>)}
       </div>
-      {editing && <MealModal J={J} existing={editingMeal} onClose={()=>setEditing(null)} onSave={saveMeal} onDelete={editing!=='new'?delMeal:null} />}
+      {editing && <MealModal J={J} existing={editingMeal} seedPhoto={editing==='new'?photoIaSeed:null} onClose={()=>{setEditing(null); setPhotoIaSeed(null);}} onSave={saveMeal} onDelete={editing!=='new'?delMeal:null} />}
     </div>
   );
 }
 
-function MealModal({ existing, onClose, onSave, onDelete, J }){
+function MealModal({ existing, onClose, onSave, onDelete, J, seedPhoto }){
   const [type, setType] = useState(existing?.type || 'colazione');
   const [description, setDescription] = useState(existing?.description || '');
   const [qty, setQty] = useState(existing?.qty_g!=null ? String(existing.qty_g) : '');
@@ -2575,13 +2600,15 @@ function MealModal({ existing, onClose, onSave, onDelete, J }){
   const [dateChoice, setDateChoice] = useState(isExistingToday ? 'oggi' : (isExistingYesterday ? 'ieri' : null));
   // photo (base64) = nuova foto appena scelta; photoUrl = url Storage esistente
   // se l'utente carica nuova foto, photo viene riempito e photoUrl ignorato
-  const [photo, setPhoto] = useState(null);
+  // seedPhoto (base64) viene da bottone "IA da foto" in PastiPage: la pre-carichiamo qui
+  const [photo, setPhoto] = useState(seedPhoto || null);
   const [photoUrl, setPhotoUrl] = useState(existing?.photo_url || null);
   const [legacyPhoto, setLegacyPhoto] = useState(existing?.photo_url ? null : (existing?.photo || null));
   const [busy, setBusy] = useState(false);
   const [estimating, setEstimating] = useState(false);
   const [estimateError, setEstimateError] = useState('');
   const [estimateNote, setEstimateNote] = useState('');
+  const [autoTriggered, setAutoTriggered] = useState(false);
   const fileRef = useRef(null);
 
   // L'immagine da mostrare a schermo
@@ -2655,6 +2682,16 @@ function MealModal({ existing, onClose, onSave, onDelete, J }){
       setEstimating(false);
     }
   }
+
+  // Se il modal è stato aperto con una foto pre-caricata dal bottone "IA da foto" della PastiPage,
+  // avvia automaticamente l'analisi una sola volta.
+  useEffect(() => {
+    if (seedPhoto && !autoTriggered && !estimating && !description.trim() && !kcal) {
+      setAutoTriggered(true);
+      estimateNutrition();
+    }
+    // eslint-disable-next-line
+  }, [seedPhoto]);
 
   const canEstimate = !estimating && (description.trim().length > 0 || !!displayPhoto);
 
