@@ -478,13 +478,12 @@ function buildWeightLossSummary({ weights, goal, meals, workouts, workoutTypes, 
 const PAGES = [
   { id:'oggi', label:'oggi', roman:'✦' },
   { id:'peso', label:'peso', roman:'I' },
-  { id:'diario', label:'diario', roman:'II' },
-  { id:'pasti', label:'pasti', roman:'III' },
-  { id:'digiuno', label:'digiuno', roman:'IV' },
-  { id:'integra', label:'rituale', roman:'V' },
-  { id:'respiro', label:'corpo', roman:'VI' },
-  { id:'sonno', label:'sonno', roman:'VII' },
-  { id:'sera', label:'sera', roman:'VIII' },
+  { id:'pasti', label:'pasti', roman:'II' },
+  { id:'digiuno', label:'digiuno', roman:'III' },
+  { id:'integra', label:'rituale', roman:'IV' },
+  { id:'respiro', label:'corpo', roman:'V' },
+  { id:'sonno', label:'sonno', roman:'VI' },
+  { id:'sera', label:'sera', roman:'VII' },
 ];
 const DEF_TYPES = [
   { id:'corsa', name:'Corsa', unit:'km' },
@@ -944,13 +943,12 @@ export default function App({ user, onLogout }){
         {(() => { const __theme = getTheme(profile?.theme); return (<>
         {page==='oggi' && <OggiPage theme={__theme} loaded={loaded} profile={profile} weights={weights} goal={goal} meals={meals} notes={foodNotes} water={waterByDay} waterGoal={waterGoal} workouts={workouts} sleeps={sleeps} fasts={fasts} supps={supplements} taken={suppTaken} updWater={updWater} setPage={setPageIdx} />}
         {page==='peso' && <PesoPage theme={__theme} loaded={loaded} weights={weights} goal={goal} updWeights={updWeights} updGoal={updGoal} meals={meals} updMeals={updMeals} openStats={() => setShowStats(true)} profile={profile} openSub={() => setShowSub(true)} />}
-        {page==='diario' && <DiarioPage theme={__theme} loaded={loaded} notes={foodNotes} water={waterByDay} waterGoal={waterGoal} updNotes={updFoodNotes} updWater={updWater} updWaterGoal={updWaterGoal} meals={meals} updMeals={updMeals} supps={supplements} taken={suppTaken} updSupps={updSupps} updTaken={updTaken} sleeps={sleeps} updSleeps={updSleeps} />}
         {page==='pasti' && <PastiPage user={user} theme={__theme} loaded={loaded} meals={meals} updMeals={updMeals} notes={foodNotes} weights={weights} goal={goal} />}
         {page==='integra' && <IntegraPage theme={__theme} loaded={loaded} supps={supplements} taken={suppTaken} updSupps={updSupps} updTaken={updTaken} />}
         {page==='digiuno' && <DigiunoPage theme={__theme} loaded={loaded} fasts={fasts} updFasts={updFasts} />}
         {page==='respiro' && <RespiroPage theme={__theme} loaded={loaded} sessions={mindfulSessions} updSessions={updMindful} workouts={workouts} types={workoutTypes} updWorkouts={updWorkouts} updTypes={updWorkoutTypes} />}
         {page==='sonno' && <SonnoPage theme={__theme} loaded={loaded} sleeps={sleeps} updSleeps={updSleeps} />}
-        {page==='sera' && <SeraPage theme={__theme} loaded={loaded} weights={weights} goal={goal} notes={foodNotes} water={waterByDay} waterGoal={waterGoal} meals={meals} workouts={workouts} workoutTypes={workoutTypes} supps={supplements} taken={suppTaken} sleeps={sleeps} mindful={mindfulSessions} />}
+        {page==='sera' && <SeraPage theme={__theme} loaded={loaded} weights={weights} goal={goal} notes={foodNotes} water={waterByDay} waterGoal={waterGoal} meals={meals} workouts={workouts} workoutTypes={workoutTypes} supps={supplements} taken={suppTaken} sleeps={sleeps} mindful={mindfulSessions} updNotes={updFoodNotes} />}
         </>); })()}
       </div>
       <BottomNav theme={getTheme(profile?.theme)} currentIdx={pageIdx} onChange={setPageIdx} />
@@ -2438,7 +2436,7 @@ function PastiPage({ user, theme, loaded, meals, updMeals, notes, weights, goal 
       <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${J.gold}40`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
       <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${J.gold}1A`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
       <div style={{position:'relative',zIndex:2,padding:'32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
-        <Header q="PASTI" sub="III" color={J.gold} dim={J.goldDim} mark="✦" />
+        <Header q="PASTI" sub="II" color={J.gold} dim={J.goldDim} mark="✦" />
         {!loaded && <Loading color={J.sage} />}
         {loaded && (<>
           <DayStrip selectedKey={selectedDay} onSelect={setSelectedDay} ink={J.dark} tan={J.sage} count={14} fontA={fMarcellus} fontB={fGaramond} />
@@ -3295,7 +3293,7 @@ function SonnoPage({ theme, loaded, sleeps, updSleeps }){
       <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${S.gold}40`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
       <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${S.gold}1A`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
       <div style={{position:'relative',zIndex:2,padding:'32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
-        <Header q="SONNO" sub="VII" color={S.gold} dim={S.goldDim} mark="✦" font={fFraunces} />
+        <Header q="SONNO" sub="VI" color={S.gold} dim={S.goldDim} mark="✦" font={fFraunces} />
 
         {!loaded && <Loading color={S.dim} />}
 
@@ -3401,12 +3399,36 @@ function SleepModal({ existing, todayK, onClose, onSave, onDelete }){
   );
 }
 
-function SeraPage({ theme, loaded, weights, goal, notes, water, waterGoal, meals, workouts, workoutTypes, supps, taken, sleeps, mindful }){
+function SeraPage({ theme, loaded, weights, goal, notes, water, waterGoal, meals, workouts, workoutTypes, supps, taken, sleeps, mindful, updNotes }){
   // Sera usa N internamente (palette Notte blu era originaria). Shadow.
   const N = theme || { bg1: '#2C3340', bg2: '#14171F', cream: '#F2E8D0', dim: '#8A8270', gold: '#C9A876', body: '#DDD3C2' };
   const [aiAnalyzing, setAiAnalyzing] = useState(false);
   const [aiResult, setAiResult] = useState(null);
   const [aiError, setAiError] = useState('');
+  // Diario (note) — sezione fusa qui dalla ex-pagina Diario
+  const [noteInput, setNoteInput] = useState('');
+  const [editingNote, setEditingNote] = useState(null);
+  const [editNoteText, setEditNoteText] = useState('');
+
+  const todayNotesSorted = (notes||[]).filter(n => sameDay(new Date(n.ts), new Date())).sort((a,b)=>new Date(a.ts)-new Date(b.ts));
+
+  async function addNote(){
+    const text = noteInput.trim();
+    if (!text || !updNotes) return;
+    await updNotes([...(notes||[]), { id: newId(), text, ts: new Date().toISOString() }]);
+    setNoteInput('');
+  }
+  async function saveEditNote(){
+    const text = editNoteText.trim();
+    if (!text || !updNotes || !editingNote) return;
+    await updNotes((notes||[]).map(n => n.id===editingNote ? { ...n, text } : n));
+    setEditingNote(null); setEditNoteText('');
+  }
+  async function deleteNote(id){
+    if (!updNotes) return;
+    await updNotes((notes||[]).filter(n => n.id !== id));
+    if (editingNote === id) { setEditingNote(null); setEditNoteText(''); }
+  }
 
   const todayWeights = weights.filter(e=>sameDay(new Date(e.ts),new Date())).sort((a,b)=>new Date(a.ts)-new Date(b.ts));
   const morning = todayWeights[0];
@@ -3467,7 +3489,7 @@ function SeraPage({ theme, loaded, weights, goal, notes, water, waterGoal, meals
       <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${N.gold}40`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
       <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${N.gold}1A`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
       <div style={{position:'relative',zIndex:2,padding:'32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
-        <Header q="SERA" sub="VIII" color={N.gold} dim={N.goldDim} mark="✦" font={fFraunces} />
+        <Header q="SERA" sub="VII" color={N.gold} dim={N.goldDim} mark="✦" font={fFraunces} />
 
         {!loaded && <Loading color={N.dim} />}
 
@@ -3482,6 +3504,59 @@ function SeraPage({ theme, loaded, weights, goal, notes, water, waterGoal, meals
             <Row theme={N} label="meditazione" value={totalMindfulMin>0?fmt0(totalMindfulMin):'—'} unit={totalMindfulMin>0?'min':''} details={todayMindful.length>1?`${todayMindful.length} sessioni`:null} />
             <Row theme={N} label="integratori" value={supps.length>0?`${suppsTakenToday} / ${supps.length}`:'—'} details={suppDetails} />
           </div>
+
+          {/* === SEZIONE DIARIO (fusa qui dalla ex-pagina Diario) === */}
+          <div style={{marginTop:30}}>
+            <div style={{display:'flex',alignItems:'center',gap:14,marginBottom:14}}>
+              <div style={{flex:1,height:1,background:`linear-gradient(90deg, transparent, ${N.gold}55)`}} />
+              <span style={{fontFamily:fFraunces,fontSize:10,letterSpacing:'0.45em',color:N.gold,textTransform:'uppercase'}}>diario</span>
+              <div style={{flex:1,height:1,background:`linear-gradient(90deg, ${N.gold}55, transparent)`}} />
+            </div>
+
+            {/* Lista note di oggi */}
+            {todayNotesSorted.length === 0 ? (
+              <div style={{textAlign:'center',fontFamily:fFraunces,fontStyle:'italic',fontSize:13,color:N.dim||N.goldDim,padding:'10px 0 16px'}}>
+                Nessuna nota oggi. Scrivi un pensiero, un dettaglio sulla giornata.
+              </div>
+            ) : (
+              <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:14}}>
+                {todayNotesSorted.map(n => {
+                  const isEditing = editingNote === n.id;
+                  const time = new Date(n.ts).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+                  if (isEditing) {
+                    return (
+                      <div key={n.id} style={{padding:'10px 12px',background:`${N.gold}0A`,border:`1px solid ${N.gold}44`}}>
+                        <textarea value={editNoteText} onChange={e=>setEditNoteText(e.target.value)} rows={3} style={{width:'100%',background:'transparent',border:'none',color:N.cream||N.body,fontFamily:fFraunces,fontStyle:'italic',fontSize:14,resize:'vertical',outline:'none'}} />
+                        <div style={{display:'flex',gap:8,justifyContent:'flex-end',marginTop:8}}>
+                          <button onClick={()=>{setEditingNote(null);setEditNoteText('');}} style={{background:'transparent',color:N.dim||N.goldDim,border:`1px solid ${N.dim||N.goldDim}66`,fontFamily:fFraunces,fontSize:10,letterSpacing:'0.2em',padding:'6px 12px',cursor:'pointer',textTransform:'uppercase'}}>annulla</button>
+                          <button onClick={()=>deleteNote(n.id)} style={{background:'transparent',color:'#C99A7A',border:`1px solid #C99A7A66`,fontFamily:fFraunces,fontSize:10,letterSpacing:'0.2em',padding:'6px 12px',cursor:'pointer',textTransform:'uppercase'}}>elimina</button>
+                          <button onClick={saveEditNote} style={{background:N.gold,color:N.bg2||'#14171F',border:'none',fontFamily:fFraunces,fontSize:10,letterSpacing:'0.2em',padding:'6px 12px',cursor:'pointer',textTransform:'uppercase'}}>salva</button>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div key={n.id} onClick={()=>{setEditingNote(n.id);setEditNoteText(n.text);}} style={{padding:'10px 12px',background:`${N.gold}06`,border:`1px solid ${N.gold}22`,cursor:'pointer'}}>
+                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:10,marginBottom:4}}>
+                        <span style={{fontFamily:fFraunces,fontSize:9,letterSpacing:'0.3em',color:N.dim||N.goldDim,textTransform:'uppercase'}}>{time}</span>
+                        <span style={{fontFamily:fFraunces,fontSize:10,color:N.dim||N.goldDim,opacity:0.7}}>tocca per modificare</span>
+                      </div>
+                      <div style={{fontFamily:fFraunces,fontStyle:'italic',fontSize:14,color:N.cream||N.body,lineHeight:1.5,whiteSpace:'pre-wrap'}}>{n.text}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Input nuova nota */}
+            <div style={{marginTop:10}}>
+              <textarea value={noteInput} onChange={e=>setNoteInput(e.target.value)} rows={2} placeholder="Una nota sulla giornata…" style={{width:'100%',background:`${N.gold}06`,border:`1px solid ${N.gold}33`,color:N.cream||N.body,fontFamily:fFraunces,fontStyle:'italic',fontSize:14,padding:'10px 12px',outline:'none',resize:'vertical',boxSizing:'border-box'}} />
+              <div style={{textAlign:'right',marginTop:8}}>
+                <button onClick={addNote} disabled={!noteInput.trim()} style={{background:noteInput.trim()?N.gold:'transparent',color:noteInput.trim()?(N.bg2||'#14171F'):N.dim,border:`1px solid ${noteInput.trim()?N.gold:N.dim+'66'}`,fontFamily:fFraunces,fontSize:10,letterSpacing:'0.3em',padding:'8px 18px',cursor:noteInput.trim()?'pointer':'not-allowed',textTransform:'uppercase'}}>aggiungi nota</button>
+              </div>
+            </div>
+          </div>
+          {/* === FINE SEZIONE DIARIO === */}
           <div style={{marginTop:22,padding:14,background:`${N.gold}0F`,border:`1px solid ${N.gold}33`,borderRadius:2,textAlign:'left'}}>
             <div style={{fontFamily:fFraunces,fontSize:9,letterSpacing:'0.4em',color:N.gold,textTransform:'uppercase'}}>⟡ riflessione</div>
             <div style={{fontFamily:fFraunces,fontStyle:'italic',fontSize:14,color:N.body,marginTop:6,lineHeight:1.5}}>
@@ -3672,7 +3747,7 @@ function DigiunoPage({ theme, loaded, fasts, updFasts }){
       <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${D.gold}40`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
       <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${D.gold}1A`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
       <div style={{position:'relative',zIndex:2,padding:'32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
-        <Header q="DIGIUNO" sub="VI" color={D.gold} dim={D.goldDim} mark="✦" font={fBodoni} />
+        <Header q="DIGIUNO" sub="III" color={D.gold} dim={D.goldDim} mark="✦" font={fBodoni} />
 
         {!loaded && <Loading color={D.dim} />}
 
@@ -3906,7 +3981,7 @@ function RespiroPage({ theme, loaded, sessions, updSessions, workouts, types, up
       <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${M.gold}40`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
       <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${M.gold}1A`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
       <div style={{position:'relative',zIndex:2,padding:'32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
-        <Header q="CORPO" sub="VI" color={M.gold} dim={M.goldDim} mark="✦" font={fCormorant} />
+        <Header q="CORPO" sub="V" color={M.gold} dim={M.goldDim} mark="✦" font={fCormorant} />
 
         {!loaded && <Loading color={M.dim} />}
 
