@@ -1280,6 +1280,7 @@ export default function StatistichePage({
       </div>
       {goalModal && (
         <GoalModal
+          Q={Q}
           existing={goalModal === 'new' ? null : goalModal}
           alreadyUsed={goalsAlreadyUsed}
           onClose={() => setGoalModal(null)}
