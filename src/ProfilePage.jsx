@@ -39,6 +39,9 @@ export default function ProfilePage({ user, profile, updProfile, onClose }) {
   const [name, setName] = useState(profile?.display_name || '');
   const [avatar, setAvatar] = useState(profile?.avatar_data || null);
   const [themeId, setThemeId] = useState(profile?.theme || DEFAULT_THEME);
+  const [sex, setSex] = useState(profile?.sex || null);
+  const [heightCm, setHeightCm] = useState(profile?.height_cm != null ? String(profile.height_cm) : '');
+  const [birthYear, setBirthYear] = useState(profile?.birth_year != null ? String(profile.birth_year) : '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [savedAt, setSavedAt] = useState(0);
@@ -51,13 +54,19 @@ export default function ProfilePage({ user, profile, updProfile, onClose }) {
     if (profile?.display_name !== undefined) setName(profile.display_name || '');
     if (profile?.avatar_data !== undefined) setAvatar(profile.avatar_data || null);
     if (profile?.theme !== undefined) setThemeId(profile.theme || DEFAULT_THEME);
-  }, [profile?.display_name, profile?.avatar_data, profile?.theme]);
+    if (profile?.sex !== undefined) setSex(profile.sex || null);
+    if (profile?.height_cm !== undefined) setHeightCm(profile.height_cm != null ? String(profile.height_cm) : '');
+    if (profile?.birth_year !== undefined) setBirthYear(profile.birth_year != null ? String(profile.birth_year) : '');
+  }, [profile?.display_name, profile?.avatar_data, profile?.theme, profile?.sex, profile?.height_cm, profile?.birth_year]);
 
   const email = user?.email || '';
   const fallbackInitial = ((name?.[0]) || email[0] || '?').toUpperCase();
   const dirty = (name || '') !== (profile?.display_name || '') ||
                 (avatar || null) !== (profile?.avatar_data || null) ||
-                (themeId || DEFAULT_THEME) !== (profile?.theme || DEFAULT_THEME);
+                (themeId || DEFAULT_THEME) !== (profile?.theme || DEFAULT_THEME) ||
+                (sex || null) !== (profile?.sex || null) ||
+                (parseInt(heightCm) || null) !== (profile?.height_cm || null) ||
+                (parseInt(birthYear) || null) !== (profile?.birth_year || null);
 
   const handleFile = async (e) => {
     const f = e.target.files?.[0];
@@ -102,6 +111,18 @@ export default function ProfilePage({ user, profile, updProfile, onClose }) {
       const newTheme = themeId || DEFAULT_THEME;
       const currentTheme = profile?.theme || DEFAULT_THEME;
       if (newTheme !== currentTheme) fields.theme = newTheme;
+
+      const newSex = sex || null;
+      const currentSex = profile?.sex || null;
+      if (newSex !== currentSex) fields.sex = newSex;
+
+      const newHeight = parseInt(heightCm) || null;
+      const currentHeight = profile?.height_cm || null;
+      if (newHeight !== currentHeight) fields.height_cm = newHeight;
+
+      const newBirthYear = parseInt(birthYear) || null;
+      const currentBirthYear = profile?.birth_year || null;
+      if (newBirthYear !== currentBirthYear) fields.birth_year = newBirthYear;
 
       if (Object.keys(fields).length > 0) {
         await updProfile(fields);
@@ -176,6 +197,68 @@ export default function ProfilePage({ user, profile, updProfile, onClose }) {
           <div style={{ fontFamily: fCinzel, fontSize: 9, letterSpacing: '0.3em', color: Q.goldDim, textTransform: 'uppercase', marginBottom: 4 }}>EMAIL ACCOUNT</div>
           <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 15, color: Q.cream, wordBreak: 'break-all' }}>{email}</div>
           <div style={{ marginTop: 6, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 11, color: Q.goldDim }}>l'email non si può cambiare per ora</div>
+        </div>
+
+        {/* === I MIEI DATI === Servono per calcolare in modo personalizzato calorie e macronutrienti */}
+        <div style={{ marginTop: 30 }}>
+          <div style={{ fontFamily: fCinzel, fontSize: 9, letterSpacing: '0.35em', color: Q.goldDim, textTransform: 'uppercase', marginBottom: 8, textAlign: 'center' }}>I MIEI DATI</div>
+          <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 12, color: Q.goldDim, textAlign: 'center', marginBottom: 18, lineHeight: 1.5 }}>
+            usati per calcolare il fabbisogno calorico personalizzato (formula Mifflin-St Jeor)
+          </div>
+
+          {/* Sesso */}
+          <div style={{ marginBottom: 18 }}>
+            <div style={{ fontFamily: fCinzel, fontSize: 9, letterSpacing: '0.3em', color: Q.goldDim, textTransform: 'uppercase', marginBottom: 8, textAlign: 'center' }}>SESSO BIOLOGICO</div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+              {[
+                { id: 'm', label: 'uomo' },
+                { id: 'f', label: 'donna' },
+                { id: 'other', label: 'altro' },
+              ].map(opt => {
+                const selected = sex === opt.id;
+                return (
+                  <button key={opt.id} onClick={() => setSex(opt.id)}
+                    style={{
+                      flex: 1,
+                      background: selected ? `${Q.gold}1A` : 'transparent',
+                      border: `1px solid ${selected ? Q.gold : Q.gold + '44'}`,
+                      color: selected ? Q.gold : Q.goldDim,
+                      fontFamily: fGaramond,
+                      fontStyle: 'italic',
+                      fontSize: 14,
+                      padding: '10px 8px',
+                      cursor: 'pointer',
+                      textAlign: 'center',
+                    }}>
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Altezza + Anno di nascita affiancati */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <div style={{ fontFamily: fCinzel, fontSize: 9, letterSpacing: '0.3em', color: Q.goldDim, textTransform: 'uppercase', marginBottom: 6, textAlign: 'center' }}>ALTEZZA · CM</div>
+              <input type="text" inputMode="numeric" value={heightCm}
+                onChange={e => setHeightCm(e.target.value.replace(/[^0-9]/g, '').slice(0, 3))}
+                placeholder="178"
+                style={{ width: '100%', boxSizing: 'border-box', background: 'transparent', border: `1px solid ${Q.gold}66`, color: Q.cream, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 18, padding: '10px 14px', textAlign: 'center', outline: 'none' }} />
+            </div>
+            <div>
+              <div style={{ fontFamily: fCinzel, fontSize: 9, letterSpacing: '0.3em', color: Q.goldDim, textTransform: 'uppercase', marginBottom: 6, textAlign: 'center' }}>ANNO DI NASCITA</div>
+              <input type="text" inputMode="numeric" value={birthYear}
+                onChange={e => setBirthYear(e.target.value.replace(/[^0-9]/g, '').slice(0, 4))}
+                placeholder="1985"
+                style={{ width: '100%', boxSizing: 'border-box', background: 'transparent', border: `1px solid ${Q.gold}66`, color: Q.cream, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 18, padding: '10px 14px', textAlign: 'center', outline: 'none' }} />
+            </div>
+          </div>
+          {birthYear && parseInt(birthYear) > 1900 && parseInt(birthYear) < new Date().getFullYear() && (
+            <div style={{ marginTop: 6, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 11, color: Q.goldDim, textAlign: 'center' }}>
+              ({new Date().getFullYear() - parseInt(birthYear)} anni)
+            </div>
+          )}
         </div>
 
         {/* Selettore tema */}
