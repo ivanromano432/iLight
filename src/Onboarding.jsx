@@ -9,16 +9,6 @@ import { getTheme } from './themes.js';
 const fGaramond = '"Cormorant Garamond", serif';
 const fCinzel = '"Cinzel", serif';
 
-const ONBOARDING_KEY_PREFIX = 'quercus_onboarded_v1_';
-
-export function hasSeenOnboarding(userId) {
-  try { return !!localStorage.getItem(ONBOARDING_KEY_PREFIX + userId); }
-  catch { return false; }
-}
-export function markOnboardingSeen(userId) {
-  try { localStorage.setItem(ONBOARDING_KEY_PREFIX + userId, '1'); } catch (_) {}
-}
-
 const SLIDES = [
   {
     title: 'Benvenuto in GoalFit',

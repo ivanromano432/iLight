@@ -6,5 +6,16 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: false,
+    // Aumentiamo soglia warning (i nostri chunk principali sono ~300kB ma comprime molto bene)
+    chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        // Spezzo manualmente i vendor in chunk separati: vengono cachati dal browser tra deploy diversi
+        manualChunks: {
+          react: ['react', 'react-dom'],
+          supabase: ['@supabase/supabase-js'],
+        },
+      },
+    },
   },
 });
