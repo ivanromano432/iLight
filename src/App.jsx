@@ -481,11 +481,10 @@ const PAGES = [
   { id:'diario', label:'diario', roman:'II' },
   { id:'pasti', label:'pasti', roman:'III' },
   { id:'digiuno', label:'digiuno', roman:'IV' },
-  { id:'allena', label:'corpo', roman:'V' },
-  { id:'integra', label:'rituale', roman:'VI' },
-  { id:'respiro', label:'respiro', roman:'VII' },
-  { id:'sonno', label:'sonno', roman:'VIII' },
-  { id:'sera', label:'sera', roman:'IX' },
+  { id:'integra', label:'rituale', roman:'V' },
+  { id:'respiro', label:'respiro', roman:'VI' },
+  { id:'sonno', label:'sonno', roman:'VII' },
+  { id:'sera', label:'sera', roman:'VIII' },
 ];
 const DEF_TYPES = [
   { id:'corsa', name:'Corsa', unit:'km' },
@@ -947,10 +946,9 @@ export default function App({ user, onLogout }){
         {page==='peso' && <PesoPage theme={__theme} loaded={loaded} weights={weights} goal={goal} updWeights={updWeights} updGoal={updGoal} meals={meals} updMeals={updMeals} openStats={() => setShowStats(true)} profile={profile} openSub={() => setShowSub(true)} />}
         {page==='diario' && <DiarioPage theme={__theme} loaded={loaded} notes={foodNotes} water={waterByDay} waterGoal={waterGoal} updNotes={updFoodNotes} updWater={updWater} updWaterGoal={updWaterGoal} meals={meals} updMeals={updMeals} supps={supplements} taken={suppTaken} updSupps={updSupps} updTaken={updTaken} sleeps={sleeps} updSleeps={updSleeps} />}
         {page==='pasti' && <PastiPage user={user} theme={__theme} loaded={loaded} meals={meals} updMeals={updMeals} notes={foodNotes} weights={weights} goal={goal} />}
-        {page==='allena' && <AllenaPage theme={__theme} loaded={loaded} workouts={workouts} types={workoutTypes} updWorkouts={updWorkouts} updTypes={updWorkoutTypes} />}
         {page==='integra' && <IntegraPage theme={__theme} loaded={loaded} supps={supplements} taken={suppTaken} updSupps={updSupps} updTaken={updTaken} />}
         {page==='digiuno' && <DigiunoPage theme={__theme} loaded={loaded} fasts={fasts} updFasts={updFasts} />}
-        {page==='respiro' && <RespiroPage theme={__theme} loaded={loaded} sessions={mindfulSessions} updSessions={updMindful} />}
+        {page==='respiro' && <RespiroPage theme={__theme} loaded={loaded} sessions={mindfulSessions} updSessions={updMindful} workouts={workouts} types={workoutTypes} updWorkouts={updWorkouts} updTypes={updWorkoutTypes} />}
         {page==='sonno' && <SonnoPage theme={__theme} loaded={loaded} sleeps={sleeps} updSleeps={updSleeps} />}
         {page==='sera' && <SeraPage theme={__theme} loaded={loaded} weights={weights} goal={goal} notes={foodNotes} water={waterByDay} waterGoal={waterGoal} meals={meals} workouts={workouts} workoutTypes={workoutTypes} supps={supplements} taken={suppTaken} sleeps={sleeps} />}
         </>); })()}
@@ -3297,7 +3295,7 @@ function SonnoPage({ theme, loaded, sleeps, updSleeps }){
       <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${S.gold}40`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
       <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${S.gold}1A`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
       <div style={{position:'relative',zIndex:2,padding:'32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
-        <Header q="SONNO" sub="VIII" color={S.gold} dim={S.goldDim} mark="✦" font={fFraunces} />
+        <Header q="SONNO" sub="VII" color={S.gold} dim={S.goldDim} mark="✦" font={fFraunces} />
 
         {!loaded && <Loading color={S.dim} />}
 
@@ -3440,7 +3438,7 @@ function SeraPage({ theme, loaded, weights, goal, notes, water, waterGoal, meals
       <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${N.gold}40`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
       <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${N.gold}1A`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
       <div style={{position:'relative',zIndex:2,padding:'32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
-        <Header q="SERA" sub="IX" color={N.gold} dim={N.goldDim} mark="✦" font={fFraunces} />
+        <Header q="SERA" sub="VIII" color={N.gold} dim={N.goldDim} mark="✦" font={fFraunces} />
 
         {!loaded && <Loading color={N.dim} />}
 
@@ -3799,7 +3797,7 @@ const MINDFUL_TYPES = [
   { id:'gratitudine', label:'gratitudine', sym:'✦' },
 ];
 
-function RespiroPage({ theme, loaded, sessions, updSessions }){
+function RespiroPage({ theme, loaded, sessions, updSessions, workouts, types, updWorkouts, updTypes }){
   // Respiro usa M internamente (palette Bosco pastello era originaria). Shadow.
   const M = theme || { bg1: '#EAE6D2', bg2: '#D8D4C0', ink: '#3A4339', accent: '#7A8E78', dim: '#9CA194', cream: '#F4F1E5' };
   const [breathingOpen, setBreathingOpen] = useState(false);
@@ -3808,6 +3806,22 @@ function RespiroPage({ theme, loaded, sessions, updSessions }){
   const [draftNote, setDraftNote] = useState('');
   const [cycleMs, setCycleMs] = useState(0);
   const [confirmDelSess, setConfirmDelSess] = useState(null);
+  // Sezione movimento (ex Allena, fusa qui)
+  const [detailTypeId, setDetailTypeId] = useState(null);
+  const [editingType, setEditingType] = useState(null);
+
+  async function saveType(data){
+    if(editingType==='new') await updTypes([...(types||[]),{id:newId(),name:data.name,unit:data.unit}]);
+    else await updTypes((types||[]).map(t=>t.id===editingType?{...t,name:data.name,unit:data.unit}:t));
+    setEditingType(null);
+  }
+  async function delType(){
+    if((workouts||[]).some(w=>w.typeId===editingType)) await updWorkouts((workouts||[]).filter(w=>w.typeId!==editingType));
+    await updTypes((types||[]).filter(t=>t.id!==editingType));
+    setEditingType(null);
+  }
+  const editingT = editingType && editingType!=='new' ? (types||[]).find(t=>t.id===editingType) : null;
+  const detailType = detailTypeId ? (types||[]).find(t=>t.id===detailTypeId) : null;
 
   useEffect(()=>{
     if (!confirmDelSess) return;
@@ -3864,17 +3878,55 @@ function RespiroPage({ theme, loaded, sessions, updSessions }){
       <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${M.gold}40`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
       <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${M.gold}1A`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
       <div style={{position:'relative',zIndex:2,padding:'32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
-        <Header q="RESPIRO" sub="VII" color={M.gold} dim={M.goldDim} mark="✦" font={fCormorant} />
+        <Header q="RESPIRO" sub="VI" color={M.gold} dim={M.goldDim} mark="✦" font={fCormorant} />
 
         {!loaded && <Loading color={M.dim} />}
 
         {loaded && (<>
-          {/* Stats */}
+          {/* Stats sessioni mindful */}
           <div style={{display:'flex',justifyContent:'space-around',marginTop:18,padding:'14px 0',borderTop:`1px solid ${M.accent}44`,borderBottom:`1px solid ${M.accent}44`}}>
             <Stat label="oggi" value={todayCount} color={M.accent} dim={M.dim} />
             <Stat label="min · 7g" value={fmt0(weekMin)} color={M.accent} dim={M.dim} />
             <Stat label="streak" value={streak} color={M.accent} dim={M.dim} />
           </div>
+
+          {/* === SEZIONE MOVIMENTO (ex pagina Allena, fusa qui) === */}
+          <div style={{marginTop:26}}>
+            <div style={{padding:'10px 0',borderBottom:`1px solid ${M.accent}33`,display:'flex',justifyContent:'space-between',alignItems:'baseline'}}>
+              <span style={{fontFamily:fDmSans,fontSize:9,letterSpacing:'0.4em',color:M.accent,textTransform:'uppercase'}}>movimento</span>
+              <span style={{fontFamily:fDmSans,fontSize:9,letterSpacing:'0.35em',color:M.dim,textTransform:'uppercase'}}>30 g · tendenza</span>
+            </div>
+            <div>
+              {(types||[]).length===0 ? (
+                <div style={{textAlign:'center',padding:'18px 0',fontFamily:fCormorant,fontStyle:'italic',fontSize:14,color:M.dim}}>Nessun tipo di allenamento.</div>
+              ) : (types||[]).map(t=>{
+                const tw = (workouts||[]).filter(w=>w.typeId===t.id);
+                const last30 = tw.filter(w=>(Date.now()-new Date(w.ts).getTime()) < 30*86400000);
+                const totalQty = last30.reduce((a,w)=>a+(w.qty||0),0);
+                const today=new Date(); const sparkVals=[];
+                for(let i=29;i>=0;i--){ const d=new Date(today); d.setDate(d.getDate()-i); const dk=dayKey(d); const sum=tw.filter(w=>dayKey(new Date(w.ts))===dk).reduce((a,w)=>a+(w.qty||0),0); sparkVals.push(sum>0?sum:null); }
+                const spark = buildLineChart(sparkVals,90,30);
+                return (
+                  <button key={t.id} onClick={()=>setDetailTypeId(t.id)} style={{display:'flex',alignItems:'center',gap:14,width:'100%',padding:'12px 4px',background:'transparent',border:'none',borderBottom:`1px solid ${M.accent}1A`,cursor:'pointer',textAlign:'left'}}>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontFamily:fCormorant,fontStyle:'italic',fontSize:18,color:M.ink}}>{t.name}</div>
+                      <div style={{fontFamily:fDmSans,fontSize:10,letterSpacing:'0.15em',color:M.dim,marginTop:2}}>{last30.length} sessioni · {fmt0(totalQty)} {t.unit}</div>
+                    </div>
+                    <svg viewBox="0 0 90 30" width="90" height="30" style={{flexShrink:0}}>
+                      {spark.points.length>1 && <path d={spark.path} stroke={M.accent} strokeWidth="1.4" fill="none" />}
+                      {spark.points.length>0 && <circle cx={spark.points[spark.points.length-1].x} cy={spark.points[spark.points.length-1].y} r="2.2" fill={M.accent} />}
+                      {spark.points.length===0 && <line x1="0" y1="15" x2="90" y2="15" stroke={M.accent} strokeWidth="0.5" strokeDasharray="2 2" opacity="0.3" />}
+                    </svg>
+                    <span style={{fontFamily:fCormorant,fontStyle:'italic',fontSize:14,color:M.dim,marginLeft:6}}>›</span>
+                  </button>
+                );
+              })}
+            </div>
+            <div style={{textAlign:'center',marginTop:14}}>
+              <button onClick={()=>setEditingType('new')} style={{background:'transparent',color:M.accent,border:`1px dashed ${M.accent}99`,fontFamily:fDmSans,fontSize:10,letterSpacing:'0.35em',padding:'9px 20px',cursor:'pointer',textTransform:'uppercase'}}>+ nuovo tipo</button>
+            </div>
+          </div>
+          {/* === FINE SEZIONE MOVIMENTO === */}
 
           {/* Esercizio respiro */}
           <div style={{textAlign:'center',marginTop:22,padding:'18px 14px',background:`${M.accent}1A`,border:`1px solid ${M.accent}33`}}>
@@ -3956,6 +4008,10 @@ function RespiroPage({ theme, loaded, sessions, updSessions }){
           </div>
         </div>
       )}
+
+      {/* Modal allenamenti (ex pagina Allena) */}
+      {detailType && <TypeDetailModal type={detailType} workouts={workouts||[]} onClose={()=>setDetailTypeId(null)} updWorkouts={updWorkouts} onEditType={()=>{setDetailTypeId(null); setEditingType(detailType.id);}} />}
+      {editingType && <TypeModal existing={editingT} onClose={()=>setEditingType(null)} onSave={saveType} onDelete={editingType!=='new'?delType:null} />}
     </div>
   );
 }
