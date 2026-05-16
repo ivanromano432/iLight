@@ -875,6 +875,37 @@ function OggiPage({ theme, loaded, profile, weights, goal, meals, notes, water, 
   const todayTaken = (taken?.[todayKey] || []).length;
   const totalSupps = (supps || []).length;
 
+  // === Calcoli per le note di colore ===
+  // Acqua: percentuale verso il target (es. 8 bicchieri)
+  const waterPct = waterGoal > 0 ? Math.min(100, (todayWater / waterGoal) * 100) : 0;
+  // Sonno: ore di sonno + colore in base alla qualità del tempo
+  const sleepH = lastNight ? durHours(lastNight.bedtime, lastNight.waketime) : null;
+  const sleepColor = sleepH == null ? '#8B7355' : sleepH < 6 ? '#C99A7A' : sleepH < 7 ? '#D4B86A' : sleepH <= 9 ? '#9CC73A' : '#D4B86A';
+  const sleepPct = sleepH == null ? 0 : Math.min(100, (sleepH / 9) * 100);
+  // Allenamento: minuti totali della settimana (solo workouts con unit='min') vs obiettivo OMS 150 min/sett
+  const weekStart = new Date(now); weekStart.setDate(weekStart.getDate() - 6); weekStart.setHours(0, 0, 0, 0);
+  const weekWorkouts = (workouts || []).filter(w => new Date(w.ts) >= weekStart);
+  const weekMinutes = weekWorkouts.reduce((a, w) => {
+    const t = (workouts && workouts.length > 0) ? null : null; // placeholder
+    // Cerco il tipo per sapere l'unità
+    return a;
+  }, 0);
+  // Versione semplificata: conto le sessioni della settimana (alcune unità sono km o ripetizioni, non solo minuti)
+  const weekSessions = weekWorkouts.length;
+  const weekSessionTarget = 5; // 5 sessioni/settimana = ~150 min se ogni sessione dura 30 min
+  const workoutPct = Math.min(100, (weekSessions / weekSessionTarget) * 100);
+
+  // === Striscia "andamento giornata" === 6 categorie, ognuna ON se ha almeno un evento di oggi
+  const dayDots = [
+    { id: 'peso', label: 'peso', done: todayWeights.length > 0, color: '#D4A856' },
+    { id: 'acqua', label: 'acqua', done: todayWater > 0, color: '#4A9EBA' },
+    { id: 'sonno', label: 'sonno', done: !!lastNight, color: '#9989B8' },
+    { id: 'pasti', label: 'pasti', done: todayMeals.length > 0, color: '#C99A7A' },
+    { id: 'corpo', label: 'corpo', done: todayWorkouts.length > 0, color: '#9CC73A' },
+    { id: 'note', label: 'diario', done: todayNotes.length > 0, color: '#8FA288' },
+  ];
+  const dayDotsDone = dayDots.filter(d => d.done).length;
+
   // BMI / progresso peso
   const heightM = profile?.height_cm ? profile.height_cm / 100 : null;
   const bmi = lastWeight && heightM ? lastWeight.weight / (heightM * heightM) : null;
@@ -952,6 +983,23 @@ function OggiPage({ theme, loaded, profile, weights, goal, meals, notes, water, 
         {!loaded && <Loading color={Q.goldDim || Q.gold} />}
 
         {loaded && (<>
+
+          {/* === Striscia 'andamento giornata' === 6 puntini colorati, uno per categoria fatta */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: `${Q.gold}0A`, border: `1px solid ${Q.gold}22`, marginBottom: 14 }}>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              {dayDots.map(d => (
+                <div key={d.id} title={`${d.label}${d.done ? ' ✓' : ''}`} style={{
+                  width: 12, height: 12, borderRadius: '50%',
+                  background: d.done ? d.color : 'transparent',
+                  border: `1.5px solid ${d.done ? d.color : Q.goldDim + '66'}`,
+                  flexShrink: 0,
+                }} />
+              ))}
+            </div>
+            <div style={{ fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.3em', color: Q.goldDim, textTransform: 'uppercase' }}>
+              {dayDotsDone}<span style={{ opacity: 0.5 }}>/{dayDots.length}</span>
+            </div>
+          </div>
 
           {/* Peso */}
           <div style={card({ marginBottom: 10 })}>
@@ -1036,23 +1084,38 @@ function OggiPage({ theme, loaded, profile, weights, goal, meals, notes, water, 
             )}
           </div>
 
-          {/* Acqua + Sonno + Allenamento (riga compatta a 3 colonne) */}
+          {/* Acqua + Sonno + Corpo (riga compatta a 3 colonne con barre cromatiche) */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 10 }}>
+
+            {/* Acqua — barra azzurra di progresso verso target */}
             <button onClick={async () => { await updWater({ ...water, [todayKey]: Math.min(100, todayWater + 1) }); }}
               style={{ ...card({}), textAlign: 'left', cursor: 'pointer', borderRadius: 2 }}>
               <div style={cardTitle}>acqua</div>
               <div style={{ ...cardValue, fontSize: 18 }}>{todayWater}<span style={{ fontSize: 11, color: Q.goldDim || Q.gold, opacity: 0.7, fontFamily: fGaramond, fontStyle: 'italic' }}>/{waterGoal}</span></div>
-              <div style={{ ...cardSub, fontSize: 11 }}>tap per +1</div>
+              <div style={{ height: 4, background: `${Q.sage || Q.gold}22`, borderRadius: 2, marginTop: 6, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${waterPct}%`, background: '#4A9EBA', transition: 'width 0.3s ease' }} />
+              </div>
+              <div style={{ ...cardSub, fontSize: 11, marginTop: 4 }}>tap per +1</div>
             </button>
+
+            {/* Sonno — barra colorata (rosso<6h, giallo 6-7h, verde 7-9h) */}
             <div style={card({})}>
               <div style={cardTitle}>sonno</div>
-              <div style={{ ...cardValue, fontSize: 18 }}>{lastNight ? fmtDur(durHours(lastNight.bedtime, lastNight.waketime)) : '—'}</div>
-              <div style={{ ...cardSub, fontSize: 11 }}>{lastNight ? `qualità ${lastNight.quality}/5` : 'notte non registrata'}</div>
+              <div style={{ ...cardValue, fontSize: 18 }}>{lastNight ? fmtDur(sleepH) : '—'}</div>
+              <div style={{ height: 4, background: `${Q.sage || Q.gold}22`, borderRadius: 2, marginTop: 6, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${sleepPct}%`, background: sleepColor, transition: 'width 0.3s ease' }} />
+              </div>
+              <div style={{ ...cardSub, fontSize: 11, marginTop: 4 }}>{lastNight ? `qualità ${lastNight.quality}/5` : 'notte non registrata'}</div>
             </div>
+
+            {/* Corpo — barra settimanale verso obiettivo 5 sessioni */}
             <div style={card({})}>
               <div style={cardTitle}>corpo</div>
-              <div style={{ ...cardValue, fontSize: 18 }}>{todayWorkouts.length}</div>
-              <div style={{ ...cardSub, fontSize: 11 }}>{todayWorkouts.length > 0 ? 'sessioni oggi' : 'niente ancora'}</div>
+              <div style={{ ...cardValue, fontSize: 18 }}>{weekSessions}<span style={{ fontSize: 11, color: Q.goldDim || Q.gold, opacity: 0.7, fontFamily: fGaramond, fontStyle: 'italic' }}>/{weekSessionTarget}</span></div>
+              <div style={{ height: 4, background: `${Q.sage || Q.gold}22`, borderRadius: 2, marginTop: 6, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${workoutPct}%`, background: '#9CC73A', transition: 'width 0.3s ease' }} />
+              </div>
+              <div style={{ ...cardSub, fontSize: 11, marginTop: 4 }}>sessioni · 7gg</div>
             </div>
           </div>
 
@@ -1076,14 +1139,28 @@ function OggiPage({ theme, loaded, profile, weights, goal, meals, notes, water, 
             );
           })()}
 
-          {/* Integratori (solo se ne ha definiti) */}
+          {/* Integratori (solo se ne ha definiti) — pallini colorati che si accendono */}
           {totalSupps > 0 && (
             <div style={card({ marginBottom: 10 })}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div style={{ flex: 1 }}>
                   <div style={cardTitle}>VI · rituale</div>
                   <div style={cardValue}>{todayTaken} / {totalSupps}</div>
-                  <div style={cardSub}>integratori di oggi</div>
+                  {/* Pallini integratori: pieni se preso oggi, vuoti altrimenti */}
+                  <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+                    {(supps || []).map(s => {
+                      const isTaken = (taken?.[todayKey] || []).includes(s.id);
+                      return (
+                        <div key={s.id} title={`${s.name}${isTaken ? ' ✓' : ''}`} style={{
+                          width: 14, height: 14, borderRadius: '50%',
+                          background: isTaken ? '#D4B86A' : 'transparent',
+                          border: `1.5px solid ${isTaken ? '#D4B86A' : Q.goldDim + '66'}`,
+                          flexShrink: 0,
+                        }} />
+                      );
+                    })}
+                  </div>
+                  <div style={{ ...cardSub, marginTop: 6 }}>integratori di oggi</div>
                 </div>
                 <button onClick={() => go('integra')} style={miniBtn}>aggiorna</button>
               </div>
@@ -3108,6 +3185,25 @@ function SeraPage({ theme, loaded, weights, goal, notes, water, waterGoal, meals
   // Target calorico del giorno (Zona 40/30/30 — stessa logica della pagina Menù)
   const kcalTarget = useMemo(() => computeNutritionTarget(profile, weights, goal).kcal, [profile, weights, goal]);
 
+  // === Spie semaforiche per il riepilogo serale ===
+  // Palette semantica: verde=tutto bene, ambra=parziale, rosso=insufficiente, azzurro=sotto target (ok per dimagrire), nessuna=non registrato
+  const OK = '#9CC73A', WARN = '#D4B86A', BAD = '#C99A7A', INFO = '#4A9EBA';
+  // sonno: <6h male, 6-7h parziale, 7-9h ottimo, >9 parziale (troppo)
+  const sleepDot = lastNightDur == null ? null : lastNightDur < 6 ? BAD : lastNightDur < 7 ? WARN : lastNightDur <= 9 ? OK : WARN;
+  // peso: presente → ok; mancante → nessuna spia
+  const pesoMattinaDot = morning ? OK : null;
+  const pesoSeraDot = (evening && evening !== morning) ? OK : null;
+  // calorie: 0 = nessuna spia; >120% target = rosso; >105% = ambra; 95-105% = verde; <95% = azzurro (sotto target volutamente, ok per dimagrire)
+  const calDot = totalKcal === 0 ? null : totalKcal > kcalTarget * 1.20 ? BAD : totalKcal > kcalTarget * 1.05 ? WARN : totalKcal >= kcalTarget * 0.95 ? OK : INFO;
+  // acqua: 0 = nessuna spia; >= goal = verde; >= 50% = ambra; <50% = rosso
+  const waterDot = todayWater === 0 ? null : todayWater >= waterGoal ? OK : todayWater >= waterGoal / 2 ? WARN : BAD;
+  // allenamenti: >=1 verde, 0 nessuna spia (non è "male" non allenarsi un giorno specifico)
+  const workoutDot = todayWorkouts.length > 0 ? OK : null;
+  // meditazione: presente → verde, no → nessuna spia
+  const mindDot = totalMindfulMin > 0 ? OK : null;
+  // integratori: solo se ne ha definiti; tutti → verde, parziali → ambra, 0 → rosso
+  const suppDot = supps.length === 0 ? null : suppsTakenToday === supps.length ? OK : suppsTakenToday > 0 ? WARN : BAD;
+
   return (
     <div style={{minHeight:'100vh',background:`radial-gradient(ellipse at top, ${N.bg1} 0%, ${N.bg2} 100%)`,color:N.cream,fontFamily:fFraunces,position:'relative',overflow:'hidden'}}>
       <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${N.gold}40`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
@@ -3119,14 +3215,14 @@ function SeraPage({ theme, loaded, weights, goal, notes, water, waterGoal, meals
 
         {loaded && (<>
           <div style={{marginTop:26,textAlign:'left'}}>
-            <Row theme={N} label="sonno notte scorsa" value={lastNightDur!=null?fmtDur(lastNightDur):'—'} />
-            <Row theme={N} label="peso · mattina" value={morning?fmt(morning.weight):'—'} unit="kg" />
-            <Row theme={N} label="peso · sera" value={evening&&evening!==morning?fmt(evening.weight):'—'} unit="kg" />
-            <Row theme={N} label="calorie" value={`${fmt0(totalKcal)} / ${fmt0(kcalTarget)}`} unit="kcal" />
-            <Row theme={N} label="acqua" value={todayWater} unit={`/ ${waterGoal}`} />
-            <Row theme={N} label="allenamenti" value={todayWorkouts.length||'—'} details={workoutDetails} />
-            <Row theme={N} label="meditazione" value={totalMindfulMin>0?fmt0(totalMindfulMin):'—'} unit={totalMindfulMin>0?'min':''} details={todayMindful.length>1?`${todayMindful.length} sessioni`:null} />
-            <Row theme={N} label="integratori" value={supps.length>0?`${suppsTakenToday} / ${supps.length}`:'—'} details={suppDetails} />
+            <Row theme={N} dot={sleepDot} label="sonno notte scorsa" value={lastNightDur!=null?fmtDur(lastNightDur):'—'} />
+            <Row theme={N} dot={pesoMattinaDot} label="peso · mattina" value={morning?fmt(morning.weight):'—'} unit="kg" />
+            <Row theme={N} dot={pesoSeraDot} label="peso · sera" value={evening&&evening!==morning?fmt(evening.weight):'—'} unit="kg" />
+            <Row theme={N} dot={calDot} label="calorie" value={`${fmt0(totalKcal)} / ${fmt0(kcalTarget)}`} unit="kcal" />
+            <Row theme={N} dot={waterDot} label="acqua" value={todayWater} unit={`/ ${waterGoal}`} />
+            <Row theme={N} dot={workoutDot} label="allenamenti" value={todayWorkouts.length||'—'} details={workoutDetails} />
+            <Row theme={N} dot={mindDot} label="meditazione" value={totalMindfulMin>0?fmt0(totalMindfulMin):'—'} unit={totalMindfulMin>0?'min':''} details={todayMindful.length>1?`${todayMindful.length} sessioni`:null} />
+            <Row theme={N} dot={suppDot} label="integratori" value={supps.length>0?`${suppsTakenToday} / ${supps.length}`:'—'} details={suppDetails} />
           </div>
 
           {/* === SEZIONE NOTE: solo note manuali (cronologia automatica rimossa) === */}
@@ -3793,13 +3889,19 @@ function Totale({ label, value, unit, dark, sage, font, big }){
     </div>
   );
 }
-function Row({ label, value, unit, details, theme }){
+function Row({ label, value, unit, details, theme, dot }){
   const T = theme || N;
   return (
     <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:12,padding:'10px 0',borderBottom:`1px solid ${T.gold}1F`}}>
-      <div style={{flex:1,minWidth:0}}>
-        <div style={{fontFamily:fFraunces,fontStyle:'italic',fontSize:13,color:T.dim||T.goldDim}}>{label}</div>
-        {details && <div style={{fontFamily:fFraunces,fontSize:11,color:T.dim||T.goldDim,opacity:0.75,marginTop:3,lineHeight:1.4}}>{details}</div>}
+      <div style={{flex:1,minWidth:0,display:'flex',alignItems:'baseline',gap:9}}>
+        {/* Spia colorata semaforica: verde=ok, ambra=parziale, rosso=insufficiente, blu=sotto target volutamente, nessuna=non registrato */}
+        {dot && (
+          <span style={{width:8,height:8,borderRadius:'50%',background:dot,flexShrink:0,alignSelf:'center'}} />
+        )}
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontFamily:fFraunces,fontStyle:'italic',fontSize:13,color:T.dim||T.goldDim}}>{label}</div>
+          {details && <div style={{fontFamily:fFraunces,fontSize:11,color:T.dim||T.goldDim,opacity:0.75,marginTop:3,lineHeight:1.4}}>{details}</div>}
+        </div>
       </div>
       <span style={{fontFamily:fFraunces,fontWeight:400,fontSize:20,color:T.gold,whiteSpace:'nowrap'}}>{value}{unit && <span style={{fontSize:11,color:T.dim||T.goldDim,marginLeft:4,fontWeight:300}}>{unit}</span>}</span>
     </div>
