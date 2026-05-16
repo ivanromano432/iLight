@@ -979,7 +979,7 @@ function BottomNav({ theme, currentIdx, onChange }){
 function buildLineChart(values, chartW, chartH){
   const padX=8, padY=14;
   const valid=values.filter(v=>v!=null);
-  if(valid.length===0) return { path:'', area:'', points:[], min:null, max:null, padX, padY, chartH, chartW };
+  if(valid.length===0) return { path:'', area:'', points:[] };
   const min=Math.min(...valid), max=Math.max(...valid), span=Math.max(max-min,0.5);
   const xStep=(chartW-padX*2)/Math.max(1,values.length-1);
   const points = values.map((v,i)=>v==null?null:{ x:padX+i*xStep, y:padY+(chartH-padY*2)*(1-(v-min)/span), v }).filter(Boolean);
@@ -988,7 +988,7 @@ function buildLineChart(values, chartW, chartH){
     path=points.map((p,i)=>`${i===0?'M':'L'} ${p.x} ${p.y}`).join(' ');
     area=path + ` L ${points[points.length-1].x} ${chartH} L ${points[0].x} ${chartH} Z`;
   }
-  return { path, area, points, min, max, padX, padY, chartH, chartW };
+  return { path, area, points };
 }
 
 function OggiPage({ theme, loaded, profile, weights, goal, meals, notes, water, waterGoal, workouts, sleeps, fasts, supps, taken, updWater, setPage }){
@@ -1465,16 +1465,6 @@ function PesoPage({ theme, loaded, weights, goal, updWeights, updGoal, meals, up
             <svg viewBox="0 0 280 70" width="100%" height={70} style={{display:'block'}}>
               <defs><linearGradient id="qa" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor={Q.gold} stopOpacity="0.18"/><stop offset="100%" stopColor={Q.gold} stopOpacity="0"/></linearGradient></defs>
               {points.length>1 && <path d={area} fill="url(#qa)" />}
-              {/* Linea media peso del periodo selezionato: orizzontale, cream del tema, tratteggio largo per non confondersi con quella del grasso */}
-              {(() => {
-                const validAvgs = dailyData.map(d=>d.avg).filter(v=>v!=null);
-                if (validAvgs.length < 2) return null;
-                const avgVal = validAvgs.reduce((a,b)=>a+b,0) / validAvgs.length;
-                const { min, max, padX, padY, chartH, chartW } = { min:Math.min(...validAvgs), max:Math.max(...validAvgs), padX:8, padY:14, chartH:70, chartW:280 };
-                const span = Math.max(max-min, 0.5);
-                const y = padY + (chartH - padY*2) * (1 - (avgVal - min) / span);
-                return <line x1={padX} x2={chartW-padX} y1={y} y2={y} stroke={Q.cream} strokeWidth="1" strokeDasharray="6,4" opacity="0.55" />;
-              })()}
               {points.length>1 && <path d={path} stroke={Q.gold} strokeWidth="1.2" fill="none" />}
               {bfChart.points.length>1 && <path d={bfChart.path} stroke="#C99A7A" strokeWidth="1.2" fill="none" strokeDasharray="3,2" opacity="0.85" />}
               {points.map((p,i)=><circle key={i} cx={p.x} cy={p.y} r={i===points.length-1?3.5:2} fill={i===points.length-1?Q.cream:Q.gold}/>)}
@@ -1485,19 +1475,12 @@ function PesoPage({ theme, loaded, weights, goal, updWeights, updGoal, meals, up
               {period === 30 && [0,7,14,21,29].map(i=>{const d=dailyData[i]; return d?<span key={i} style={{opacity:i===29?1:0.6}}>{d.date.toLocaleDateString('it-IT',{day:'numeric',month:'short'})}</span>:null;})}
               {period === 365 && [0,13,26,39,51].map(i=>{const d=dailyData[i]; return d?<span key={i} style={{opacity:i===51?1:0.6}}>{d.date.toLocaleDateString('it-IT',{month:'short'})}</span>:null;})}
             </div>
-            {(() => {
-              const validAvgs = dailyData.map(d=>d.avg).filter(v=>v!=null);
-              if (validAvgs.length < 2) return null;
-              const avgVal = validAvgs.reduce((a,b)=>a+b,0) / validAvgs.length;
-              const hasBf = bfChart.points.length > 0;
-              return (
-                <div style={{display:'flex',justifyContent:'center',gap:18,marginTop:8,fontFamily:fGaramond,fontStyle:'italic',fontSize:10,color:Q.goldDim,flexWrap:'wrap'}}>
-                  <span style={{display:'inline-flex',alignItems:'center',gap:5}}><span style={{display:'inline-block',width:14,height:1.5,background:Q.gold}}/>peso</span>
-                  <span style={{display:'inline-flex',alignItems:'center',gap:5}}><span style={{display:'inline-block',width:14,height:1.5,backgroundImage:`repeating-linear-gradient(90deg,${Q.cream} 0 4px,transparent 4px 7px)`,opacity:0.7}}/>media {fmt(avgVal,1)} kg</span>
-                  {hasBf && <span style={{display:'inline-flex',alignItems:'center',gap:5}}><span style={{display:'inline-block',width:14,height:1.5,backgroundImage:'repeating-linear-gradient(90deg,#C99A7A 0 3px,transparent 3px 5px)'}}/>% grasso</span>}
-                </div>
-              );
-            })()}
+            {bfChart.points.length>0 && (
+              <div style={{display:'flex',justifyContent:'center',gap:18,marginTop:8,fontFamily:fGaramond,fontStyle:'italic',fontSize:10,color:Q.goldDim}}>
+                <span style={{display:'inline-flex',alignItems:'center',gap:5}}><span style={{display:'inline-block',width:14,height:1.5,background:Q.gold}}/>peso</span>
+                <span style={{display:'inline-flex',alignItems:'center',gap:5}}><span style={{display:'inline-block',width:14,height:1.5,background:'#C99A7A',backgroundImage:'repeating-linear-gradient(90deg,#C99A7A 0 3px,transparent 3px 5px)'}}/>% grasso</span>
+              </div>
+            )}
             {quality && (
               <div style={{marginTop:10,textAlign:'center',fontFamily:fGaramond,fontStyle:'italic',fontSize:12,color:quality.color,padding:'6px 10px',background:`${quality.color}11`,border:`1px solid ${quality.color}33`}}>
                 {quality.label}
