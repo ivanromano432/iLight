@@ -116,27 +116,67 @@ export default function AppleHealthImport({ profile, existingWeights, onImport, 
     setError('');
     setStage('parsing');
     try {
+      const lower = (file.name || '').toLowerCase();
+      const isZipLike = lower.endsWith('.zip') || file.type === 'application/zip' || file.type === 'application/x-zip-compressed';
+      const isXmlLike = lower.endsWith('.xml') || file.type === 'text/xml' || file.type === 'application/xml';
+
       let xmlString;
-      const lower = file.name.toLowerCase();
-      if (lower.endsWith('.zip')) {
-        const buf = await file.arrayBuffer();
-        const zip = await JSZip.loadAsync(buf);
-        // Cerca export.xml (sta dentro apple_health_export/)
-        let entry = null;
-        zip.forEach((path, e) => {
-          if (entry) return;
-          if (/export\.xml$/i.test(path) && !e.dir) entry = e;
-        });
-        if (!entry) throw new Error('export.xml non trovato nel file zip. Controlla che sia l\'esportazione di Apple Salute.');
-        xmlString = await entry.async('string');
-      } else if (lower.endsWith('.xml')) {
+
+      if (isXmlLike && !isZipLike) {
         xmlString = await file.text();
       } else {
-        throw new Error('Formato non riconosciuto. Carica export.zip o export.xml dall\'app Salute.');
+        // Trattiamo qualsiasi cosa che non sia chiaramente .xml come ZIP (anche file senza estensione su iOS)
+        const buf = await file.arrayBuffer();
+        let zip;
+        try {
+          zip = await JSZip.loadAsync(buf);
+        } catch (zipErr) {
+          throw new Error('Non riesco ad aprire il file come ZIP. Assicurati di aver caricato export.zip (o export.xml estratto) dall\'app Salute.');
+        }
+
+        // Raccoglie TUTTI i file dentro lo zip
+        const allFiles = [];
+        zip.forEach((path, e) => { if (!e.dir) allFiles.push({ path, entry: e }); });
+
+        // 1) Cerca export.xml preciso (qualsiasi cartella)
+        let entry = allFiles.find(f => /(^|\/)export\.xml$/i.test(f.path))?.entry;
+
+        // 2) Se non trovato, cerca un .xml che NON sia export_cda.xml (CDA è inutile)
+        if (!entry) {
+          entry = allFiles.find(f => /\.xml$/i.test(f.path) && !/_cda\.xml$/i.test(f.path))?.entry;
+        }
+
+        // 3) Se ancora niente, vedi se c'e' uno zip annidato (Apple a volte fa export.zip > apple_health_export.zip)
+        if (!entry) {
+          const innerZipEntry = allFiles.find(f => /\.zip$/i.test(f.path));
+          if (innerZipEntry) {
+            try {
+              const innerBuf = await innerZipEntry.entry.async('arraybuffer');
+              const innerZip = await JSZip.loadAsync(innerBuf);
+              const innerFiles = [];
+              innerZip.forEach((p, e) => { if (!e.dir) innerFiles.push({ path: p, entry: e }); });
+              entry = innerFiles.find(f => /(^|\/)export\.xml$/i.test(f.path))?.entry
+                   || innerFiles.find(f => /\.xml$/i.test(f.path) && !/_cda\.xml$/i.test(f.path))?.entry;
+            } catch (_) { /* ignora */ }
+          }
+        }
+
+        if (!entry) {
+          const sample = allFiles.slice(0, 5).map(f => f.path).join(', ') || '(zip vuoto)';
+          throw new Error(`Nessun file XML trovato nello zip. Contenuto: ${sample}${allFiles.length > 5 ? '...' : ''}. Verifica di aver scelto l'esportazione di Apple Salute (Salute > tuo profilo > Esporta tutti i dati Salute).`);
+        }
+
+        xmlString = await entry.async('string');
+      }
+
+      if (!xmlString || xmlString.length < 100) {
+        throw new Error('Il file XML e\' vuoto o corrotto.');
       }
 
       const records = extractRecords(xmlString);
-      if (records.length === 0) throw new Error('Nessun dato di peso/grasso/massa magra trovato in questo file.');
+      if (records.length === 0) {
+        throw new Error('Nessun dato di peso, percentuale di grasso o massa magra trovato. Verifica di aver registrato pesate nell\'app Salute.');
+      }
       const all = aggregate(records).sort((a, b) => new Date(a.ts) - new Date(b.ts));
 
       // Dedup contro existingWeights (per minuteKey)
@@ -419,14 +459,18 @@ export default function AppleHealthImport({ profile, existingWeights, onImport, 
         {stage === 'error' && (
           <div>
             <div style={{
-              background: '#5a1a1a22',
-              border: '1px solid #C99A7A55',
-              padding: '16px 18px',
+              background: Q.cream,
+              border: `2px solid ${Q.ink}`,
+              padding: '18px 18px',
               marginBottom: 22,
-              fontSize: 14,
-              color: '#E8B89A',
+              fontSize: 15,
+              color: Q.ink,
               lineHeight: 1.5,
+              fontFamily: fGaramond,
             }}>
+              <div style={{ fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.3em', textTransform: 'uppercase', color: Q.ink, opacity: 0.6, marginBottom: 8 }}>
+                ⚠ errore
+              </div>
               {error}
             </div>
             <button onClick={() => { setStage('idle'); setError(''); }} style={{
