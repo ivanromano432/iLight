@@ -37,77 +37,123 @@ function buildCSS(theme) {
   const isDashboard = theme.structuralVariant === 'dashboard';
 
   // CSS con !important per battere gli inline style React.
+  // Usiamo sia 'body.cls' che 'html.cls' come scope, per maggiore specificity.
   return `
     /* === ${theme.name} (${theme.structuralVariant}) === */
 
+    /* Indicatore visivo (debug): un piccolo bordo verde sull'angolo della pagina che conferma che il tema è applicato */
+    html.${cls} body::before {
+      content: '${theme.structuralVariant === 'diario' ? '◇ DIARIO' : '▣ CRUSCOTTO'}';
+      position: fixed;
+      bottom: 8px;
+      right: 8px;
+      z-index: 99999;
+      font-size: 9px;
+      letter-spacing: 0.2em;
+      color: ${green};
+      background: ${bg};
+      padding: 3px 8px;
+      border: 1px solid ${green};
+      border-radius: ${isDashboard ? '10px' : '0'};
+      font-family: ${fontMicro};
+      font-weight: 700;
+      pointer-events: none;
+      opacity: 0.65;
+    }
+
     /* Background piatto: sostituisce ovunque ci sia un radial-gradient inline */
+    html.${cls} [style*="radial-gradient"],
     body.${cls} [style*="radial-gradient"] {
       background: ${bg} !important;
       background-image: none !important;
     }
 
     /* Nasconde le cornici decorative inset (le 2 div con aria-hidden e inset) */
+    html.${cls} [aria-hidden="true"][style*="inset:"],
     body.${cls} [aria-hidden="true"][style*="inset:"],
     body.${cls} [aria-hidden][style*="inset:14"],
     body.${cls} [aria-hidden][style*="inset:20"] {
       display: none !important;
     }
 
-    /* Override font globale per tutti gli elementi */
+    /* === FONT OVERRIDE === */
+    /* Override font globale per tutti gli elementi - massima specificity */
+    html.${cls},
+    html.${cls} body,
+    html.${cls} body *,
     body.${cls},
     body.${cls} * {
       font-family: ${fontText} !important;
     }
 
+    /* Override anche su selettori che usano Cormorant Garamond inline */
+    html.${cls} *[style*="Cormorant Garamond"],
+    html.${cls} *[style*="Garamond"],
+    body.${cls} *[style*="Cormorant Garamond"],
+    body.${cls} *[style*="Garamond"] {
+      font-family: ${fontText} !important;
+    }
+
     /* Mantieni il font Micro (Cinzel per Diario, Inter per Cruscotto) sui label maiuscoli */
-    body.${cls} [style*="letter-spacing"][style*="uppercase"],
-    body.${cls} [style*="text-transform:uppercase"],
-    body.${cls} [style*="text-transform: uppercase"] {
+    html.${cls} *[style*="Cinzel"],
+    html.${cls} *[style*="letter-spacing"][style*="uppercase"],
+    html.${cls} *[style*="text-transform:uppercase"],
+    html.${cls} *[style*="text-transform: uppercase"],
+    body.${cls} *[style*="Cinzel"],
+    body.${cls} *[style*="letter-spacing"][style*="uppercase"],
+    body.${cls} *[style*="text-transform:uppercase"],
+    body.${cls} *[style*="text-transform: uppercase"] {
       font-family: ${fontMicro} !important;
       ${isDashboard ? 'font-weight: 700 !important;' : ''}
     }
 
-    /* I valori numerici grandi (>20px) restano nel font principale ma con peso eventuale */
+    /* Per Cruscotto: numeri grandi in bold con letter-spacing stretto (look fitness app) */
     ${isDashboard ? `
-    body.${cls} [style*="font-size:32"],
-    body.${cls} [style*="font-size: 32"],
-    body.${cls} [style*="font-size:28"],
-    body.${cls} [style*="font-size: 28"],
-    body.${cls} [style*="font-size:24"],
-    body.${cls} [style*="font-size: 24"],
-    body.${cls} [style*="font-size:22"],
-    body.${cls} [style*="font-size: 22"] {
+    html.${cls} *[style*="font-size:32"],
+    html.${cls} *[style*="font-size: 32"],
+    html.${cls} *[style*="font-size:28"],
+    html.${cls} *[style*="font-size: 28"],
+    html.${cls} *[style*="font-size:24"],
+    html.${cls} *[style*="font-size: 24"],
+    html.${cls} *[style*="font-size:22"],
+    html.${cls} *[style*="font-size: 22"] {
       font-weight: 700 !important;
       letter-spacing: -0.5px !important;
+      font-style: normal !important;
     }
     ` : ''}
 
-    /* I bordi decorativi 2px rotondi delle card vengono semplificati */
+    /* Bordi card semplificati: tondi per Cruscotto, squadrati per Diario */
     ${isDashboard ? `
-    body.${cls} [style*="border:1px solid"][style*="background"]:not(button) {
+    html.${cls} *[style*="border:1px solid"][style*="background"]:not(button),
+    body.${cls} *[style*="border:1px solid"][style*="background"]:not(button) {
       border-color: ${teal}44 !important;
       border-radius: 12px !important;
     }
     ` : `
-    body.${cls} [style*="border:1px solid"][style*="background"]:not(button) {
+    html.${cls} *[style*="border:1px solid"][style*="background"]:not(button),
+    body.${cls} *[style*="border:1px solid"][style*="background"]:not(button) {
       border-color: ${teal}22 !important;
       border-radius: 0 !important;
     }
     `}
 
-    /* Bottoni: arrotondati per Dashboard, squadrati per Diario */
+    /* Bottoni: arrotondati per Cruscotto, squadrati per Diario */
     ${isDashboard ? `
+    html.${cls} button[style*="border"],
     body.${cls} button[style*="border"] {
       border-radius: 6px !important;
       font-weight: 600 !important;
     }
     ` : `
+    html.${cls} button[style*="border"],
     body.${cls} button[style*="border"] {
       border-radius: 0 !important;
     }
     `}
 
     /* Body globale */
+    html.${cls},
     body.${cls} {
       background: ${bg} !important;
       color: ${ink} !important;
@@ -124,8 +170,9 @@ export default function ThemeStyles({ theme }) {
   useEffect(() => {
     if (typeof document === 'undefined') return;
 
-    // Rimuovo eventuali classi tema precedenti dal body
-    document.body.classList.forEach(cn => {
+    // Rimuovo eventuali classi tema precedenti dal body.
+    // Uso Array.from per evitare problemi durante l'iterazione di DOMTokenList live.
+    Array.from(document.body.classList).forEach(cn => {
       if (cn.startsWith('theme-')) document.body.classList.remove(cn);
     });
     // Rimuovo lo <style> tag precedente
@@ -134,8 +181,9 @@ export default function ThemeStyles({ theme }) {
 
     if (!theme || !theme.structuralVariant) return; // tema classico, niente da fare
 
-    // Aggiungo classe al body
+    // Aggiungo classe sia al body sia all'html per massima specificity
     document.body.classList.add(`theme-${theme.id}`);
+    document.documentElement.classList.add(`theme-${theme.id}`);
 
     // Inietto il nuovo <style>
     const styleEl = document.createElement('style');
@@ -146,6 +194,7 @@ export default function ThemeStyles({ theme }) {
     // Cleanup al cambio di tema
     return () => {
       document.body.classList.remove(`theme-${theme.id}`);
+      document.documentElement.classList.remove(`theme-${theme.id}`);
       const s = document.getElementById('goalfit-theme-styles');
       if (s) s.remove();
     };
