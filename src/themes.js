@@ -193,6 +193,12 @@ export const THEMES = {
     goldDim: '#8FA0A8', light: '#8FA0A8', dim: '#8FA0A8', tan: '#1E8FA0',
     border: '#2BA8B5',
     danger: DANGER,
+    // === Override strutturali per il "vestito" Diario ===
+    fontText: "'Cardo', serif",         // font principale (paragrafi, titoli, valori)
+    fontMicro: "'Cinzel', serif",       // font dei micro-label maiuscoli spaziati
+    useFlat: true,                       // sostituisce il radial gradient con sfondo piatto
+    noDecorBorders: true,                // nasconde le 2 cornici decorative inset
+    structuralVariant: 'diario',         // identificatore variante (per styling specifico)
   },
 
   // 12. CRUSCOTTO — bianco quasi puro, turchese contrastato, lime scuro — versione "dashboard" moderna
@@ -210,6 +216,12 @@ export const THEMES = {
     goldDim: '#5A6470', light: '#5A6470', dim: '#5A6470', tan: '#155F6B',
     border: '#1E8FA0',
     danger: DANGER,
+    // === Override strutturali per il "vestito" Dashboard ===
+    fontText: "'Inter', system-ui, sans-serif",
+    fontMicro: "'Inter', system-ui, sans-serif",
+    useFlat: true,
+    noDecorBorders: true,
+    structuralVariant: 'dashboard',
   },
 };
 

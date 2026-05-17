@@ -16,6 +16,7 @@ const Onboarding = lazy(() => import('./Onboarding.jsx'));
 import { hasSeenOnboarding, markOnboardingSeen } from './onboardingHelpers.js';
 import { uploadMealPhoto as uploadMealPhotoToStorage, deleteMealPhoto as deleteMealPhotoFromStorage } from './photoStorage.js';
 import { getTheme } from './themes.js';
+import ThemeStyles from './ThemeStyles.jsx';
 import { supabase } from './supabase.js';
 
 const Q = { bg1: '#3A2818', bg2: '#1F140C', gold: '#C9A876', goldDim: '#8B7355', cream: '#E8D8B8', ink: '#1F140C' };
@@ -849,6 +850,7 @@ export default function App({ user, onLogout }){
     <div style={{minHeight:'100vh', background:'#000', position:'relative'}}>
       <div style={{paddingBottom:76}}>
         {(() => { const __theme = getTheme(profile?.theme); return (<>
+        <ThemeStyles theme={__theme} />
         {page==='oggi' && <OggiPage theme={__theme} loaded={loaded} profile={profile} weights={weights} goal={goal} meals={meals} notes={foodNotes} water={waterByDay} waterGoal={waterGoal} workouts={workouts} sleeps={sleeps} fasts={fasts} supps={supplements} taken={suppTaken} updWater={updWater} setPage={setPageIdx} />}
         {page==='peso' && <PesoPage theme={__theme} loaded={loaded} weights={weights} goal={goal} updWeights={updWeights} updGoal={updGoal} meals={meals} updMeals={updMeals} openStats={() => setShowStats(true)} profile={profile} openSub={() => setShowSub(true)} />}
         {page==='pasti' && <PastiPage user={user} theme={__theme} loaded={loaded} meals={meals} updMeals={updMeals} notes={foodNotes} weights={weights} goal={goal} />}
