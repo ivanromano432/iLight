@@ -214,7 +214,7 @@ export const THEMES = {
     desc: 'palette identica al Foglio Bianco, layout dashboard moderno',
     isDark: false,
     swatch: ['#FFFFFF', '#3F95A1', '#9CC756'],
-    bg: '#FFFFFF', bg1: '#FFFFFF', bg2: '#FAFAFA',
+    bg: '#FFFFFF', bg1: '#FFFFFF', bg2: '#FFFFFF',
     ink: '#2A3942', dark: '#2A3942',
     cream: '#2A3942', pale: '#2A3942', body: '#2A3942',
     gold: '#3F95A1', sage: '#3F95A1', silver: '#3F95A1', accent: '#3F95A1',
