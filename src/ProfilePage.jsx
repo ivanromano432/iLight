@@ -4,7 +4,6 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { THEMES, THEME_ORDER, DEFAULT_THEME, getTheme } from './themes.js';
-import { LAYOUTS, getCurrentLayoutId, setLayoutId as saveLayoutId } from './layouts.js';
 import { supabase } from './supabase.js';
 import { pushSupported, getPushStatus, subscribePush, unsubscribePush, registerServiceWorker } from './pushNotifications.js';
 
@@ -42,15 +41,6 @@ export default function ProfilePage({ user, profile, updProfile, onClose }) {
   const [name, setName] = useState(profile?.display_name || '');
   const [avatar, setAvatar] = useState(profile?.avatar_data || null);
   const [themeId, setThemeId] = useState(profile?.theme || DEFAULT_THEME);
-  // Layout della Home: classic | diario | dashboard. Persiste in localStorage (non sul profilo
-  // perché è una preferenza estetica del device, non un dato dell'account).
-  const [layoutId, setLayoutId] = useState(getCurrentLayoutId());
-  function changeLayout(id) {
-    saveLayoutId(id);
-    setLayoutId(id);
-    // Forzo aggiornamento globale notificando un evento custom: la Home si re-renderizza.
-    try { window.dispatchEvent(new CustomEvent('goalfit-layout-changed', { detail: { id } })); } catch (_) {}
-  }
   const [sex, setSex] = useState(profile?.sex || null);
   const [heightCm, setHeightCm] = useState(profile?.height_cm != null ? String(profile.height_cm) : '');
   const [birthYear, setBirthYear] = useState(profile?.birth_year != null ? String(profile.birth_year) : '');
@@ -432,81 +422,6 @@ export default function ProfilePage({ user, profile, updProfile, onClose }) {
           </div>
           <div style={{ marginTop: 10, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 11, color: Q.goldDim, textAlign: 'center' }}>
             in questo primo aggiornamento il tema cambia solo le pagine I peso, II diario e III pasti. Altre pagine seguono nel prossimo deploy.
-          </div>
-        </div>
-
-        {/* === SELETTORE LAYOUT HOME === */}
-        <div style={{ marginTop: 30 }}>
-          <div style={{ fontFamily: fCinzel, fontSize: 9, letterSpacing: '0.35em', color: Q.goldDim, textTransform: 'uppercase', marginBottom: 8, textAlign: 'center' }}>LAYOUT HOME</div>
-          <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 12, color: Q.goldDim, textAlign: 'center', marginBottom: 14 }}>
-            il vestito della pagina principale — applicato all'istante
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {Object.values(LAYOUTS).map(L => {
-              const selected = layoutId === L.id;
-              return (
-                <button key={L.id} onClick={() => changeLayout(L.id)}
-                  style={{
-                    background: selected ? `${Q.gold}1A` : 'transparent',
-                    border: `1px solid ${selected ? Q.gold : Q.gold + '44'}`,
-                    padding: '12px 14px',
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 12,
-                  }}>
-                  {/* Mini preview cromatica del layout */}
-                  <div style={{
-                    width: 48, height: 48, flexShrink: 0,
-                    background: L.id === 'classic' ? Q.bg : '#FFFFFF',
-                    border: `1px solid ${L.id === 'classic' ? Q.gold + '44' : '#2BA8B544'}`,
-                    borderRadius: L.id === 'dashboard' ? 8 : (L.id === 'diario' ? 0 : 4),
-                    display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: 3,
-                    position: 'relative',
-                  }}>
-                    {L.id === 'classic' && (
-                      <>
-                        <div style={{ width: 20, height: 2, background: Q.gold }} />
-                        <div style={{ width: 14, height: 4, background: Q.gold, opacity: 0.6 }} />
-                        <div style={{ width: 24, height: 2, background: Q.gold, opacity: 0.4 }} />
-                      </>
-                    )}
-                    {L.id === 'diario' && (
-                      <>
-                        <div style={{ display: 'flex', gap: 2 }}>
-                          {[1,2,3,4,5,6].map(i => <div key={i} style={{ width: 4, height: 4, borderRadius: '50%', background: i<=4 ? '#2BA8B5' : 'transparent', border: '1px solid #2BA8B5' }} />)}
-                        </div>
-                        <div style={{ width: 26, height: 1, background: '#2BA8B5', marginTop: 4 }} />
-                        <div style={{ width: 18, height: 8, background: '#9CC73A', marginTop: 4, borderRadius: 1 }} />
-                        <div style={{ width: 26, height: 1, background: '#2BA8B5', marginTop: 4 }} />
-                      </>
-                    )}
-                    {L.id === 'dashboard' && (
-                      <>
-                        <div style={{ display: 'flex', gap: 2, marginBottom: 3 }}>
-                          {[1,2,3].map(i => <div key={i} style={{ width: 8, height: 4, borderRadius: 2, background: i===1 ? '#2BA8B5' : '#2BA8B533' }} />)}
-                        </div>
-                        <div style={{ width: 32, height: 14, border: '1px solid #2BA8B5', borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <div style={{ width: 14, height: 6, background: '#9CC73A', borderRadius: 1 }} />
-                        </div>
-                      </>
-                    )}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.25em', color: selected ? Q.gold : Q.cream, textTransform: 'uppercase' }}>
-                      {selected ? '✓ ' : ''}{L.name}
-                    </div>
-                    <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 11, color: Q.goldDim, marginTop: 3, lineHeight: 1.4 }}>
-                      {L.description}
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-          <div style={{ marginTop: 10, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 11, color: Q.goldDim, textAlign: 'center' }}>
-            i layout "diario" e "dashboard" usano sfondo bianco, scritte turchese, dati verdi e simboli semaforici. il cambio è immediato.
           </div>
         </div>
 
