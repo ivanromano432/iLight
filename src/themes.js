@@ -176,10 +176,45 @@ export const THEMES = {
     border: '#1B4549',
     danger: DANGER,
   },
+
+  // 11. FOGLIO BIANCO — bianco puro, turchese chiaro, lime — versione "diario" chiara e arieggiata
+  foglioBianco: {
+    id: 'foglioBianco',
+    name: 'Foglio Bianco',
+    desc: 'sfondo bianco, turchese tenue e verde lime sui dati',
+    isDark: false,
+    swatch: ['#FFFFFF', '#2BA8B5', '#9CC73A'],
+    bg: '#FFFFFF', bg1: '#FFFFFF', bg2: '#FAFAFA',
+    ink: '#2A3942', dark: '#2A3942',
+    cream: '#2A3942', pale: '#2A3942', body: '#2A3942',
+    // Gold (linee, scritte, simboli): turchese del logo
+    gold: '#2BA8B5', sage: '#2BA8B5', silver: '#2BA8B5', accent: '#2BA8B5', amber: '#9CC73A', active: '#9CC73A',
+    // Dim: turchese più scuro
+    goldDim: '#8FA0A8', light: '#8FA0A8', dim: '#8FA0A8', tan: '#1E8FA0',
+    border: '#2BA8B5',
+    danger: DANGER,
+  },
+
+  // 12. CRUSCOTTO — bianco quasi puro, turchese contrastato, lime scuro — versione "dashboard" moderna
+  cruscotto: {
+    id: 'cruscotto',
+    name: 'Cruscotto',
+    desc: 'bianco moderno, turchese contrastato e lime carico',
+    isDark: false,
+    swatch: ['#FAFCFD', '#1E8FA0', '#8FB82A'],
+    bg: '#FAFCFD', bg1: '#FAFCFD', bg2: '#F0F4F6',
+    ink: '#1A2024', dark: '#1A2024',
+    cream: '#1A2024', pale: '#1A2024', body: '#1A2024',
+    // Turchese più scuro per maggior contrasto su bianco
+    gold: '#1E8FA0', sage: '#1E8FA0', silver: '#1E8FA0', accent: '#1E8FA0', amber: '#8FB82A', active: '#8FB82A',
+    goldDim: '#5A6470', light: '#5A6470', dim: '#5A6470', tan: '#155F6B',
+    border: '#1E8FA0',
+    danger: DANGER,
+  },
 };
 
 export const THEME_ORDER = [
-  'giardino', 'bersaglio', 'refettorio', 'biblioteca', 'alba', 'cuoio',
+  'giardino', 'bersaglio', 'foglioBianco', 'cruscotto', 'refettorio', 'biblioteca', 'alba', 'cuoio',
   'sera_viola', 'notte_blu', 'bosco_pastello', 'notturno_ambra',
 ];
 
