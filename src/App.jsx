@@ -1117,7 +1117,7 @@ function OggiPage({ theme, loaded, profile, weights, goal, meals, notes, water, 
                 <span style={{ color: '#9CC756' }}>Goal</span><span style={{ color: '#2A3942' }}>fit</span>
               </div>
             </div>
-            <div style={{ fontSize: 10, color: '#9AA5AB', textTransform: 'uppercase', letterSpacing: '0.18em', fontWeight: 600 }}>
+            <div style={{ fontSize: 10, color: '#9AA5AB', textTransform: 'uppercase', letterSpacing: '0.18em', fontWeight: 600, marginRight: 44 }}>
               {weekdayShort} {dayNum} · {nameUpper}
             </div>
           </div>
