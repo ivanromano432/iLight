@@ -2513,20 +2513,31 @@ function MenuPage({ theme, loaded, meals, updMeals, weights, goal, profile, updP
   // Target giornalieri di kcal e macronutrienti (Zona 40/30/30 per dimagrimento)
   const target = useMemo(() => computeNutritionTarget(profile, weights, goal), [profile, weights, goal]);
 
-  // Pasti pianificati di OGGI
+  // Pasti pianificati di OGGI (mostrati nella sezione "il mio menù")
   const todayK = dayKey(new Date());
   const plannedMeals = useMemo(() =>
     (meals||[]).filter(m => m.status === 'planned' && sameDay(new Date(m.ts), new Date())),
     [meals]
   );
+  // Tutti i pasti di OGGI (planned + eaten), usati per i totali della giornata.
+  // Così i pasti registrati come "mangiati" in Pasti contribuiscono al progresso del menù,
+  // e i pasti pianificati che vengono poi marcati "mangiati" NON spariscono dal totale.
+  const todayMeals = useMemo(() =>
+    (meals||[]).filter(m => sameDay(new Date(m.ts), new Date())),
+    [meals]
+  );
 
-  // Totali correnti dal menu pianificato
-  const totals = useMemo(() => plannedMeals.reduce((acc, m) => ({
+  // Totali correnti dalla giornata (pianificato + consumato)
+  const totals = useMemo(() => todayMeals.reduce((acc, m) => ({
     kcal: acc.kcal + (m.kcal||0),
     protein: acc.protein + (m.p||0),
     carbs: acc.carbs + (m.c||0),
     fat: acc.fat + (m.g||0),
-  }), { kcal: 0, protein: 0, carbs: 0, fat: 0 }), [plannedMeals]);
+  }), { kcal: 0, protein: 0, carbs: 0, fat: 0 }), [todayMeals]);
+
+  // Breakdown per la riga informativa
+  const eatenKcal = useMemo(() => todayMeals.filter(m => m.status === 'eaten').reduce((a,m) => a + (m.kcal||0), 0), [todayMeals]);
+  const plannedKcal = useMemo(() => todayMeals.filter(m => m.status === 'planned').reduce((a,m) => a + (m.kcal||0), 0), [todayMeals]);
 
   const targetReached = totals.kcal >= target.kcal * 0.95 && totals.kcal <= target.kcal * 1.05;
 
@@ -2537,8 +2548,8 @@ function MenuPage({ theme, loaded, meals, updMeals, weights, goal, profile, updP
       const summary = buildEatingHabitsSummary({ meals, weights, goal })
         + `\n\nTARGET ODIERNO (Dieta a Zona 40/30/30 per dimagrimento):\n`
         + `- Calorie: ${target.kcal} kcal · Proteine: ${target.protein}g · Carb: ${target.carbs}g · Grassi: ${target.fat}g\n`
-        + `MENU GIÀ PIANIFICATO OGGI:\n`
-        + `- Calorie: ${totals.kcal}/${target.kcal} kcal · Proteine: ${totals.protein}/${target.protein}g · Carb: ${totals.carbs}/${target.carbs}g · Grassi: ${totals.fat}/${target.fat}g\n`
+        + `MENU DI OGGI (consumato + pianificato):\n`
+        + `- Calorie: ${totals.kcal}/${target.kcal} kcal (${eatenKcal} mangiate, ${plannedKcal} in piano) · Proteine: ${totals.protein}/${target.protein}g · Carb: ${totals.carbs}/${target.carbs}g · Grassi: ${totals.fat}/${target.fat}g\n`
         + `RESIDUI DA COPRIRE: ${Math.max(0,target.kcal-totals.kcal)} kcal · ${Math.max(0,target.protein-totals.protein)}g P · ${Math.max(0,target.carbs-totals.carbs)}g C · ${Math.max(0,target.fat-totals.fat)}g G\n\n`
         + `LINEE GUIDA per i suggerimenti:\n`
         + `- Proponi solo alimenti che favoriscono il dimagrimento (alta sazietà, indice glicemico basso/medio, ricchi di nutrienti).\n`
@@ -2621,6 +2632,13 @@ function MenuPage({ theme, loaded, meals, updMeals, weights, goal, profile, updP
             <ProgressRow label="proteine · 30%" current={totals.protein} target={target.protein} unit="g" />
             <ProgressRow label="carboidrati · 40%" current={totals.carbs} target={target.carbs} unit="g" />
             <ProgressRow label="grassi · 30%" current={totals.fat} target={target.fat} unit="g" />
+            {(eatenKcal > 0 || plannedKcal > 0) && (
+              <div style={{marginTop:6,fontFamily:fGaramond,fontStyle:'italic',fontSize:11,color:J.sage,textAlign:'center',opacity:0.85}}>
+                {eatenKcal > 0 && <span><span style={{fontWeight:600}}>{fmt0(eatenKcal)}</span> mangiate</span>}
+                {eatenKcal > 0 && plannedKcal > 0 && <span> · </span>}
+                {plannedKcal > 0 && <span><span style={{fontWeight:600}}>{fmt0(plannedKcal)}</span> in piano</span>}
+              </div>
+            )}
             {targetReached && (
               <div style={{marginTop:6,padding:'8px 10px',background:`#A5B88922`,border:`1px solid #A5B889`,fontFamily:fGaramond,fontStyle:'italic',fontSize:12,color:'#6B8060',textAlign:'center'}}>
                 ✓ obiettivo del giorno raggiunto
