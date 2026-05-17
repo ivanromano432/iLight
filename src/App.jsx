@@ -957,16 +957,20 @@ function OggiPage({ theme, loaded, profile, weights, goal, meals, notes, water, 
   const todayWater = water?.[todayKey] || 0;
   const todayWorkouts = (workouts || []).filter(w => sameDay(new Date(w.ts), now));
   // Sonno: prendiamo l'ULTIMO registrato (qualsiasi data), come fa SonnoPage.
-  // `lastNightToday` serve solo a marcare la pill come "tracciato oggi".
+  // Per la pill di tracciamento giornaliero consideriamo "fresco" anche un sonno
+  // con wakeDate di ieri: capita di registrarlo dopo mezzanotte (e diventa "ieri"
+  // tecnicamente sul calendario) o di tracciarlo la mattina con la data del
+  // risveglio corretta. In entrambi i casi vale come "ho tracciato la notte appena passata".
   const sortedSleeps = useMemo(() => (sleeps || []).slice().sort((a, b) => (b.wakeDate || '').localeCompare(a.wakeDate || '')), [sleeps]);
   const lastNight = sortedSleeps[0] || null;
-  const lastNightToday = lastNight && lastNight.wakeDate === todayKey ? lastNight : null;
+  const yesterdayKey = dayKey(new Date(now.getTime() - 86400000));
+  const sleepRecentlyLogged = (sleeps || []).some(s => s.wakeDate === todayKey || s.wakeDate === yesterdayKey);
+  const lastNightToday = sleepRecentlyLogged ? lastNight : null;
   // Etichetta di freschezza per il sonno mostrato
   const sleepFreshness = (() => {
     if (!lastNight) return '';
     if (lastNight.wakeDate === todayKey) return 'stanotte';
-    const yKey = dayKey(new Date(now.getTime() - 86400000));
-    if (lastNight.wakeDate === yKey) return 'ieri';
+    if (lastNight.wakeDate === yesterdayKey) return 'ieri';
     try { return parseDayKey(lastNight.wakeDate).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' }); }
     catch { return ''; }
   })();
