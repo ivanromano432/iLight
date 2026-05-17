@@ -994,6 +994,17 @@ function OggiPage({ theme, loaded, profile, weights, goal, meals, notes, water, 
   const weekSessionTarget = 5; // 5 sessioni/settimana = ~150 min se ogni sessione dura 30 min
   const workoutPct = Math.min(100, (weekSessions / weekSessionTarget) * 100);
 
+  // === Diario completato oggi? === 
+  // La pill "diario" si spunta quando l'utente ha fatto almeno una volta l'analisi IA
+  // nella pagina Sera (vedi runAiAnalysis). Quella salva il risultato in localStorage
+  // con chiave per-utente per-giorno; qui ci limitiamo a verificare la presenza.
+  const aiDiaryDoneToday = useMemo(() => {
+    try {
+      const key = `goalfit_ai_sera_${profile?.id || 'anon'}_${todayKey}`;
+      return !!localStorage.getItem(key);
+    } catch (_) { return false; }
+  }, [profile?.id, todayKey]);
+
   // === Striscia "andamento giornata" === 6 categorie, ognuna ON se ha almeno un evento di oggi
   const dayDots = [
     { id: 'peso', label: 'peso', done: todayWeights.length > 0, color: '#D4A856' },
@@ -1001,7 +1012,7 @@ function OggiPage({ theme, loaded, profile, weights, goal, meals, notes, water, 
     { id: 'sonno', label: 'sonno', done: !!lastNightToday, color: '#9989B8' },
     { id: 'pasti', label: 'pasti', done: todayMeals.length > 0, color: '#C99A7A' },
     { id: 'corpo', label: 'corpo', done: todayWorkouts.length > 0, color: '#9CC73A' },
-    { id: 'note', label: 'diario', done: todayNotes.length > 0, color: '#8FA288' },
+    { id: 'note', label: 'diario', done: aiDiaryDoneToday, color: '#8FA288' },
   ];
   const dayDotsDone = dayDots.filter(d => d.done).length;
 
@@ -1084,7 +1095,7 @@ function OggiPage({ theme, loaded, profile, weights, goal, meals, notes, water, 
       { id: 'sonno',  label: 'sonno',  done: !!lastNightToday },
       { id: 'pasti',  label: 'pasti',  done: todayMeals.length > 0 },
       { id: 'corpo',  label: 'corpo',  done: todayWorkouts.length > 0 },
-      { id: 'diario', label: 'diario', done: todayNotes.length > 0 },
+      { id: 'diario', label: 'diario', done: aiDiaryDoneToday },
     ];
 
     // Spie semaforiche per i tile (OK verde / WARN ocra / INFO turchese / dim grigio)
