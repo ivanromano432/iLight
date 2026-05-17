@@ -1024,6 +1024,308 @@ function OggiPage({ theme, loaded, profile, weights, goal, meals, notes, water, 
     if (idx >= 0) setPage(idx);
   }
 
+  // ============================================================
+  // === VARIANTE CRUSCOTTO (dashboard) ===
+  // Layout completamente diverso quando il tema attivo ha
+  // structuralVariant === 'dashboard'. Stessa palette del Foglio
+  // Bianco ma layout moderno con header brand, striscia pill,
+  // hero card "PESO E CALORIE" e grid di tile.
+  // ============================================================
+  if (theme?.structuralVariant === 'dashboard') {
+    // Header data: "SAB 17 · IVAN"
+    const weekdayShort = now
+      .toLocaleDateString('it-IT', { weekday: 'short' })
+      .replace('.', '')
+      .toUpperCase()
+      .slice(0, 3);
+    const dayNum = now.getDate();
+    const nameUpper = (firstName || 'TU').toUpperCase();
+
+    // Pill strip: 6 categorie (stesso dataset di dayDots ma senza colori custom)
+    const pillCats = [
+      { id: 'peso',   label: 'peso',   done: todayWeights.length > 0 },
+      { id: 'acqua',  label: 'acqua',  done: todayWater > 0 },
+      { id: 'sonno',  label: 'sonno',  done: !!lastNight },
+      { id: 'pasti',  label: 'pasti',  done: todayMeals.length > 0 },
+      { id: 'corpo',  label: 'corpo',  done: todayWorkouts.length > 0 },
+      { id: 'diario', label: 'diario', done: todayNotes.length > 0 },
+    ];
+
+    // Spie semaforiche per i tile (OK verde / WARN ocra / INFO turchese / dim grigio)
+    const acquaSpia = waterPct >= 100 ? '#9CC756' : waterPct >= 50 ? '#3F95A1' : '#D9B86A';
+    const sonnoSpia = sleepH == null ? '#9AA5AB' : sleepH < 6 ? '#E04545' : sleepH < 7 ? '#D9B86A' : sleepH <= 9 ? '#9CC756' : '#D9B86A';
+    const corpoSpia = workoutPct >= 100 ? '#9CC756' : workoutPct >= 50 ? '#3F95A1' : '#D9B86A';
+    const ritualeDone = totalSupps > 0 && todayTaken >= totalSupps;
+    const ritualeSpia = totalSupps === 0 ? '#9AA5AB' : ritualeDone ? '#9CC756' : todayTaken > 0 ? '#3F95A1' : '#D9B86A';
+
+    // Stili condivisi dei tile
+    const tile = (extra = {}) => ({
+      position: 'relative', textAlign: 'center',
+      border: '1px solid #E5EAEE', borderRadius: 14,
+      padding: '12px 10px', background: '#FFFFFF',
+      color: '#2A3942', fontFamily: "'Inter', system-ui, sans-serif",
+      ...extra,
+    });
+    const tileLabel = { fontSize: 9, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: '#3F95A1', marginBottom: 6 };
+    const tileValue = { fontSize: 22, fontWeight: 800, color: '#9CC756', lineHeight: 1 };
+    const tileUnit  = { fontSize: 11, fontWeight: 500, color: '#5AA8B3' };
+    const tileSpia  = (color) => ({ position: 'absolute', top: 8, right: 8, width: 8, height: 8, borderRadius: '50%', background: color });
+    const tileBar   = (pct, color) => (
+      <div style={{ height: 4, background: '#F0F2F4', borderRadius: 2, marginTop: 8, overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: `${pct}%`, background: color, transition: 'width 0.3s ease' }} />
+      </div>
+    );
+    const pillBtn = {
+      background: 'transparent', color: '#3F95A1', border: '1px solid #3F95A1',
+      fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase',
+      padding: '8px 14px', borderRadius: 999, cursor: 'pointer',
+      fontFamily: "'Inter', system-ui, sans-serif",
+    };
+
+    return (
+      <div style={{ minHeight: '100vh', background: '#FFFFFF', color: '#2A3942', fontFamily: "'Inter', system-ui, sans-serif" }}>
+        <div style={{ padding: '20px 18px 28px', maxWidth: 480, margin: '0 auto' }}>
+
+          {/* === HEADER === */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <img src="/icon-192.png" alt="" style={{ width: 28, height: 28, borderRadius: 8, display: 'block' }} />
+              <div style={{ fontSize: 16, fontWeight: 800, letterSpacing: '-0.01em' }}>
+                <span style={{ color: '#9CC756' }}>Goal</span><span style={{ color: '#2A3942' }}>fit</span>
+              </div>
+            </div>
+            <div style={{ fontSize: 10, color: '#9AA5AB', textTransform: 'uppercase', letterSpacing: '0.18em', fontWeight: 600 }}>
+              {weekdayShort} {dayNum} · {nameUpper}
+            </div>
+          </div>
+
+          {!loaded && <Loading color="#9AA5AB" />}
+
+          {loaded && (<>
+
+            {/* === STRISCIA PILL === */}
+            <div style={{ display: 'flex', gap: 4, background: '#FAFAFA', padding: 4, borderRadius: 999, marginBottom: 14 }}>
+              {pillCats.map(p => (
+                <div key={p.id} style={{
+                  flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                  background: p.done ? '#3F95A1' : '#FFFFFF',
+                  border: p.done ? 'none' : '1px solid #E5EAEE',
+                  borderRadius: 999, padding: '6px 4px', gap: 3,
+                }}>
+                  <div style={{
+                    width: 14, height: 14, borderRadius: '50%',
+                    border: `1.5px solid ${p.done ? '#FFFFFF' : '#3F95A1'}`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    {p.done && <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#FFFFFF' }} />}
+                  </div>
+                  <div style={{
+                    fontSize: 8, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase',
+                    color: p.done ? '#FFFFFF' : '#3F95A1',
+                  }}>
+                    {p.label}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* === HERO CARD: PESO E CALORIE === */}
+            <div style={{
+              border: '1px solid #3F95A1', borderRadius: 16, padding: 18, marginBottom: 12,
+              background: 'linear-gradient(180deg, #FFFFFF 0%, rgba(63,149,161,0.02) 100%)',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: '#3F95A1' }}>
+                  peso e calorie
+                </div>
+                <div style={{ fontSize: 11, color: '#5AA8B3' }}>
+                  {goal ? `obiettivo ${fmt(goal)} kg` : 'imposta obiettivo'}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 4 }}>
+                <div style={{ fontSize: 38, fontWeight: 800, color: '#9CC756', letterSpacing: '-1px', lineHeight: 1 }}>
+                  {lastWeight ? fmt(lastWeight.weight) : '—'}
+                </div>
+                <div style={{ fontSize: 14, fontWeight: 500, color: '#3F95A1' }}>kg</div>
+              </div>
+
+              <div style={{ fontSize: 12, fontWeight: 600, color: '#9CC756', marginBottom: 14 }}>
+                {(() => {
+                  if (!lastWeight) return 'non hai ancora pesato oggi';
+                  if (goalDistance == null) return 'imposta un obiettivo per vedere il delta';
+                  if (Math.abs(goalDistance) < 0.5) return '✓ sei al peso obiettivo';
+                  if (goalDistance > 0) return `${fmt(goalDistance)} kg dall'obiettivo · sulla buona strada`;
+                  return `${fmt(Math.abs(goalDistance))} kg sotto l'obiettivo`;
+                })()}
+              </div>
+
+              {/* Divider */}
+              <div style={{ height: 1, background: 'rgba(63,149,161,0.15)', marginBottom: 14 }} />
+
+              {/* Macro Zona */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: '#3F95A1' }}>
+                  macro zona
+                </div>
+                <div style={{ fontSize: 11, color: '#5AA8B3' }}>
+                  <span style={{ color: '#9CC756', fontWeight: 700 }}>{fmt0(todayKcal)}</span>
+                  <span> / {fmt0(kcalTarget)} kcal</span>
+                </div>
+              </div>
+
+              {totalMacroKcal > 0 ? (
+                <>
+                  <div style={{ display: 'flex', height: 6, width: '100%', borderRadius: 3, overflow: 'hidden', marginBottom: 8, background: '#F0F2F4' }}>
+                    <div style={{ width: `${pctC}%`, background: '#9CC756', minWidth: pctC > 0 ? 2 : 0 }} />
+                    <div style={{ width: `${pctP}%`, background: '#3F95A1', minWidth: pctP > 0 ? 2 : 0 }} />
+                    <div style={{ width: `${pctG}%`, background: '#D9B86A', minWidth: pctG > 0 ? 2 : 0 }} />
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#9AA5AB' }}>
+                    <span><span style={{ color: '#9CC756' }}>●</span> carb {pctC}%</span>
+                    <span><span style={{ color: '#3F95A1' }}>●</span> prot {pctP}%</span>
+                    <span><span style={{ color: '#D9B86A' }}>●</span> gras {pctG}%</span>
+                  </div>
+                  {!inZone && (
+                    <div style={{ marginTop: 8, fontSize: 11, color: '#9AA5AB', lineHeight: 1.4 }}>
+                      {(() => {
+                        const dev = [
+                          { name: 'carboidrati', cur: pctC, tgt: 40 },
+                          { name: 'proteine', cur: pctP, tgt: 30 },
+                          { name: 'grassi', cur: pctG, tgt: 30 },
+                        ].map(m => ({ ...m, delta: m.cur - m.tgt }));
+                        const tooHigh = dev.filter(m => m.delta > 5).sort((a, b) => b.delta - a.delta)[0];
+                        const tooLow = dev.filter(m => m.delta < -5).sort((a, b) => a.delta - b.delta)[0];
+                        if (tooHigh && tooLow) return `troppi ${tooHigh.name}, pochi ${tooLow.name}`;
+                        if (tooHigh) return `troppi ${tooHigh.name}`;
+                        if (tooLow) return `pochi ${tooLow.name}`;
+                        return '';
+                      })()}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div style={{ fontSize: 12, color: '#9AA5AB' }}>
+                  nessun pasto registrato oggi
+                </div>
+              )}
+            </div>
+
+            {/* === GRID 3 colonne: acqua / sonno / corpo === */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 8 }}>
+              {/* Acqua (tap per +1) */}
+              <button onClick={async () => { await updWater({ ...water, [todayKey]: Math.min(100, todayWater + 1) }); }}
+                style={{ ...tile(), cursor: 'pointer' }}>
+                <div style={tileSpia(acquaSpia)} />
+                <div style={tileLabel}>acqua</div>
+                <div style={tileValue}>
+                  {todayWater}<span style={tileUnit}>/{waterGoal}</span>
+                </div>
+                {tileBar(waterPct, acquaSpia)}
+              </button>
+
+              {/* Sonno */}
+              <div style={tile()}>
+                <div style={tileSpia(sonnoSpia)} />
+                <div style={tileLabel}>sonno</div>
+                <div style={tileValue}>{lastNight ? fmtDur(sleepH) : '—'}</div>
+                {tileBar(sleepPct, sonnoSpia)}
+              </div>
+
+              {/* Corpo (settimana) */}
+              <button onClick={() => go('respiro')} style={{ ...tile(), cursor: 'pointer' }}>
+                <div style={tileSpia(corpoSpia)} />
+                <div style={tileLabel}>corpo</div>
+                <div style={tileValue}>
+                  {weekSessions}<span style={tileUnit}>/{weekSessionTarget}</span>
+                </div>
+                {tileBar(workoutPct, corpoSpia)}
+              </button>
+            </div>
+
+            {/* === GRID 2 colonne: rituale / respiro === */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+              {/* Rituale */}
+              <button onClick={() => go('integra')} style={{ ...tile(), cursor: 'pointer' }}>
+                <div style={tileSpia(ritualeSpia)} />
+                <div style={tileLabel}>rituale</div>
+                <div style={tileValue}>
+                  {todayTaken}<span style={tileUnit}>/{totalSupps || 0}</span>
+                </div>
+                {tileBar(totalSupps > 0 ? Math.min(100, (todayTaken / totalSupps) * 100) : 0, ritualeSpia)}
+              </button>
+
+              {/* Respiro (preview - placeholder) */}
+              <button onClick={() => go('respiro')} style={{ ...tile(), cursor: 'pointer' }}>
+                <div style={tileSpia('#9AA5AB')} />
+                <div style={tileLabel}>respiro</div>
+                <div style={tileValue}>—</div>
+                {tileBar(0, '#3F95A1')}
+              </button>
+            </div>
+
+            {/* === Digiuno attivo (se c'è) === */}
+            {activeFast && (() => {
+              const startTs = new Date(activeFast.started_ts);
+              const elapsedH = (now.getTime() - startTs.getTime()) / 3600000;
+              const targetH = activeFast.planned_hours || null;
+              const pct = targetH ? Math.min(100, (elapsedH / targetH) * 100) : null;
+              if (!isFinite(elapsedH)) return null;
+              return (
+                <div style={{
+                  border: '1px solid #3F95A1', borderRadius: 14, padding: '14px 16px',
+                  background: 'rgba(63,149,161,0.04)', marginBottom: 12,
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: '#3F95A1', marginBottom: 4 }}>
+                        digiuno in corso
+                      </div>
+                      <div style={{ fontSize: 22, fontWeight: 800, color: '#9CC756', lineHeight: 1 }}>
+                        {elapsedH.toFixed(1)}<span style={{ fontSize: 12, fontWeight: 500, color: '#5AA8B3' }}>h{targetH ? ` / ${targetH}h` : ''}</span>
+                      </div>
+                      {pct != null && (
+                        <div style={{ fontSize: 12, color: '#9AA5AB', marginTop: 2 }}>{pct.toFixed(0)}% completato</div>
+                      )}
+                    </div>
+                    <button onClick={() => go('digiuno')} style={pillBtn}>vedi</button>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* === Riepilogo della giornata === */}
+            <div style={{ marginTop: 14, textAlign: 'center' }}>
+              <button onClick={() => go('sera')} style={{ ...pillBtn, padding: '10px 22px', letterSpacing: '0.2em' }}>
+                riepilogo della giornata
+              </button>
+            </div>
+
+            {/* === Frase di chiusura === */}
+            <div style={{ marginTop: 22, textAlign: 'center', fontSize: 12, color: '#9AA5AB', lineHeight: 1.5, padding: '0 16px' }}>
+              {(() => {
+                if (todayMeals.length === 0 && !lastWeight && todayNotes.length === 0) {
+                  return 'Una piccola pesata, una nota o un bicchiere d\'acqua: basta poco per cominciare.';
+                }
+                if (goalDistance != null && Math.abs(goalDistance) < 1) {
+                  return 'Sei a un soffio dall\'obiettivo. Costanza, non fretta.';
+                }
+                if (todayNotes.length >= 3) {
+                  return 'Stai scrivendo molto, è una buona giornata.';
+                }
+                if (todayWater >= waterGoal) {
+                  return 'Acqua a posto. Il corpo te ne sarà grato.';
+                }
+                return 'Una cosa per volta. Niente conteggi ossessivi, solo cura.';
+              })()}
+            </div>
+
+          </>)}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ minHeight: '100vh', background: `radial-gradient(ellipse at top, ${Q.bg1} 0%, ${Q.bg2} 100%)`, color: Q.cream, fontFamily: fGaramond, position: 'relative', overflow: 'hidden' }}>
       <div aria-hidden style={{ position: 'absolute', inset: 14, border: `1px solid ${Q.gold}40`, borderRadius: 20, pointerEvents: 'none', zIndex: 1 }} />

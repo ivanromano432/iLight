@@ -177,22 +177,28 @@ export const THEMES = {
     danger: DANGER,
   },
 
-  // 11. FOGLIO BIANCO — bianco puro, turchese chiaro, lime — versione "diario" chiara e arieggiata
+  // 11. FOGLIO BIANCO — palette definitiva (turchese #3F95A1 + lime #9CC756), variante "diario"
   foglioBianco: {
     id: 'foglioBianco',
     name: 'Foglio Bianco',
     desc: 'sfondo bianco, turchese tenue e verde lime sui dati',
     isDark: false,
-    swatch: ['#FFFFFF', '#2BA8B5', '#9CC73A'],
+    swatch: ['#FFFFFF', '#3F95A1', '#9CC756'],
     bg: '#FFFFFF', bg1: '#FFFFFF', bg2: '#FAFAFA',
     ink: '#2A3942', dark: '#2A3942',
     cream: '#2A3942', pale: '#2A3942', body: '#2A3942',
-    // Gold (linee, scritte, simboli): turchese del logo
-    gold: '#2BA8B5', sage: '#2BA8B5', silver: '#2BA8B5', accent: '#2BA8B5', amber: '#9CC73A', active: '#9CC73A',
-    // Dim: turchese più scuro
-    goldDim: '#8FA0A8', light: '#8FA0A8', dim: '#8FA0A8', tan: '#1E8FA0',
-    border: '#2BA8B5',
+    // Turchese principale (label, linee, simboli)
+    gold: '#3F95A1', sage: '#3F95A1', silver: '#3F95A1', accent: '#3F95A1',
+    // Verde lime per i dati grandi
+    amber: '#9CC756', active: '#9CC756',
+    // Dim: grigio neutro per testi secondari
+    goldDim: '#9AA5AB', light: '#9AA5AB', dim: '#9AA5AB',
+    // Turchese dim per unità di misura
+    tan: '#5AA8B3',
+    border: '#3F95A1',
     danger: DANGER,
+    // Colori semaforici per barre/spie
+    okColor: '#9CC756', infoColor: '#3F95A1', warnColor: '#D9B86A', badColor: '#E04545',
     // === Override strutturali per il "vestito" Diario ===
     fontText: "'Cardo', serif",         // font principale (paragrafi, titoli, valori)
     fontMicro: "'Cinzel', serif",       // font dei micro-label maiuscoli spaziati
@@ -201,21 +207,23 @@ export const THEMES = {
     structuralVariant: 'diario',         // identificatore variante (per styling specifico)
   },
 
-  // 12. CRUSCOTTO — bianco quasi puro, turchese contrastato, lime scuro — versione "dashboard" moderna
+  // 12. CRUSCOTTO — stessa palette di Foglio Bianco, layout dashboard moderno (font Inter)
   cruscotto: {
     id: 'cruscotto',
     name: 'Cruscotto',
-    desc: 'bianco moderno, turchese contrastato e lime carico',
+    desc: 'palette identica al Foglio Bianco, layout dashboard moderno',
     isDark: false,
-    swatch: ['#FAFCFD', '#1E8FA0', '#8FB82A'],
-    bg: '#FAFCFD', bg1: '#FAFCFD', bg2: '#F0F4F6',
-    ink: '#1A2024', dark: '#1A2024',
-    cream: '#1A2024', pale: '#1A2024', body: '#1A2024',
-    // Turchese più scuro per maggior contrasto su bianco
-    gold: '#1E8FA0', sage: '#1E8FA0', silver: '#1E8FA0', accent: '#1E8FA0', amber: '#8FB82A', active: '#8FB82A',
-    goldDim: '#5A6470', light: '#5A6470', dim: '#5A6470', tan: '#155F6B',
-    border: '#1E8FA0',
+    swatch: ['#FFFFFF', '#3F95A1', '#9CC756'],
+    bg: '#FFFFFF', bg1: '#FFFFFF', bg2: '#FAFAFA',
+    ink: '#2A3942', dark: '#2A3942',
+    cream: '#2A3942', pale: '#2A3942', body: '#2A3942',
+    gold: '#3F95A1', sage: '#3F95A1', silver: '#3F95A1', accent: '#3F95A1',
+    amber: '#9CC756', active: '#9CC756',
+    goldDim: '#9AA5AB', light: '#9AA5AB', dim: '#9AA5AB',
+    tan: '#5AA8B3',
+    border: '#3F95A1',
     danger: DANGER,
+    okColor: '#9CC756', infoColor: '#3F95A1', warnColor: '#D9B86A', badColor: '#E04545',
     // === Override strutturali per il "vestito" Dashboard ===
     fontText: "'Inter', system-ui, sans-serif",
     fontMicro: "'Inter', system-ui, sans-serif",

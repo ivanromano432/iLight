@@ -41,26 +41,6 @@ function buildCSS(theme) {
   return `
     /* === ${theme.name} (${theme.structuralVariant}) === */
 
-    /* Indicatore visivo (debug): un piccolo bordo verde sull'angolo della pagina che conferma che il tema è applicato */
-    html.${cls} body::before {
-      content: '${theme.structuralVariant === 'diario' ? '◇ DIARIO' : '▣ CRUSCOTTO'}';
-      position: fixed;
-      bottom: 8px;
-      right: 8px;
-      z-index: 99999;
-      font-size: 9px;
-      letter-spacing: 0.2em;
-      color: ${green};
-      background: ${bg};
-      padding: 3px 8px;
-      border: 1px solid ${green};
-      border-radius: ${isDashboard ? '10px' : '0'};
-      font-family: ${fontMicro};
-      font-weight: 700;
-      pointer-events: none;
-      opacity: 0.65;
-    }
-
     /* Background piatto: sostituisce ovunque ci sia un radial-gradient inline */
     html.${cls} [style*="radial-gradient"],
     body.${cls} [style*="radial-gradient"] {
