@@ -3861,19 +3861,14 @@ function DigiunoPage({ theme, loaded, fasts, updFasts }){
   const [category, setCategory] = useState('intermittent');
   const [customHours, setCustomHours] = useState('');
   const [confirmEnd, setConfirmEnd] = useState(false);
-  const [confirmDel, setConfirmDel] = useState(null); // id digiuno da eliminare
+  const [editing, setEditing] = useState(null); // fast in edit (oggetto fast intero)
 
-  // Reset auto delle conferme dopo 4s
+  // Reset auto della conferma "termina" dopo 4s
   useEffect(()=>{
     if (!confirmEnd) return;
     const id = setTimeout(()=>setConfirmEnd(false), 4000);
     return ()=>clearTimeout(id);
   },[confirmEnd]);
-  useEffect(()=>{
-    if (!confirmDel) return;
-    const id = setTimeout(()=>setConfirmDel(null), 4000);
-    return ()=>clearTimeout(id);
-  },[confirmDel]);
 
   const active = useMemo(()=>fasts.find(f=>!f.ended_ts) || null,[fasts]);
   const past = useMemo(()=>fasts.filter(f=>f.ended_ts).sort((a,b)=>new Date(b.ended_ts)-new Date(a.ended_ts)),[fasts]);
@@ -3897,6 +3892,11 @@ function DigiunoPage({ theme, loaded, fasts, updFasts }){
   }
   async function deleteFast(id){
     await updFasts(fasts.filter(f=>f.id!==id));
+    setEditing(null);
+  }
+  async function updateFast(updated){
+    await updFasts(fasts.map(f=>f.id===updated.id?updated:f));
+    setEditing(null);
   }
   async function startCustom(){
     const h = parseInt(customHours);
@@ -3995,12 +3995,12 @@ function DigiunoPage({ theme, loaded, fasts, updFasts }){
                   const dur = (new Date(f.ended_ts)-new Date(f.started_ts))/3600000;
                   const reached = (dur/f.planned_hours)*100;
                   return (
-                    <button key={f.id} onClick={()=>{ if(confirmDel===f.id){ deleteFast(f.id); setConfirmDel(null); } else { setConfirmDel(f.id); } }} style={{width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',padding:'11px 4px',background:confirmDel===f.id?`${D.danger}1A`:'transparent',border:'none',borderBottom:`1px solid ${D.accent}1F`,cursor:'pointer',textAlign:'left',color:D.cream}}>
+                    <button key={f.id} onClick={()=>setEditing(f)} style={{width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',padding:'11px 4px',background:'transparent',border:'none',borderBottom:`1px solid ${D.accent}1F`,cursor:'pointer',textAlign:'left',color:D.cream}}>
                       <div>
                         <div style={{fontFamily:fBodoni,fontStyle:'italic',fontSize:16}}>{fmtElapsed((new Date(f.ended_ts)-new Date(f.started_ts)))}{' '}<span style={{fontSize:11,color:D.dim}}>· {f.label}</span></div>
                         <div style={{fontFamily:fDmSans,fontSize:9,letterSpacing:'0.15em',color:D.dim,marginTop:2,textTransform:'uppercase'}}>{new Date(f.started_ts).toLocaleDateString('it-IT',{day:'numeric',month:'short'})} — {Math.round(reached)}%</div>
                       </div>
-                      <span style={{fontFamily:fBodoni,fontStyle:'italic',fontSize:12,color:confirmDel===f.id?D.danger:D.dim}}>{confirmDel===f.id?'tocca ancora ✗':'elimina'}</span>
+                      <span style={{fontFamily:fBodoni,fontStyle:'italic',fontSize:18,color:D.dim,paddingRight:6}}>›</span>
                     </button>
                   );
                 })}
@@ -4013,6 +4013,7 @@ function DigiunoPage({ theme, loaded, fasts, updFasts }){
           <>
             <div style={{textAlign:'center',marginTop:20}}>
               <div style={{fontFamily:fDmSans,fontSize:9,letterSpacing:'0.45em',color:D.amber,textTransform:'uppercase',marginBottom:6}}>{active.label} · iniziato {new Date(active.started_ts).toLocaleString('it-IT',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</div>
+              <button onClick={()=>setEditing(active)} style={{background:'transparent',border:'none',color:D.dim,fontFamily:fDmSans,fontSize:9,letterSpacing:'0.3em',textTransform:'uppercase',cursor:'pointer',padding:'2px 6px',marginBottom:8,textDecoration:'underline',textUnderlineOffset:3}}>modifica inizio</button>
               <div style={{fontFamily:fBodoni,fontStyle:'italic',fontWeight:400,fontSize:64,lineHeight:1,color:D.cream,letterSpacing:'-0.02em'}}>{fmtElapsed(elapsedMs)}</div>
               <div style={{fontFamily:fDmSans,fontSize:10,letterSpacing:'0.4em',color:D.dim,marginTop:6,textTransform:'uppercase'}}>su {plannedH}h obiettivo</div>
             </div>
@@ -4069,6 +4070,157 @@ function DigiunoPage({ theme, loaded, fasts, updFasts }){
               )}
             </div>
           </>
+        )}
+      </div>
+
+      {editing && (
+        <FastEditModal
+          fast={editing}
+          isActive={!editing.ended_ts}
+          D={D}
+          onClose={()=>setEditing(null)}
+          onSave={updateFast}
+          onDelete={deleteFast}
+        />
+      )}
+    </div>
+  );
+}
+
+
+/* ====== Modale modifica/elimina digiuno ====== */
+function FastEditModal({ fast, isActive, D, onClose, onSave, onDelete }){
+  // Converte ISO timestamp in valore datetime-local (YYYY-MM-DDTHH:mm in fuso locale)
+  function isoToInput(iso){
+    if(!iso) return '';
+    const d = new Date(iso);
+    const pad = n => String(n).padStart(2,'0');
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+  function inputToISO(s){
+    if(!s) return null;
+    const d = new Date(s);
+    return isNaN(d.getTime()) ? null : d.toISOString();
+  }
+
+  const [startedInput, setStartedInput] = useState(isoToInput(fast.started_ts));
+  const [endedInput, setEndedInput]     = useState(isoToInput(fast.ended_ts));
+  const [plannedHours, setPlannedHours] = useState(String(fast.planned_hours||16));
+  const [label, setLabel]               = useState(fast.label||'');
+  const [confirmDel, setConfirmDel]     = useState(false);
+
+  // Validazione
+  const startedISO = inputToISO(startedInput);
+  const endedISO   = isActive ? null : inputToISO(endedInput);
+  const nowMs      = Date.now();
+  const phNum      = parseInt(plannedHours, 10);
+  const errors = [];
+  if(!startedISO) errors.push('Inizio mancante o non valido');
+  if(startedISO && new Date(startedISO).getTime() > nowMs) errors.push("L'inizio non può essere nel futuro");
+  if(!isActive){
+    if(!endedISO) errors.push('Fine mancante o non valida');
+    if(startedISO && endedISO && new Date(endedISO).getTime() <= new Date(startedISO).getTime()) errors.push('La fine deve essere dopo l\'inizio');
+    if(endedISO && new Date(endedISO).getTime() > nowMs) errors.push('La fine non può essere nel futuro');
+  }
+  if(isNaN(phNum) || phNum < 1 || phNum > 240) errors.push('Obiettivo: 1–240 ore');
+  const canSave = errors.length === 0;
+
+  // Durata effettiva calcolata in tempo reale (solo se non attivo e dati validi)
+  const effectiveDurH = (!isActive && startedISO && endedISO) ? (new Date(endedISO).getTime() - new Date(startedISO).getTime())/3600000 : null;
+
+  function handleSave(){
+    if(!canSave) return;
+    const planned_end = startedISO ? new Date(new Date(startedISO).getTime() + phNum*3600000).toISOString() : fast.planned_end_ts;
+    const updated = {
+      ...fast,
+      started_ts: startedISO,
+      ended_ts: isActive ? null : endedISO,
+      planned_hours: phNum,
+      planned_end_ts: planned_end,
+      label: label.trim() || `${phNum}h`,
+    };
+    onSave(updated);
+  }
+
+  // Stili
+  const overlayStyle = { position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', backdropFilter:'blur(4px)', WebkitBackdropFilter:'blur(4px)', zIndex:200, display:'flex', alignItems:'center', justifyContent:'center', padding:20 };
+  const cardStyle = { background:`linear-gradient(180deg, ${D.bg1} 0%, ${D.bg2} 100%)`, border:`1px solid ${D.accent||D.gold}55`, maxWidth:380, width:'100%', padding:'24px 22px', borderRadius:4, maxHeight:'88vh', overflowY:'auto', color:D.cream };
+  const labelStyle = { fontFamily:fDmSans, fontSize:9, letterSpacing:'0.4em', color:D.dim, textTransform:'uppercase', marginBottom:6 };
+  const inputStyle = { width:'100%', background:'transparent', border:`1px solid ${(D.accent||D.gold)}55`, fontFamily:fBodoni, fontStyle:'italic', fontSize:16, color:D.cream, padding:'10px 12px', outline:'none', borderRadius:0, colorScheme:'dark' };
+
+  return (
+    <div onClick={onClose} style={overlayStyle}>
+      <div onClick={e=>e.stopPropagation()} style={cardStyle}>
+        <h2 style={{fontFamily:fBodoni, fontStyle:'italic', fontWeight:400, fontSize:22, color:D.cream, textAlign:'center', margin:0}}>
+          {isActive ? 'Modifica digiuno attivo' : 'Modifica digiuno'}
+        </h2>
+        {isActive && (
+          <div style={{fontFamily:fBodoni, fontStyle:'italic', fontSize:12, color:D.dim, textAlign:'center', marginTop:4, marginBottom:6}}>
+            Sul digiuno in corso puoi correggere solo l'orario di inizio.
+          </div>
+        )}
+
+        <div style={{marginTop:18}}>
+          <div style={labelStyle}>inizio</div>
+          <input type="datetime-local" value={startedInput} onChange={e=>setStartedInput(e.target.value)} style={inputStyle} />
+        </div>
+
+        {!isActive && (
+          <div style={{marginTop:14}}>
+            <div style={labelStyle}>fine</div>
+            <input type="datetime-local" value={endedInput} onChange={e=>setEndedInput(e.target.value)} style={inputStyle} />
+          </div>
+        )}
+
+        {!isActive && (
+          <div style={{display:'grid', gridTemplateColumns:'1fr 1.5fr', gap:10, marginTop:14}}>
+            <div>
+              <div style={labelStyle}>obiettivo (h)</div>
+              <input type="text" inputMode="numeric" value={plannedHours} onChange={e=>setPlannedHours(e.target.value.replace(/[^0-9]/g,''))} style={{...inputStyle, textAlign:'center'}} />
+            </div>
+            <div>
+              <div style={labelStyle}>etichetta</div>
+              <input type="text" value={label} onChange={e=>setLabel(e.target.value)} placeholder="es. 16:8" style={inputStyle} />
+            </div>
+          </div>
+        )}
+
+        {effectiveDurH != null && (
+          <div style={{marginTop:14, textAlign:'center', fontFamily:fBodoni, fontStyle:'italic', fontSize:14, color:D.amber}}>
+            durata effettiva: {Math.floor(effectiveDurH)}h {String(Math.round((effectiveDurH%1)*60)).padStart(2,'0')}m
+            {phNum > 0 && (
+              <span style={{color:D.dim, fontSize:12}}> · {Math.round((effectiveDurH/phNum)*100)}% obiettivo</span>
+            )}
+          </div>
+        )}
+
+        {errors.length > 0 && (
+          <div style={{marginTop:14, padding:'10px 12px', background:`${D.danger}1A`, border:`1px solid ${D.danger}55`, fontFamily:fBodoni, fontStyle:'italic', fontSize:13, color:D.danger}}>
+            {errors[0]}
+          </div>
+        )}
+
+        <div style={{display:'flex', gap:8, marginTop:20, justifyContent:'space-between', alignItems:'center'}}>
+          <button onClick={onClose} style={{background:'transparent', color:D.dim, border:`1px solid ${D.dim}66`, fontFamily:fDmSans, fontSize:10, letterSpacing:'0.3em', padding:'10px 16px', cursor:'pointer', textTransform:'uppercase'}}>annulla</button>
+          <button onClick={handleSave} disabled={!canSave} style={{background:canSave?(D.amber||D.gold):`${D.dim}55`, color:canSave?D.bg2:D.dim, border:'none', fontFamily:fDmSans, fontSize:10, letterSpacing:'0.35em', padding:'10px 22px', cursor:canSave?'pointer':'not-allowed', textTransform:'uppercase'}}>salva</button>
+        </div>
+
+        {/* Sezione elimina — solo per digiuni terminati, con conferma esplicita */}
+        {!isActive && (
+          <div style={{marginTop:22, paddingTop:18, borderTop:`1px solid ${D.accent||D.gold}1F`}}>
+            {!confirmDel ? (
+              <button onClick={()=>setConfirmDel(true)} style={{width:'100%', background:'transparent', color:D.danger, border:`1px solid ${D.danger}66`, fontFamily:fDmSans, fontSize:10, letterSpacing:'0.35em', padding:'10px 14px', cursor:'pointer', textTransform:'uppercase'}}>elimina digiuno</button>
+            ) : (
+              <div style={{padding:'14px', background:`${D.danger}1A`, border:`1px solid ${D.danger}55`}}>
+                <div style={{fontFamily:fBodoni, fontStyle:'italic', fontSize:14, color:D.cream, textAlign:'center', marginBottom:4}}>Eliminare questo digiuno?</div>
+                <div style={{fontFamily:fBodoni, fontStyle:'italic', fontSize:12, color:D.dim, textAlign:'center', marginBottom:12}}>L'operazione non è reversibile.</div>
+                <div style={{display:'flex', gap:8, justifyContent:'center'}}>
+                  <button onClick={()=>setConfirmDel(false)} style={{flex:1, background:'transparent', color:D.dim, border:`1px solid ${D.dim}66`, fontFamily:fDmSans, fontSize:10, letterSpacing:'0.3em', padding:'10px 14px', cursor:'pointer', textTransform:'uppercase'}}>annulla</button>
+                  <button onClick={()=>onDelete(fast.id)} style={{flex:1, background:D.danger, color:D.bg2, border:'none', fontFamily:fDmSans, fontSize:10, letterSpacing:'0.3em', padding:'10px 14px', cursor:'pointer', textTransform:'uppercase'}}>sì, elimina</button>
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>
