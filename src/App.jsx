@@ -763,58 +763,81 @@ export default function App({ user, onLogout }){
   const displayName = profile?.display_name || '';
   const accountInitial = ((displayName?.[0]) || accountEmail[0] || '?').toUpperCase();
   const avatarSrc = profile?.avatar_data || null;
-  const renderAccountMenu = () => (
-    <>
-      <div style={{ position: 'fixed', top: 12, right: 12, zIndex: 9000 }}>
-        <button onClick={() => setShowAccountMenu(!showAccountMenu)} aria-label="account"
-          style={{ width: 36, height: 36, borderRadius: '50%', background: avatarSrc ? 'transparent' : 'rgba(232,224,210,0.85)', border: '1px solid rgba(60,51,41,0.2)', color: '#3C3329', fontFamily: "'Cardo',serif", fontSize: 16, fontStyle: 'italic', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', boxShadow: '0 2px 6px rgba(0,0,0,0.08)', overflow: 'hidden', padding: 0 }}>
-          {avatarSrc ? <img src={avatarSrc} alt="profilo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : accountInitial}
-        </button>
-        {showAccountMenu && (
-          <div style={{ position: 'absolute', top: 44, right: 0, background: '#E8E0D2', border: '1px solid rgba(60,51,41,0.2)', padding: '14px 16px', minWidth: 240, fontFamily: "'Cardo',serif", color: '#3C3329', boxShadow: '0 4px 16px rgba(0,0,0,0.12)' }}>
-            <div style={{ fontSize: 12, fontStyle: 'italic', color: '#8C6A4E', marginBottom: 4 }}>connesso come</div>
-            <div style={{ fontSize: 14, marginBottom: 10, wordBreak: 'break-all' }}>{displayName || accountEmail}</div>
+  const renderAccountMenu = () => {
+    // Il menu eredita la palette del tema attivo, così su Cruscotto è bianco/turchese,
+    // su Foglio Bianco è bianco/serif, sui temi scuri (Refettorio, Notte blu...) si scurisce di conseguenza.
+    const Q = getTheme(profile?.theme);
+    const isDashboard = Q.structuralVariant === 'dashboard';
+    const fontFamily = Q.fontText || "'Cardo', serif";
+    const labelStyle = isDashboard ? 'normal' : 'italic';
+    const surface    = Q.bg1 || '#E8E0D2';
+    const ink        = Q.ink || Q.cream || '#3C3329';
+    const accent     = Q.gold || '#8C6A4E';
+    const accentSoft = Q.goldDim || Q.dim || accent;
+    const radius     = isDashboard ? 14 : 0;
+    const btnRadius  = isDashboard ? 10 : 0;
+    const btnBorder  = isDashboard ? `1px solid ${accent}40` : `1px solid ${ink}40`;
+    const btnFontWeight = isDashboard ? 600 : 400;
+    // Pulsante esci: pill turchese su dashboard, "ink-block" su tipografici
+    const exitBg     = isDashboard ? accent : ink;
+    const exitColor  = isDashboard ? '#FFFFFF' : surface;
+    // CTA primario abbonamento: lime su dashboard, gold su tipografici
+    const ctaBg      = isDashboard ? (Q.amber || '#9CC756') : '#C9A876';
+    const ctaColor   = isDashboard ? '#2A3942' : '#1F140C';
+    return (
+      <>
+        <div style={{ position: 'fixed', top: 12, right: 12, zIndex: 9000 }}>
+          <button onClick={() => setShowAccountMenu(!showAccountMenu)} aria-label="account"
+            style={{ width: 36, height: 36, borderRadius: '50%', background: avatarSrc ? 'transparent' : `${surface}D9`, border: `1px solid ${accent}40`, color: ink, fontFamily, fontSize: 16, fontStyle: labelStyle, fontWeight: isDashboard ? 700 : 400, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', boxShadow: '0 2px 6px rgba(0,0,0,0.08)', overflow: 'hidden', padding: 0 }}>
+            {avatarSrc ? <img src={avatarSrc} alt="profilo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : accountInitial}
+          </button>
+          {showAccountMenu && (
+            <div style={{ position: 'absolute', top: 44, right: 0, background: surface, border: `1px solid ${accent}40`, borderRadius: radius, padding: '14px 16px', minWidth: 240, fontFamily, color: ink, boxShadow: '0 4px 16px rgba(0,0,0,0.12)' }}>
+              <div style={{ fontSize: 12, fontStyle: labelStyle, color: accentSoft, marginBottom: 4 }}>connesso come</div>
+              <div style={{ fontSize: 14, marginBottom: 10, wordBreak: 'break-all', fontStyle: labelStyle }}>{displayName || accountEmail}</div>
 
-            {/* Badge stato abbonamento */}
-            <div style={{ padding: '8px 10px', border: `1px solid ${subState.color}66`, background: `${subState.color}14`, marginBottom: 12, fontSize: 13, fontStyle: 'italic', color: subState.color, textAlign: 'center' }}>
-              {subState.label}
-            </div>
+              {/* Badge stato abbonamento */}
+              <div style={{ padding: '8px 10px', border: `1px solid ${subState.color}66`, background: `${subState.color}14`, borderRadius: btnRadius, marginBottom: 12, fontSize: 13, fontStyle: labelStyle, color: subState.color, textAlign: 'center' }}>
+                {subState.label}
+              </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <button onClick={() => { setShowAccountMenu(false); setShowProfile(true); }}
-                style={{ background: 'transparent', color: '#3C3329', border: '1px solid rgba(60,51,41,0.25)', fontFamily: "'Cardo',serif", fontStyle: 'italic', fontSize: 14, padding: '8px 12px', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
-                ☉ profilo
-              </button>
-              <button onClick={() => { setShowAccountMenu(false); setShowLayout(true); }}
-                style={{ background: 'transparent', color: '#3C3329', border: '1px solid rgba(60,51,41,0.25)', fontFamily: "'Cardo',serif", fontStyle: 'italic', fontSize: 14, padding: '8px 12px', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
-                ✦ layout
-              </button>
-              <button onClick={() => { setShowAccountMenu(false); setShowGuida(true); }}
-                style={{ background: 'transparent', color: '#3C3329', border: '1px solid rgba(60,51,41,0.25)', fontFamily: "'Cardo',serif", fontStyle: 'italic', fontSize: 14, padding: '8px 12px', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
-                ✦ guida
-              </button>
-              <button onClick={() => { setShowAccountMenu(false); setShowSub(true); }}
-                style={{
-                  background: subState.ctaPrimary ? '#C9A876' : 'transparent',
-                  color: subState.ctaPrimary ? '#1F140C' : '#3C3329',
-                  border: subState.ctaPrimary ? '1px solid #C9A876' : '1px solid rgba(60,51,41,0.25)',
-                  fontFamily: "'Cardo',serif", fontStyle: 'italic', fontSize: 14,
-                  padding: '8px 12px', cursor: 'pointer', width: '100%', textAlign: 'left',
-                  fontWeight: subState.ctaPrimary ? 600 : 400,
-                }}>
-                {subState.ctaLabel}
-              </button>
-              <button onClick={() => { setShowAccountMenu(false); onLogout && onLogout(); }}
-                style={{ background: '#3C3329', color: '#E8E0D2', border: 'none', fontFamily: "'Cardo',serif", fontStyle: 'italic', fontSize: 14, padding: '8px 12px', cursor: 'pointer', width: '100%', marginTop: 4 }}>
-                esci
-              </button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <button onClick={() => { setShowAccountMenu(false); setShowProfile(true); }}
+                  style={{ background: 'transparent', color: ink, border: btnBorder, borderRadius: btnRadius, fontFamily, fontStyle: labelStyle, fontSize: 14, fontWeight: btnFontWeight, padding: '8px 12px', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
+                  ☉ profilo
+                </button>
+                <button onClick={() => { setShowAccountMenu(false); setShowLayout(true); }}
+                  style={{ background: 'transparent', color: ink, border: btnBorder, borderRadius: btnRadius, fontFamily, fontStyle: labelStyle, fontSize: 14, fontWeight: btnFontWeight, padding: '8px 12px', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
+                  ✦ layout
+                </button>
+                <button onClick={() => { setShowAccountMenu(false); setShowGuida(true); }}
+                  style={{ background: 'transparent', color: ink, border: btnBorder, borderRadius: btnRadius, fontFamily, fontStyle: labelStyle, fontSize: 14, fontWeight: btnFontWeight, padding: '8px 12px', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
+                  ✦ guida
+                </button>
+                <button onClick={() => { setShowAccountMenu(false); setShowSub(true); }}
+                  style={{
+                    background: subState.ctaPrimary ? ctaBg : 'transparent',
+                    color: subState.ctaPrimary ? ctaColor : ink,
+                    border: subState.ctaPrimary ? `1px solid ${ctaBg}` : btnBorder,
+                    borderRadius: btnRadius,
+                    fontFamily, fontStyle: labelStyle, fontSize: 14,
+                    padding: '8px 12px', cursor: 'pointer', width: '100%', textAlign: 'left',
+                    fontWeight: subState.ctaPrimary ? 700 : btnFontWeight,
+                  }}>
+                  {subState.ctaLabel}
+                </button>
+                <button onClick={() => { setShowAccountMenu(false); onLogout && onLogout(); }}
+                  style={{ background: exitBg, color: exitColor, border: 'none', borderRadius: btnRadius, fontFamily, fontStyle: labelStyle, fontSize: 14, fontWeight: isDashboard ? 700 : 400, padding: '8px 12px', cursor: 'pointer', width: '100%', marginTop: 4, textAlign: isDashboard ? 'center' : 'left', letterSpacing: isDashboard ? '0.1em' : 'normal', textTransform: isDashboard ? 'uppercase' : 'none' }}>
+                  esci
+                </button>
+              </div>
             </div>
-          </div>
-        )}
-      </div>
-      {showAccountMenu && <div onClick={() => setShowAccountMenu(false)} style={{ position: 'fixed', inset: 0, zIndex: 8999, background: 'transparent' }} />}
-    </>
-  );
+          )}
+        </div>
+        {showAccountMenu && <div onClick={() => setShowAccountMenu(false)} style={{ position: 'fixed', inset: 0, zIndex: 8999, background: 'transparent' }} />}
+      </>
+    );
+  };
 
   if (showSub) {
     return (
