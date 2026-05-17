@@ -956,7 +956,20 @@ function OggiPage({ theme, loaded, profile, weights, goal, meals, notes, water, 
   const todayNotes = (notes || []).filter(n => sameDay(new Date(n.ts), now));
   const todayWater = water?.[todayKey] || 0;
   const todayWorkouts = (workouts || []).filter(w => sameDay(new Date(w.ts), now));
-  const lastNight = (sleeps || []).find(s => s.wakeDate === todayKey);
+  // Sonno: prendiamo l'ULTIMO registrato (qualsiasi data), come fa SonnoPage.
+  // `lastNightToday` serve solo a marcare la pill come "tracciato oggi".
+  const sortedSleeps = useMemo(() => (sleeps || []).slice().sort((a, b) => (b.wakeDate || '').localeCompare(a.wakeDate || '')), [sleeps]);
+  const lastNight = sortedSleeps[0] || null;
+  const lastNightToday = lastNight && lastNight.wakeDate === todayKey ? lastNight : null;
+  // Etichetta di freschezza per il sonno mostrato
+  const sleepFreshness = (() => {
+    if (!lastNight) return '';
+    if (lastNight.wakeDate === todayKey) return 'stanotte';
+    const yKey = dayKey(new Date(now.getTime() - 86400000));
+    if (lastNight.wakeDate === yKey) return 'ieri';
+    try { return parseDayKey(lastNight.wakeDate).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' }); }
+    catch { return ''; }
+  })();
   const activeFast = (fasts || []).find(f => !f.ended_ts);
   const todayTaken = (taken?.[todayKey] || []).length;
   const totalSupps = (supps || []).length;
@@ -985,7 +998,7 @@ function OggiPage({ theme, loaded, profile, weights, goal, meals, notes, water, 
   const dayDots = [
     { id: 'peso', label: 'peso', done: todayWeights.length > 0, color: '#D4A856' },
     { id: 'acqua', label: 'acqua', done: todayWater > 0, color: '#4A9EBA' },
-    { id: 'sonno', label: 'sonno', done: !!lastNight, color: '#9989B8' },
+    { id: 'sonno', label: 'sonno', done: !!lastNightToday, color: '#9989B8' },
     { id: 'pasti', label: 'pasti', done: todayMeals.length > 0, color: '#C99A7A' },
     { id: 'corpo', label: 'corpo', done: todayWorkouts.length > 0, color: '#9CC73A' },
     { id: 'note', label: 'diario', done: todayNotes.length > 0, color: '#8FA288' },
@@ -1068,7 +1081,7 @@ function OggiPage({ theme, loaded, profile, weights, goal, meals, notes, water, 
     const pillCats = [
       { id: 'peso',   label: 'peso',   done: todayWeights.length > 0 },
       { id: 'acqua',  label: 'acqua',  done: todayWater > 0 },
-      { id: 'sonno',  label: 'sonno',  done: !!lastNight },
+      { id: 'sonno',  label: 'sonno',  done: !!lastNightToday },
       { id: 'pasti',  label: 'pasti',  done: todayMeals.length > 0 },
       { id: 'corpo',  label: 'corpo',  done: todayWorkouts.length > 0 },
       { id: 'diario', label: 'diario', done: todayNotes.length > 0 },
@@ -1248,12 +1261,17 @@ function OggiPage({ theme, loaded, profile, weights, goal, meals, notes, water, 
               </button>
 
               {/* Sonno */}
-              <div style={tile()}>
+              <button onClick={() => go('sonno')} style={{ ...tile(), cursor: 'pointer' }}>
                 <div style={tileSpia(sonnoSpia)} />
                 <div style={tileLabel}>sonno</div>
                 <div style={tileValue}>{lastNight ? fmtDur(sleepH) : '—'}</div>
+                {lastNight && sleepFreshness && (
+                  <div style={{ fontSize: 9, color: lastNightToday ? '#5AA8B3' : '#9AA5AB', marginTop: 3, fontWeight: 500, letterSpacing: '0.05em' }}>
+                    {sleepFreshness}
+                  </div>
+                )}
                 {tileBar(sleepPct, sonnoSpia)}
-              </div>
+              </button>
 
               {/* Corpo (settimana) */}
               <button onClick={() => go('respiro')} style={{ ...tile(), cursor: 'pointer' }}>
@@ -1493,7 +1511,7 @@ function OggiPage({ theme, loaded, profile, weights, goal, meals, notes, water, 
               <div style={{ height: 4, background: `${Q.sage || Q.gold}22`, borderRadius: 2, marginTop: 6, overflow: 'hidden' }}>
                 <div style={{ height: '100%', width: `${sleepPct}%`, background: sleepColor, transition: 'width 0.3s ease' }} />
               </div>
-              <div style={{ ...cardSub, fontSize: 11, marginTop: 4 }}>{lastNight ? `qualità ${lastNight.quality}/5` : 'notte non registrata'}</div>
+              <div style={{ ...cardSub, fontSize: 11, marginTop: 4 }}>{lastNight ? `${sleepFreshness} · qualità ${lastNight.quality}/5` : 'notte non registrata'}</div>
             </div>
 
             {/* Corpo — barra settimanale verso obiettivo 5 sessioni */}
