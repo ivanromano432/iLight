@@ -16,6 +16,7 @@ const Onboarding = lazy(() => import('./Onboarding.jsx'));
 import { hasSeenOnboarding, markOnboardingSeen } from './onboardingHelpers.js';
 import { uploadMealPhoto as uploadMealPhotoToStorage, deleteMealPhoto as deleteMealPhotoFromStorage } from './photoStorage.js';
 import { getTheme } from './themes.js';
+import { getLayout, getCurrentLayoutId, ensureLayoutFonts } from './layouts.js';
 import { supabase } from './supabase.js';
 
 const Q = { bg1: '#3A2818', bg2: '#1F140C', gold: '#C9A876', goldDim: '#8B7355', cream: '#E8D8B8', ink: '#1F140C' };
@@ -898,6 +899,18 @@ function buildLineChart(values, chartW, chartH){
 
 function OggiPage({ theme, loaded, profile, weights, goal, meals, notes, water, waterGoal, workouts, sleeps, fasts, supps, taken, updWater, setPage }){
   const Q = theme || { bg1: '#3A2818', bg2: '#1F140C', gold: '#C9A876', goldDim: '#8B7355', cream: '#E8D8B8', ink: '#1F140C' };
+
+  // === Layout selezionato dall'utente (Profilo → LAYOUT HOME) ===
+  // Quando l'utente cambia layout, ascolto l'evento custom e ri-renderizzo.
+  const [layoutId, setLayoutIdState] = useState(getCurrentLayoutId());
+  const L = getLayout(layoutId);
+  const isOverride = L.isOverride;
+  useEffect(() => {
+    if (isOverride) ensureLayoutFonts();
+    function onChange(e){ setLayoutIdState(e?.detail?.id || getCurrentLayoutId()); }
+    window.addEventListener('goalfit-layout-changed', onChange);
+    return () => window.removeEventListener('goalfit-layout-changed', onChange);
+  }, [isOverride]);
   const now = new Date();
   const todayKey = dayKey(now);
   const h = now.getHours();
@@ -972,15 +985,34 @@ function OggiPage({ theme, loaded, profile, weights, goal, meals, notes, water, 
   const bmi = lastWeight && heightM ? lastWeight.weight / (heightM * heightM) : null;
   const goalDistance = (lastWeight && goal) ? (lastWeight.weight - goal) : null;
 
-  // Card style
-  const card = (extra = {}) => ({
-    padding: '14px 16px',
-    background: `${Q.gold}0D`,
-    border: `1px solid ${Q.gold}33`,
-    borderRadius: 2,
-    ...extra,
-  });
-  const cardTitle = {
+  // Card style — base coerente col tema, override quando layout="diario"/"dashboard"
+  const card = (extra = {}) => {
+    if (isOverride) {
+      return {
+        padding: L.cardPadding,
+        background: L.cardBg,
+        border: L.cardBorder,
+        borderRadius: L.cardBorderRadius,
+        ...(L.cardDivider !== 'none' ? { borderBottom: L.cardDivider } : {}),
+        ...extra,
+      };
+    }
+    return {
+      padding: '14px 16px',
+      background: `${Q.gold}0D`,
+      border: `1px solid ${Q.gold}33`,
+      borderRadius: 2,
+      ...extra,
+    };
+  };
+  const cardTitle = isOverride ? {
+    fontFamily: L.fontMicro,
+    fontSize: 10,
+    letterSpacing: '0.3em',
+    color: L.inkLabel,
+    textTransform: 'uppercase',
+    fontWeight: 600,
+  } : {
     fontFamily: fCinzel,
     fontSize: 9,
     letterSpacing: '0.4em',
@@ -988,14 +1020,27 @@ function OggiPage({ theme, loaded, profile, weights, goal, meals, notes, water, 
     textTransform: 'uppercase',
     opacity: 0.9,
   };
-  const cardValue = {
+  const cardValue = isOverride ? {
+    fontFamily: L.fontNumber,
+    fontSize: 30,
+    color: L.inkValue,
+    lineHeight: 1.1,
+    marginTop: 4,
+    fontWeight: L.id === 'dashboard' ? 700 : 400,
+  } : {
     fontFamily: fGaramond,
     fontStyle: 'italic',
     fontSize: 22,
     color: Q.gold,
     marginTop: 2,
   };
-  const cardSub = {
+  const cardSub = isOverride ? {
+    fontFamily: L.fontText,
+    fontStyle: L.id === 'diario' ? 'italic' : 'normal',
+    fontSize: 13,
+    color: L.inkSubtle,
+    marginTop: 4,
+  } : {
     fontFamily: fGaramond,
     fontStyle: 'italic',
     fontSize: 13,
@@ -1003,7 +1048,19 @@ function OggiPage({ theme, loaded, profile, weights, goal, meals, notes, water, 
     opacity: 0.7,
     marginTop: 2,
   };
-  const miniBtn = {
+  const miniBtn = isOverride ? {
+    background: 'transparent',
+    color: L.teal,
+    border: `1px solid ${L.teal}66`,
+    fontFamily: L.fontMicro,
+    fontSize: 10,
+    letterSpacing: '0.2em',
+    padding: '6px 12px',
+    cursor: 'pointer',
+    textTransform: 'uppercase',
+    borderRadius: L.id === 'dashboard' ? 6 : 0,
+    fontWeight: L.id === 'dashboard' ? 600 : 400,
+  } : {
     background: 'transparent',
     color: Q.gold,
     border: `1px solid ${Q.gold}66`,
@@ -1023,34 +1080,107 @@ function OggiPage({ theme, loaded, profile, weights, goal, meals, notes, water, 
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: `radial-gradient(ellipse at top, ${Q.bg1} 0%, ${Q.bg2} 100%)`, color: Q.cream, fontFamily: fGaramond, position: 'relative', overflow: 'hidden' }}>
-      <div aria-hidden style={{ position: 'absolute', inset: 14, border: `1px solid ${Q.gold}40`, borderRadius: 20, pointerEvents: 'none', zIndex: 1 }} />
-      <div aria-hidden style={{ position: 'absolute', inset: 20, border: `1px solid ${Q.gold}1A`, borderRadius: 16, pointerEvents: 'none', zIndex: 1 }} />
+    <div style={{
+      minHeight: '100vh',
+      background: isOverride ? L.bg : `radial-gradient(ellipse at top, ${Q.bg1} 0%, ${Q.bg2} 100%)`,
+      color: isOverride ? L.inkPrimary : Q.cream,
+      fontFamily: isOverride ? L.fontText : fGaramond,
+      position: 'relative',
+      overflow: 'hidden',
+    }}>
+      {/* Bordi decorativi solo in modalità classic */}
+      {!isOverride && <div aria-hidden style={{ position: 'absolute', inset: 14, border: `1px solid ${Q.gold}40`, borderRadius: 20, pointerEvents: 'none', zIndex: 1 }} />}
+      {!isOverride && <div aria-hidden style={{ position: 'absolute', inset: 20, border: `1px solid ${Q.gold}1A`, borderRadius: 16, pointerEvents: 'none', zIndex: 1 }} />}
       <div style={{ position: 'relative', zIndex: 2, padding: '32px 24px 28px', maxWidth: 480, margin: '0 auto' }}>
 
+        {/* Header: logo (solo dashboard) + saluto */}
+        {isOverride && L.showLogo && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <img src="/icon-192.png" alt="GoalFit" style={{ width: 32, height: 32, borderRadius: 7, display: 'block' }} />
+              <div style={{ fontFamily: L.fontHeading, fontSize: 18, fontWeight: 800, letterSpacing: '-0.5px' }}>
+                <span style={{ color: L.green }}>Goal</span><span style={{ color: L.teal }}>fit</span>
+              </div>
+            </div>
+            <div style={{ fontFamily: L.fontMicro, fontSize: 10, letterSpacing: '0.2em', color: L.inkSubtle, textTransform: 'uppercase' }}>
+              {firstName || ''}
+            </div>
+          </div>
+        )}
+
         {/* Saluto */}
-        <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <div style={{ fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.45em', color: Q.gold, opacity: 0.7, textTransform: 'uppercase', marginBottom: 8 }}>
-            ✦ OGGI ✦
+        <div style={{ textAlign: 'center', marginBottom: isOverride ? 22 : 28 }}>
+          <div style={{
+            fontFamily: isOverride ? L.fontMicro : fCinzel,
+            fontSize: isOverride ? 9 : 10,
+            letterSpacing: isOverride ? '0.35em' : '0.45em',
+            color: isOverride ? L.teal : Q.gold,
+            opacity: isOverride ? 1 : 0.7,
+            textTransform: 'uppercase',
+            marginBottom: 8,
+            fontWeight: isOverride && L.id === 'dashboard' ? 700 : 400,
+          }}>
+            {isOverride ? '✦ OGGI ✦' : '✦ OGGI ✦'}
           </div>
-          <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 28, color: Q.gold, lineHeight: 1.2 }}>
-            {greet}{firstName ? `, ${firstName}` : ''}
+          <div style={{
+            fontFamily: isOverride ? L.fontHeading : fGaramond,
+            fontStyle: isOverride && L.id === 'diario' ? 'italic' : 'normal',
+            fontSize: isOverride ? 26 : 28,
+            color: isOverride ? L.inkPrimary : Q.gold,
+            lineHeight: 1.2,
+            fontWeight: isOverride && L.id === 'dashboard' ? 700 : 400,
+          }}>
+            {greet}{firstName ? <>, <span style={{ color: isOverride ? L.teal : 'inherit' }}>{firstName}</span></> : ''}
           </div>
-          <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 13, color: Q.cream, opacity: 0.65, marginTop: 4 }}>
+          <div style={{
+            fontFamily: isOverride ? L.fontText : fGaramond,
+            fontStyle: 'italic',
+            fontSize: 13,
+            color: isOverride ? L.inkSubtle : Q.cream,
+            opacity: isOverride ? 1 : 0.65,
+            marginTop: 4,
+          }}>
             {dataOggi}
           </div>
         </div>
 
-        {!loaded && <Loading color={Q.goldDim || Q.gold} />}
+        {!loaded && <Loading color={isOverride ? L.teal : (Q.goldDim || Q.gold)} />}
 
         {loaded && (<>
 
-          {/* === Striscia 'andamento giornata' === 6 puntini colorati, uno per categoria fatta */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: `${Q.gold}0A`, border: `1px solid ${Q.gold}22`, marginBottom: 14 }}>
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          {/* === Striscia 'andamento giornata' === Diario: dots tra 2 righe orizzontali. Dashboard: pill. Classic: dots in cornice. */}
+          {isOverride && L.stripStyle === 'pills' ? (
+            <div style={{ display: 'flex', gap: 6, padding: 4, background: L.bg2, borderRadius: 999, marginBottom: 14 }}>
               {dayDots.map(d => (
-                <div key={d.id} title={`${d.label}${d.done ? ' ✓' : ''}`} style={{
-                  width: 12, height: 12, borderRadius: '50%',
+                <div key={d.id} style={{
+                  flex: 1,
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+                  padding: '6px 4px', borderRadius: 999,
+                  background: d.done ? L.teal : '#FFFFFF',
+                  border: `1px solid ${d.done ? L.teal : '#E5EAEE'}`,
+                }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: d.done ? '#FFFFFF' : L.teal, opacity: d.done ? 1 : 0.4 }} />
+                  <span style={{ fontFamily: L.fontMicro, fontSize: 7, letterSpacing: '0.1em', fontWeight: 700, color: d.done ? '#FFFFFF' : L.teal, textTransform: 'uppercase' }}>{d.label}</span>
+                </div>
+              ))}
+            </div>
+          ) : isOverride && L.stripStyle === 'underline' ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0', borderTop: `1px solid ${L.teal}`, borderBottom: `1px solid ${L.teal}`, marginBottom: 22 }}>
+              <div style={{ display: 'flex', gap: 12 }}>
+                {dayDots.map(d => (
+                  <div key={d.id} style={{ width: 10, height: 10, borderRadius: '50%', border: `1.5px solid ${L.teal}`, background: d.done ? L.teal : 'transparent' }} />
+                ))}
+              </div>
+              <span style={{ fontFamily: L.fontMicro, fontSize: 11, letterSpacing: '0.2em', color: L.teal, textTransform: 'uppercase' }}>
+                <span style={{ color: L.green, fontWeight: 700 }}>{dayDotsDone}</span>/{dayDots.length}
+              </span>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: `${Q.gold}0A`, border: `1px solid ${Q.gold}22`, marginBottom: 14 }}>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                {dayDots.map(d => (
+                  <div key={d.id} title={`${d.label}${d.done ? ' ✓' : ''}`} style={{
+                    width: 12, height: 12, borderRadius: '50%',
                   background: d.done ? d.color : 'transparent',
                   border: `1.5px solid ${d.done ? d.color : Q.goldDim + '66'}`,
                   flexShrink: 0,
@@ -1061,6 +1191,7 @@ function OggiPage({ theme, loaded, profile, weights, goal, meals, notes, water, 
               {dayDotsDone}<span style={{ opacity: 0.5 }}>/{dayDots.length}</span>
             </div>
           </div>
+          )}
 
           {/* Peso */}
           <div style={card({ marginBottom: 10 })}>
