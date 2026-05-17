@@ -934,7 +934,7 @@ function OggiPage({ theme, loaded, profile, weights, goal, meals, notes, water, 
   const todayWater = water?.[todayKey] || 0;
   const todayWorkouts = (workouts || []).filter(w => sameDay(new Date(w.ts), now));
   const lastNight = (sleeps || []).find(s => s.wakeDate === todayKey);
-  const activeFast = (fasts || []).find(f => !f.end_ts);
+  const activeFast = (fasts || []).find(f => !f.ended_ts);
   const todayTaken = (taken?.[todayKey] || []).length;
   const totalSupps = (supps || []).length;
 
@@ -1184,10 +1184,12 @@ function OggiPage({ theme, loaded, profile, weights, goal, meals, notes, water, 
 
           {/* Digiuno attivo (solo se c'è) */}
           {activeFast && (() => {
-            const startTs = new Date(activeFast.start_ts);
+            const startTs = new Date(activeFast.started_ts);
             const elapsedH = (now.getTime() - startTs.getTime()) / 3600000;
-            const targetH = activeFast.target_h || null;
+            const targetH = activeFast.planned_hours || null;
             const pct = targetH ? Math.min(100, (elapsedH / targetH) * 100) : null;
+            // Guard: se per qualsiasi motivo il timestamp è invalido (NaN), non mostro la card
+            if (!isFinite(elapsedH)) return null;
             return (
               <div style={card({ marginBottom: 10, background: `${Q.gold}1A` })}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
