@@ -3894,15 +3894,31 @@ const FAST_PRESETS_EXTENDED = [
   { id:'72h', label:'72 ore', hours:72, desc:'3 giorni · rigenerazione cellulare' },
 ];
 const FAST_PHASES = [
-  { h:0, label:'glucosio', note:'il corpo brucia gli ultimi zuccheri' },
-  { h:4, label:'glicogeno', note:'consuma le riserve epatiche' },
-  { h:12, label:'lipolisi', note:'inizia a bruciare i grassi' },
-  { h:16, label:'autofagia · I', note:'le cellule iniziano la pulizia' },
-  { h:24, label:'chetosi', note:'energia dai corpi chetonici' },
-  { h:36, label:'autofagia · II', note:'rinnovo cellulare attivo' },
-  { h:48, label:'rigenerazione', note:'staminali e antinfiammazione' },
-  { h:72, label:'profonda', note:'massimo beneficio metabolico' },
+  // ─── Stato alimentato → glicogeno (0–12h) ───────────────────────────────
+  { h:0,   label:'digestione',          note:'glucosio dal cibo in circolo',   body:"L'insulina è alta dopo il pasto. Il corpo usa lo zucchero appena ingerito come fonte primaria di energia e immagazzina l'eccesso." },
+  { h:4,   label:'post-assorbente',     note:'glicogeno epatico in uso',       body:"L'insulina cala. Il fegato libera glucosio dalle sue scorte di glicogeno per mantenere stabile la glicemia." },
+  { h:12,  label:'lipolisi',            note:'il grasso inizia a bruciare',     body:'Glicogeno epatico quasi esaurito. Cresce il glucagone. Inizia la mobilizzazione degli acidi grassi dal tessuto adiposo.' },
+  // ─── Chetosi e autofagia (16–36h) ───────────────────────────────────────
+  { h:16,  label:'autofagia · I',       note:'pulizia cellulare leggera',       body:"Le cellule iniziano a riciclare componenti danneggiati. L'ormone della crescita (GH) comincia a salire." },
+  { h:18,  label:'chetosi iniziale',    note:'compaiono i corpi chetonici',     body:'Il fegato converte gli acidi grassi in chetoni (β-idrossibutirrato). Possibile sensazione di lucidità mentale.' },
+  { h:24,  label:'chetosi affermata',   note:'cervello a chetoni',              body:'I chetoni coprono circa il 30% del fabbisogno energetico cerebrale. La sensibilità insulinica migliora. Fine del giorno 1.' },
+  { h:36,  label:'autofagia · II',      note:'rinnovo cellulare attivo',        body:'Picco di autofagia: pulizia profonda delle cellule. La norepinefrina aumenta per preservare la massa muscolare.' },
+  // ─── Rigenerazione profonda (48–72h) ────────────────────────────────────
+  { h:48,  label:'rigenerazione',       note:'GH e BDNF al massimo',            body:"L'ormone della crescita può raggiungere fino a 5 volte il livello base. Il BDNF sostiene la neuroplasticità. Fine del giorno 2." },
+  { h:72,  label:'reset immunitario',   note:'staminali in azione',             body:'Le cellule staminali iniziano a rigenerare il sistema immunitario. IGF-1 cala (associato in letteratura a effetti anti-aging). Fine del giorno 3.' },
+  // ─── Territorio da supervisione medica (96–168h, 4–7 giorni) ────────────
+  { h:96,  label:'adattamento profondo', note:'massima produzione di chetoni',  body:'Chetosi profonda stabilizzata. Il sistema immunitario produce nuovi globuli bianchi. Da qui serve competenza medica.' },
+  { h:120, label:'rinnovo cellulare',    note:'pulizia metabolica estesa',      body:'Mucosa intestinale rinnovata. Calano i marker infiammatori sistemici. Rischio crescente di squilibri elettrolitici (sodio, potassio, magnesio).' },
+  { h:144, label:'adattamento metabolico', note:'massima efficienza sui grassi', body:'Il metabolismo basale si adatta lievemente al ribasso. Il corpo è al massimo dell\u2019efficienza nell\u2019usare i grassi. Possibili ipotensione e debolezza.' },
+  { h:168, label:'digiuno terapeutico',  note:'solo sotto controllo medico',    body:'Solo sotto stretta supervisione medica. Il sistema immunitario completa il proprio reset. Attenzione massima al rientro alimentare per evitare la refeeding syndrome.' },
 ];
+
+// Etichetta breve per la timeline: ore fino a 72, poi giorni
+function phaseShort(h){
+  if (h < 96) return `${h}h`;
+  const d = Math.round(h / 24);
+  return `${d}g`;
+}
 
 // === Avvertimenti sicurezza digiuno ===
 // Livelli progressivi in base alla durata pianificata (o tempo trascorso).
@@ -4133,9 +4149,14 @@ function DigiunoPage({ theme, loaded, fasts, updFasts }){
             {/* Phase corrente */}
             {currentPhase && (
               <div style={{marginTop:22,padding:14,background:`${D.amber}1F`,borderLeft:`3px solid ${D.amber}`}}>
-                <div style={{fontFamily:fDmSans,fontSize:9,letterSpacing:'0.4em',color:D.amber,textTransform:'uppercase',marginBottom:4}}>fase · {currentPhase.h}h+</div>
+                <div style={{fontFamily:fDmSans,fontSize:9,letterSpacing:'0.4em',color:D.amber,textTransform:'uppercase',marginBottom:4}}>fase · {phaseShort(currentPhase.h)}+</div>
                 <div style={{fontFamily:fBodoni,fontStyle:'italic',fontSize:20,color:D.cream}}>{currentPhase.label}</div>
                 <div style={{fontFamily:fBodoni,fontStyle:'italic',fontSize:13,color:D.dim,marginTop:4,lineHeight:1.4}}>{currentPhase.note}</div>
+                {currentPhase.body && (
+                  <div style={{marginTop:10,paddingTop:10,borderTop:`1px solid ${D.amber}33`,fontFamily:fBodoni,fontStyle:'italic',fontSize:13,color:D.cream,lineHeight:1.6}}>
+                    {currentPhase.body}
+                  </div>
+                )}
               </div>
             )}
             {nextPhase && (
@@ -4162,11 +4183,15 @@ function DigiunoPage({ theme, loaded, fasts, updFasts }){
               <div style={{fontFamily:fDmSans,fontSize:9,letterSpacing:'0.4em',color:D.dim,textAlign:'center',textTransform:'uppercase',marginBottom:10}}>fasi del digiuno</div>
               {FAST_PHASES.map(p=>{
                 const reached = elapsedH >= p.h;
+                const isCurrent = currentPhase && currentPhase.h === p.h;
+                // Colore della fase basato sul livello di rischio della soglia stessa
+                const phaseRisk = fastRiskInfo(fastRiskLevel(p.h));
+                const phaseColor = phaseRisk ? phaseRisk.color : D.amber;
                 return (
                   <div key={p.h} style={{display:'flex',alignItems:'baseline',gap:10,padding:'8px 0',borderBottom:`1px solid ${D.accent}11`,opacity:reached?1:0.45}}>
-                    <span style={{fontFamily:fDmSans,fontSize:10,letterSpacing:'0.15em',color:reached?D.amber:D.dim,minWidth:40}}>{p.h}h</span>
-                    <span style={{fontFamily:fBodoni,fontStyle:'italic',fontSize:14,color:reached?D.cream:D.dim,flex:1}}>{p.label}</span>
-                    {reached && <span style={{color:D.amber,fontSize:12}}>✓</span>}
+                    <span style={{fontFamily:fDmSans,fontSize:10,letterSpacing:'0.15em',color:reached?phaseColor:D.dim,minWidth:40}}>{phaseShort(p.h)}</span>
+                    <span style={{fontFamily:fBodoni,fontStyle:'italic',fontSize:14,color:reached?D.cream:D.dim,flex:1,fontWeight:isCurrent?600:400}}>{p.label}</span>
+                    {reached && <span style={{color:phaseColor,fontSize:12}}>{isCurrent?'●':'✓'}</span>}
                   </div>
                 );
               })}
