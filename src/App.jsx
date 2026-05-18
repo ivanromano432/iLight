@@ -3904,6 +3904,28 @@ const FAST_PHASES = [
   { h:72, label:'profonda', note:'massimo beneficio metabolico' },
 ];
 
+// === Avvertimenti sicurezza digiuno ===
+// Livelli progressivi in base alla durata pianificata (o tempo trascorso).
+// Il design è "informa, non bloccare": l'utente resta libero di scegliere, ma i digiuni
+// oltre 72h richiedono una conferma esplicita perché la posizione di GoalFit è
+// che non vadano svolti senza supervisione medica.
+function fastRiskLevel(hours){
+  if (hours == null || hours <= 16) return 'none';
+  if (hours <= 24) return 'info';
+  if (hours <= 48) return 'caution';
+  if (hours <= 72) return 'warning';
+  return 'danger';
+}
+function fastRiskInfo(level){
+  switch(level){
+    case 'info':    return { color:'#5AA8B3', label:'nota',         text:'Idratati bene, integra elettroliti (sodio, potassio, magnesio) e ascolta il corpo. Non adatto in gravidanza, allattamento, diabete, disturbi alimentari o se assumi farmaci.' };
+    case 'caution': return { color:'#D9B86A', label:'attenzione',   text:'Digiuno oltre 24h. Consigliato solo se hai già esperienza e non hai condizioni mediche. Se è la prima volta o assumi farmaci, parla prima con un medico.' };
+    case 'warning': return { color:'#E08A3C', label:'avvertimento', text:'Digiuno esteso (48–72h). GoalFit consiglia vivamente la supervisione di un medico: possibili rischi includono ipotensione, ipoglicemia, squilibri elettrolitici, perdita di massa magra.' };
+    case 'danger':  return { color:'#E04545', label:'sconsigliato', text:'Digiuno oltre 72 ore. Come società sconsigliamo di procedere senza la supervisione attiva di un medico. GoalFit non promuove digiuni prolungati come pratica autonoma.' };
+    default:        return null;
+  }
+}
+
 function DigiunoPage({ theme, loaded, fasts, updFasts }){
   // Digiuno usa D internamente (palette Notturno ambra era originaria). Shadow.
   const D = theme || { bg1: '#1F2228', bg2: '#0E1115', cream: '#E8E4D5', accent: '#C9A876', amber: '#D4A23E', dim: '#6B6478', active: '#A8826E', danger: '#C99A7A' };
@@ -3913,6 +3935,7 @@ function DigiunoPage({ theme, loaded, fasts, updFasts }){
   const [customHours, setCustomHours] = useState('');
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [editing, setEditing] = useState(null); // fast in edit (oggetto fast intero)
+  const [pendingFast, setPendingFast] = useState(null); // digiuno 'danger' (>72h) in attesa di conferma medica esplicita
 
   // Reset auto della conferma "termina" dopo 4s
   useEffect(()=>{
@@ -3936,6 +3959,17 @@ function DigiunoPage({ theme, loaded, fasts, updFasts }){
     const planned_end = new Date(started.getTime() + hours*3600000);
     await updFasts([...fasts, { id:newId(), started_ts:started.toISOString(), planned_hours:hours, planned_end_ts:planned_end.toISOString(), type:preset?.id||'custom', label:preset?.label||`${hours}h`, ended_ts:null }]);
     setPickerOpen(false);
+    setPendingFast(null);
+  }
+  // Gate di sicurezza: se il digiuno richiesto è oltre 72h, mostriamo conferma esplicita
+  // prima di avviarlo. Sotto soglia, parte direttamente.
+  function requestStartFast(preset, hoursOverride){
+    const hours = hoursOverride ?? preset.hours;
+    if (fastRiskLevel(hours) === 'danger') {
+      setPendingFast({ preset, hoursOverride });
+      return;
+    }
+    startFast(preset, hoursOverride);
   }
   async function endFast(){
     if(!active) return;
@@ -3952,7 +3986,7 @@ function DigiunoPage({ theme, loaded, fasts, updFasts }){
   async function startCustom(){
     const h = parseInt(customHours);
     if(isNaN(h)||h<1||h>240) return;
-    await startFast({id:'custom',label:`${h}h`,hours:h}, h);
+    requestStartFast({id:'custom',label:`${h}h`,hours:h}, h);
     setCustomHours('');
   }
 
@@ -4005,7 +4039,7 @@ function DigiunoPage({ theme, loaded, fasts, updFasts }){
 
             <div style={{marginTop:18}}>
               {category==='intermittent' && FAST_PRESETS_INTERMITTENT.map(p=>(
-                <button key={p.id} onClick={()=>startFast(p)} style={{width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',padding:'14px 16px',marginBottom:8,background:`${D.accent}0F`,border:`1px solid ${D.accent}33`,borderLeft:`3px solid ${D.amber}`,cursor:'pointer',textAlign:'left',color:D.cream}}>
+                <button key={p.id} onClick={()=>requestStartFast(p)} style={{width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',padding:'14px 16px',marginBottom:8,background:`${D.accent}0F`,border:`1px solid ${D.accent}33`,borderLeft:`3px solid ${D.amber}`,cursor:'pointer',textAlign:'left',color:D.cream}}>
                   <div>
                     <div style={{fontFamily:fBodoni,fontStyle:'italic',fontSize:20,lineHeight:1}}>{p.label}</div>
                     <div style={{fontFamily:fBodoni,fontStyle:'italic',fontSize:12,color:D.dim,marginTop:4}}>{p.desc}</div>
@@ -4013,24 +4047,42 @@ function DigiunoPage({ theme, loaded, fasts, updFasts }){
                   <span style={{fontFamily:fDmSans,fontSize:10,letterSpacing:'0.3em',color:D.amber,textTransform:'uppercase'}}>inizia ›</span>
                 </button>
               ))}
-              {category==='extended' && FAST_PRESETS_EXTENDED.map(p=>(
-                <button key={p.id} onClick={()=>startFast(p)} style={{width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',padding:'14px 16px',marginBottom:8,background:`${D.accent}0F`,border:`1px solid ${D.accent}33`,borderLeft:`3px solid ${D.amber}`,cursor:'pointer',textAlign:'left',color:D.cream}}>
-                  <div>
-                    <div style={{fontFamily:fBodoni,fontStyle:'italic',fontSize:20,lineHeight:1}}>{p.label}</div>
-                    <div style={{fontFamily:fBodoni,fontStyle:'italic',fontSize:12,color:D.dim,marginTop:4}}>{p.desc}</div>
+              {category==='extended' && FAST_PRESETS_EXTENDED.map(p=>{
+                const lvl = fastRiskLevel(p.hours);
+                const info = fastRiskInfo(lvl);
+                return (
+                  <button key={p.id} onClick={()=>requestStartFast(p)} style={{width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',padding:'14px 16px',marginBottom:8,background:`${D.accent}0F`,border:`1px solid ${D.accent}33`,borderLeft:`3px solid ${info?info.color:D.amber}`,cursor:'pointer',textAlign:'left',color:D.cream}}>
+                    <div>
+                      <div style={{fontFamily:fBodoni,fontStyle:'italic',fontSize:20,lineHeight:1}}>{p.label}</div>
+                      <div style={{fontFamily:fBodoni,fontStyle:'italic',fontSize:12,color:D.dim,marginTop:4}}>{p.desc}</div>
+                      {info && (
+                        <div style={{fontFamily:fDmSans,fontSize:9,letterSpacing:'0.18em',color:info.color,marginTop:6,textTransform:'uppercase'}}>{info.label}</div>
+                      )}
+                    </div>
+                    <span style={{fontFamily:fDmSans,fontSize:10,letterSpacing:'0.3em',color:info?info.color:D.amber,textTransform:'uppercase'}}>inizia ›</span>
+                  </button>
+                );
+              })}
+              {category==='custom' && (() => {
+                const hPreview = parseInt(customHours, 10);
+                const lvlPreview = !isNaN(hPreview) ? fastRiskLevel(hPreview) : 'none';
+                const infoPreview = fastRiskInfo(lvlPreview);
+                return (
+                  <div style={{padding:'18px 16px',background:`${D.accent}0F`,border:`1px solid ${D.accent}33`,borderLeft:`3px solid ${infoPreview?infoPreview.color:D.amber}`}}>
+                    <div style={{fontFamily:fBodoni,fontStyle:'italic',fontSize:14,color:D.cream,marginBottom:10}}>Durata in ore (1 – 240)</div>
+                    <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                      <input type="text" inputMode="numeric" value={customHours} onChange={e=>setCustomHours(e.target.value)} placeholder="es. 36" style={{flex:1,background:'transparent',border:`1px solid ${D.accent}66`,fontFamily:fBodoni,fontStyle:'italic',fontSize:24,color:D.cream,padding:'8px 12px',outline:'none',textAlign:'center'}} />
+                      <button onClick={startCustom} disabled={!customHours} style={{background:infoPreview?infoPreview.color:D.amber,color:D.bg2,border:'none',fontFamily:fDmSans,fontSize:10,letterSpacing:'0.35em',padding:'14px 22px',cursor:customHours?'pointer':'default',opacity:customHours?1:0.4,textTransform:'uppercase'}}>inizia</button>
+                    </div>
+                    {infoPreview && (
+                      <div style={{marginTop:14,padding:'12px 14px',background:`${infoPreview.color}14`,border:`1px solid ${infoPreview.color}55`,borderRadius:2}}>
+                        <div style={{fontFamily:fDmSans,fontSize:9,letterSpacing:'0.3em',color:infoPreview.color,textTransform:'uppercase',marginBottom:6}}>{infoPreview.label}</div>
+                        <div style={{fontFamily:fBodoni,fontStyle:'italic',fontSize:13,color:D.cream,lineHeight:1.5}}>{infoPreview.text}</div>
+                      </div>
+                    )}
                   </div>
-                  <span style={{fontFamily:fDmSans,fontSize:10,letterSpacing:'0.3em',color:D.amber,textTransform:'uppercase'}}>inizia ›</span>
-                </button>
-              ))}
-              {category==='custom' && (
-                <div style={{padding:'18px 16px',background:`${D.accent}0F`,border:`1px solid ${D.accent}33`,borderLeft:`3px solid ${D.amber}`}}>
-                  <div style={{fontFamily:fBodoni,fontStyle:'italic',fontSize:14,color:D.cream,marginBottom:10}}>Durata in ore (1 – 240)</div>
-                  <div style={{display:'flex',gap:8,alignItems:'center'}}>
-                    <input type="text" inputMode="numeric" value={customHours} onChange={e=>setCustomHours(e.target.value)} placeholder="es. 36" style={{flex:1,background:'transparent',border:`1px solid ${D.accent}66`,fontFamily:fBodoni,fontStyle:'italic',fontSize:24,color:D.cream,padding:'8px 12px',outline:'none',textAlign:'center'}} />
-                    <button onClick={startCustom} disabled={!customHours} style={{background:D.amber,color:D.bg2,border:'none',fontFamily:fDmSans,fontSize:10,letterSpacing:'0.35em',padding:'14px 22px',cursor:customHours?'pointer':'default',opacity:customHours?1:0.4,textTransform:'uppercase'}}>inizia</button>
-                  </div>
-                </div>
-              )}
+                );
+              })()}
             </div>
 
             {past.length>0 && (
@@ -4092,6 +4144,19 @@ function DigiunoPage({ theme, loaded, fasts, updFasts }){
               </div>
             )}
 
+            {/* Avviso sicurezza progressivo basato sul tempo trascorso (non sul piano) */}
+            {(() => {
+              const lvl = fastRiskLevel(elapsedH);
+              const info = fastRiskInfo(lvl);
+              if (!info) return null;
+              return (
+                <div style={{marginTop:12,padding:'12px 14px',background:`${info.color}14`,border:`1px solid ${info.color}55`,borderRadius:2}}>
+                  <div style={{fontFamily:fDmSans,fontSize:9,letterSpacing:'0.3em',color:info.color,textTransform:'uppercase',marginBottom:6}}>{info.label}</div>
+                  <div style={{fontFamily:fBodoni,fontStyle:'italic',fontSize:13,color:D.cream,lineHeight:1.5}}>{info.text}</div>
+                </div>
+              );
+            })()}
+
             {/* Phases timeline */}
             <div style={{marginTop:22}}>
               <div style={{fontFamily:fDmSans,fontSize:9,letterSpacing:'0.4em',color:D.dim,textAlign:'center',textTransform:'uppercase',marginBottom:10}}>fasi del digiuno</div>
@@ -4122,7 +4187,39 @@ function DigiunoPage({ theme, loaded, fasts, updFasts }){
             </div>
           </>
         )}
+
+        {/* Disclaimer permanente — sempre visibile nella DigiunoPage */}
+        <div style={{marginTop:36,paddingTop:18,borderTop:`1px solid ${D.accent}22`}}>
+          <div style={{fontFamily:fDmSans,fontSize:9,letterSpacing:'0.4em',color:D.dim,textAlign:'center',textTransform:'uppercase',marginBottom:10}}>nota di sicurezza</div>
+          <div style={{fontFamily:fBodoni,fontStyle:'italic',fontSize:12,color:D.dim,lineHeight:1.6,textAlign:'center',padding:'0 6px'}}>
+            GoalFit non è un dispositivo medico e non sostituisce il parere di un professionista. Il digiuno non è adatto in gravidanza, allattamento, diabete (tipo 1 e 2), disturbi del comportamento alimentare, sottopeso, o se assumi farmaci. Per digiuni superiori alle 24 ore consigliamo di parlare con il proprio medico; oltre le 72 ore <span style={{color:D.cream}}>sconsigliamo di procedere senza supervisione medica attiva</span>.
+          </div>
+        </div>
       </div>
+
+      {/* Modale di conferma per digiuni oltre le 72h (rischio "danger") */}
+      {pendingFast && (() => {
+        const h = pendingFast.hoursOverride ?? pendingFast.preset.hours;
+        const info = fastRiskInfo('danger');
+        return (
+          <div onClick={()=>setPendingFast(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.75)',backdropFilter:'blur(4px)',WebkitBackdropFilter:'blur(4px)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
+            <div onClick={e=>e.stopPropagation()} style={{background:`linear-gradient(180deg, ${D.bg1} 0%, ${D.bg2} 100%)`,border:`1px solid ${info.color}88`,maxWidth:380,width:'100%',padding:'24px 22px',color:D.cream}}>
+              <div style={{fontFamily:fDmSans,fontSize:10,letterSpacing:'0.4em',color:info.color,textAlign:'center',textTransform:'uppercase',marginBottom:8}}>{info.label}</div>
+              <h2 style={{fontFamily:fBodoni,fontStyle:'italic',fontWeight:400,fontSize:22,color:D.cream,textAlign:'center',margin:'0 0 14px'}}>Digiuno di {h} ore</h2>
+              <div style={{fontFamily:fBodoni,fontStyle:'italic',fontSize:13,color:D.cream,lineHeight:1.6,marginBottom:16}}>
+                {info.text}
+              </div>
+              <div style={{padding:'12px 14px',background:`${info.color}14`,border:`1px solid ${info.color}55`,marginBottom:18,fontFamily:fBodoni,fontStyle:'italic',fontSize:12,color:D.dim,lineHeight:1.5}}>
+                Procedi solo se hai consultato un medico, sei consapevole dei rischi e ti assumi la responsabilità di questa scelta.
+              </div>
+              <div style={{display:'flex',gap:8}}>
+                <button onClick={()=>setPendingFast(null)} style={{flex:1,background:'transparent',color:D.cream,border:`1px solid ${D.cream}55`,fontFamily:fDmSans,fontSize:10,letterSpacing:'0.3em',padding:'12px 14px',cursor:'pointer',textTransform:'uppercase'}}>annulla</button>
+                <button onClick={()=>startFast(pendingFast.preset, pendingFast.hoursOverride)} style={{flex:1,background:info.color,color:D.bg2,border:'none',fontFamily:fDmSans,fontSize:10,letterSpacing:'0.3em',padding:'12px 14px',cursor:'pointer',textTransform:'uppercase'}}>procedo comunque</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {editing && (
         <FastEditModal
