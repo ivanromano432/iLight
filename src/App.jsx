@@ -784,6 +784,16 @@ export default function App({ user, onLogout }){
     // CTA primario abbonamento: lime su dashboard, gold su tipografici
     const ctaBg      = isDashboard ? (Q.amber || '#9CC756') : '#C9A876';
     const ctaColor   = isDashboard ? '#2A3942' : '#1F140C';
+    // Colore badge stato abbonamento derivato dal tone, agganciato alla palette del tema
+    // (semaforico su Cruscotto, fallback ai toni caldi sui temi classici).
+    const badgeColor = {
+      active:   Q.okColor   || '#6B8E5C',
+      trial:    Q.infoColor || Q.gold || '#8C6A4E',
+      lifetime: Q.infoColor || Q.gold || '#8C6A4E',
+      neutral:  Q.dim || Q.goldDim || '#8C6A4E',
+      past_due: Q.warnColor || '#C99A7A',
+      expired:  Q.badColor  || '#C99A7A',
+    }[subState.tone] || (Q.gold || '#8C6A4E');
     return (
       <>
         <div style={{ position: 'fixed', top: 12, right: 12, zIndex: 9000 }}>
@@ -797,7 +807,7 @@ export default function App({ user, onLogout }){
               <div style={{ fontSize: 14, marginBottom: 10, wordBreak: 'break-all', fontStyle: labelStyle }}>{displayName || accountEmail}</div>
 
               {/* Badge stato abbonamento */}
-              <div style={{ padding: '8px 10px', border: `1px solid ${subState.color}66`, background: `${subState.color}14`, borderRadius: btnRadius, marginBottom: 12, fontSize: 13, fontStyle: labelStyle, color: subState.color, textAlign: 'center' }}>
+              <div style={{ padding: '8px 10px', border: `1px solid ${badgeColor}66`, background: `${badgeColor}14`, borderRadius: btnRadius, marginBottom: 12, fontSize: 13, fontStyle: labelStyle, color: badgeColor, textAlign: 'center' }}>
                 {subState.label}
               </div>
 

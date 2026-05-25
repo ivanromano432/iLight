@@ -34,6 +34,11 @@ function buildCSS(theme) {
   const teal = theme.gold || '#2BA8B5';
   const green = theme.amber || '#9CC73A';
   const ink = theme.ink || '#2A3942';
+  // Colori semaforici per il remap dei colori semantici hardcoded delle pagine classiche.
+  const ok   = theme.okColor   || green;
+  const warn = theme.warnColor || '#D9B86A';
+  const bad  = theme.badColor  || '#E04545';
+  const info = theme.infoColor || teal;
   const isDashboard = theme.structuralVariant === 'dashboard';
 
   // CSS con !important per battere gli inline style React.
@@ -131,6 +136,23 @@ function buildCSS(theme) {
       border-radius: 0 !important;
     }
     `}
+
+    /* === REMAP COLORI SEMANTICI HARDCODED ===
+       Le pagine "classiche" usano colori caldi fissi (salvia, salmone, oro, arancio)
+       pensati per i temi tipografici. Su Cruscotto/Foglio Bianco li riportiamo sulla
+       palette del tema (lime=ok, turchese=info/accento, ocra=warn, rosso=bad) agendo
+       solo sul color del testo, via attribute selector sugli inline style React.
+       Scoped al tema strutturale: gli altri temi non sono toccati. */
+    ${[
+      // positivo / "va bene" -> verde ok
+      ['#A5B889', ok], ['#6B8060', ok], ['#9CC73A', ok],
+      // attenzione / negativo / sopra-soglia -> ocra warn
+      ['#C99A7A', warn], ['#D4B86A', warn], ['#C8763C', warn],
+      // errore / elimina -> rosso bad
+      ['#A04848', bad],
+      // accenti decorativi oro/ambra/blu -> turchese info
+      ['#C9A876', info], ['#B89548', info], ['#4A9EBA', info],
+    ].map(([from, to]) => `html.${cls} [style*="${from}"], body.${cls} [style*="${from}"] { color: ${to} !important; }`).join('\n    ')}
 
     /* Body globale */
     html.${cls},
