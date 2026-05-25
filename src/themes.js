@@ -238,7 +238,7 @@ export const THEME_ORDER = [
   'sera_viola', 'notte_blu', 'bosco_pastello', 'notturno_ambra',
 ];
 
-export const DEFAULT_THEME = 'giardino';
+export const DEFAULT_THEME = 'cruscotto';
 
 export function getTheme(themeId) {
   return THEMES[themeId] || THEMES[DEFAULT_THEME];
