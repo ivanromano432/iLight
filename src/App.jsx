@@ -3460,9 +3460,9 @@ function SonnoPage({ theme, loaded, sleeps, updSleeps }){
         {!loaded && <Loading color={S.dim} />}
 
         {loaded && (<>
-          <div style={{textAlign:'center',marginTop:28}}>
+          <div style={(S?.structuralVariant === 'dashboard') ? {textAlign:'center',background:'#FFFFFF',border:'1px solid #E5EAEE',borderRadius:16,padding:'18px 16px',boxShadow:'0 1px 3px rgba(42,57,66,0.04)'} : {textAlign:'center',marginTop:28}}>
             <div style={{fontFamily:fFraunces,fontSize:9,letterSpacing:'0.45em',color:S.dim,textTransform:'uppercase'}}>{lastNight?`NOTTE DEL ${parseDayKey(lastNight.wakeDate).toLocaleDateString('it-IT',{day:'numeric',month:'short'})}`:'NESSUNA NOTTE REGISTRATA'}</div>
-            <div style={{fontFamily:fFraunces,fontStyle:'italic',fontWeight:300,fontSize:62,lineHeight:1,color:S.pale,marginTop:8}}>{lastNightDur!=null?fmtDur(lastNightDur):'—'}</div>
+            <div style={{fontFamily:fFraunces,fontStyle:(S?.structuralVariant === 'dashboard')?'normal':'italic',fontWeight:(S?.structuralVariant === 'dashboard')?800:300,fontSize:62,lineHeight:1,color:(S?.structuralVariant === 'dashboard')?'#9CC756':S.pale,marginTop:8}}>{lastNightDur!=null?fmtDur(lastNightDur):'—'}</div>
             {lastNight && (<>
               <div style={{fontFamily:fFraunces,fontStyle:'italic',fontSize:13,color:S.silver,marginTop:6}}>dalle {lastNight.bedtime} alle {lastNight.waketime}</div>
               <div style={{fontSize:18,letterSpacing:'0.1em',color:S.gold,marginTop:8}}>{'★'.repeat(lastNight.quality)}<span style={{color:S.dim}}>{'★'.repeat(5-lastNight.quality)}</span></div>
@@ -3691,7 +3691,7 @@ function SeraPage({ theme, loaded, weights, goal, notes, water, waterGoal, meals
         {!loaded && <Loading color={N.dim} />}
 
         {loaded && (<>
-          <div style={{marginTop:26,textAlign:'left'}}>
+          <div style={(N?.structuralVariant === 'dashboard') ? {marginTop:14,textAlign:'left',background:'#FFFFFF',border:'1px solid #E5EAEE',borderRadius:16,padding:'8px 16px',boxShadow:'0 1px 3px rgba(42,57,66,0.04)'} : {marginTop:26,textAlign:'left'}}>
             <Row theme={N} dot={sleepDot} label="sonno notte scorsa" value={lastNightDur!=null?fmtDur(lastNightDur):'—'} />
             <Row theme={N} dot={pesoMattinaDot} label="peso · mattina" value={morning?fmt(morning.weight):'—'} unit="kg" />
             <Row theme={N} dot={pesoSeraDot} label="peso · sera" value={evening&&evening!==morning?fmt(evening.weight):'—'} unit="kg" />
@@ -4519,7 +4519,7 @@ function RespiroPage({ theme, loaded, sessions, updSessions, workouts, types, up
 
         {loaded && (<>
           {/* Stats sessioni mindful */}
-          <div style={{display:'flex',justifyContent:'space-around',marginTop:18,padding:'14px 0',borderTop:`1px solid ${M.accent}44`,borderBottom:`1px solid ${M.accent}44`}}>
+          <div style={(M?.structuralVariant === 'dashboard') ? {display:'flex',justifyContent:'space-around',marginTop:14,padding:'16px 0',background:'#FFFFFF',border:'1px solid #E5EAEE',borderRadius:16,boxShadow:'0 1px 3px rgba(42,57,66,0.04)'} : {display:'flex',justifyContent:'space-around',marginTop:18,padding:'14px 0',borderTop:`1px solid ${M.accent}44`,borderBottom:`1px solid ${M.accent}44`}}>
             <Stat label="oggi" value={todayCount} color={M.accent} dim={M.dim} />
             <Stat label="min · 7g" value={fmt0(weekMin)} color={M.accent} dim={M.dim} />
             <Stat label="streak" value={streak} color={M.accent} dim={M.dim} />
