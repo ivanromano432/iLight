@@ -30,6 +30,8 @@ const NAV = { bg: '#1A1108', border: '#3A2818', dim: '#6B5D45', gold: '#C9A876',
 const M = { bg1: '#EAE6D2', bg2: '#D8D4C0', ink: '#3A4339', accent: '#7A8E78', dim: '#9CA194', cream: '#F4F1E5' };
 const D = { bg1: '#1F2228', bg2: '#0E1115', cream: '#E8E4D5', accent: '#C9A876', amber: '#D4A23E', dim: '#6B6478', active: '#A8826E', danger: '#C99A7A' };
 const SUPP_COLORS = ['#4A5C4D','#A0524C','#C9A876','#5C6B7E','#8B5E83','#7A8C5E','#A8826E','#6B4A3D'];
+// Palette integratori coerente col tema dashboard (turchese/lime/cool), distinguibili ma on-brand.
+const SUPP_COLORS_DASH = ['#3F95A1','#9CC756','#5AA8B3','#6FA8DC','#B0C95E','#7FB7A8','#C7A15A','#A088C0'];
 
 const fCinzel = "'Cinzel',serif", fGaramond = "'EB Garamond',serif", fCardo = "'Cardo',serif", fCaveat = "'Caveat',cursive";
 const fMarcellus = "'Marcellus',serif", fBodoni = "'Bodoni Moda',serif", fCormorant = "'Cormorant Garamond',serif";
@@ -2541,6 +2543,8 @@ function computeNutritionTarget(profile, weights, goal) {
 // === MenuPage: pianificazione del menù giornaliero con proposte IA cliccabili e progress su kcal/macro target ===
 function MenuPage({ theme, loaded, meals, updMeals, weights, goal, profile, updProfile }) {
   const J = theme || { bg: '#E5E3D5', dark: '#2D3A2E', sage: '#5C6B4E', light: '#8FA288' };
+  const isDashboard = J?.structuralVariant === 'dashboard';
+  const iaColor = isDashboard ? '#3F95A1' : '#C8763C';
   const [suggestions, setSuggestions] = useState(null);
   const [suggestLoading, setSuggestLoading] = useState(false);
   const [suggestError, setSuggestError] = useState('');
@@ -2698,7 +2702,7 @@ function MenuPage({ theme, loaded, meals, updMeals, weights, goal, profile, updP
             ) : MEAL_TYPES.map(type => {
               const mealsOfType = plannedMeals.filter(m => m.type === type.id);
               if (mealsOfType.length === 0) return null;
-              const amber = '#B89548', amberBg = '#F2E8D0';
+              const amber = isDashboard ? '#3F95A1' : '#B89548', amberBg = isDashboard ? '#EAF4F5' : '#F2E8D0';
               return (
                 <div key={type.id} style={{marginTop:14}}>
                   <div style={{padding:'6px 0',borderBottom:`1px solid ${amber}55`}}>
@@ -2724,15 +2728,15 @@ function MenuPage({ theme, loaded, meals, updMeals, weights, goal, profile, updP
           {/* === PROPOSTE IA — sempre visibili e cliccabili === */}
           <div style={{marginTop:30}}>
             <div style={{display:'flex',alignItems:'center',gap:14,marginBottom:14}}>
-              <div style={{flex:1,height:1,background:`linear-gradient(90deg, transparent, #C8763C66)`}} />
-              <span style={{fontFamily:fMarcellus,fontSize:10,letterSpacing:'0.4em',color:'#C8763C',textTransform:'uppercase'}}>proposte ia</span>
-              <div style={{flex:1,height:1,background:`linear-gradient(90deg, #C8763C66, transparent)`}} />
+              <div style={{flex:1,height:1,background:`linear-gradient(90deg, transparent, ${iaColor}66)`}} />
+              <span style={{fontFamily:fMarcellus,fontSize:10,letterSpacing:'0.4em',color:iaColor,textTransform:'uppercase'}}>proposte ia</span>
+              <div style={{flex:1,height:1,background:`linear-gradient(90deg, ${iaColor}66, transparent)`}} />
             </div>
 
             {!suggestions && !suggestLoading && !suggestError && (
               <div style={{textAlign:'center'}}>
                 <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:13,color:J.sage,marginBottom:12,lineHeight:1.5,maxWidth:340,margin:'0 auto 12px'}}>L'IA propone pasti bilanciati Zona 40/30/30 con alimenti che favoriscono il dimagrimento, in base ai macro che ti mancano.</div>
-                <button onClick={loadSuggestions} style={{background:'transparent',color:'#C8763C',border:`1px solid #C8763C`,fontFamily:fMarcellus,fontSize:10,letterSpacing:'0.35em',padding:'12px 24px',cursor:'pointer',textTransform:'uppercase'}}>chiedi suggerimenti</button>
+                <button onClick={loadSuggestions} style={{background:'transparent',color:iaColor,border:`1px solid ${iaColor}`,fontFamily:fMarcellus,fontSize:10,letterSpacing:'0.35em',padding:'12px 24px',cursor:'pointer',textTransform:'uppercase'}}>chiedi suggerimenti</button>
               </div>
             )}
             {suggestLoading && <div style={{textAlign:'center',padding:'14px 0',fontFamily:fGaramond,fontStyle:'italic',fontSize:14,color:J.sage}}>⋯ sto pensando ai tuoi pasti</div>}
@@ -2744,11 +2748,11 @@ function MenuPage({ theme, loaded, meals, updMeals, weights, goal, profile, updP
             )}
             {suggestions && suggestions.length > 0 && (
               <>
-                <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:12,color:'#A8623E',textAlign:'center',marginBottom:10}}>tocca un piatto per aggiungerlo al menù · i totali si aggiornano</div>
+                <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:12,color:isDashboard?'#5AA8B3':'#A8623E',textAlign:'center',marginBottom:10}}>tocca un piatto per aggiungerlo al menù · i totali si aggiornano</div>
                 <div>
                   {suggestions.map((m, i) => {
                     const tName = MEAL_TYPES.find(t=>t.id===m.type)?.name || m.type;
-                    const orange = '#C8763C', orangeBg = '#F2E0CC';
+                    const orange = isDashboard ? '#3F95A1' : '#C8763C', orangeBg = isDashboard ? '#EAF4F5' : '#F2E0CC';
                     return (
                       <button key={i} onClick={()=>addSuggestion(m)} style={{width:'100%',display:'flex',gap:10,alignItems:'flex-start',padding:'12px 14px',marginBottom:8,background:orangeBg,border:`1px solid ${orange}`,borderLeft:`3px solid ${orange}`,color:orange,cursor:'pointer',textAlign:'left',borderRadius:0}}>
                         <div style={{flex:1,minWidth:0}}>
@@ -3271,6 +3275,7 @@ function IntegraPage({ theme, loaded, supps, taken, updSupps, updTaken }){
   // Originariamente questa pagina usava T (palette Cuoio globale).
   // Shadow di T con il theme attivo passato come prop.
   const T = theme || { bg: '#F2EBDC', ink: '#1F1A12', dim: '#6B5D45' };
+  const isDashboard = T?.structuralVariant === 'dashboard';
   const [editingSupp, setEditingSupp] = useState(null);
   const [editingDay, setEditingDay] = useState(null);
   const [name, setName] = useState('');
@@ -3279,7 +3284,12 @@ function IntegraPage({ theme, loaded, supps, taken, updSupps, updTaken }){
   const days = [];
   for(let i=27;i>=0;i--){ const d=new Date(today); d.setDate(d.getDate()-i); days.push(d); }
 
-  const suppsWithColor = useMemo(()=>supps.map((s,i)=>({...s, color:s.color||SUPP_COLORS[i%SUPP_COLORS.length]})),[supps]);
+  // Su tema dashboard usa la palette cool on-brand per indice (ignora i colori terrosi salvati);
+  // sugli altri temi mantiene il colore salvato o la palette classica.
+  const suppsWithColor = useMemo(()=>supps.map((s,i)=> isDashboard
+    ? ({...s, color: SUPP_COLORS_DASH[i%SUPP_COLORS_DASH.length]})
+    : ({...s, color: s.color||SUPP_COLORS[i%SUPP_COLORS.length]})
+  ),[supps, isDashboard]);
 
   async function saveSupp(){
     const n=name.trim(); if(!n)return;
@@ -3307,7 +3317,7 @@ function IntegraPage({ theme, loaded, supps, taken, updSupps, updTaken }){
       <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${T.gold}40`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
       <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${T.gold}1A`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
       <div style={{position:'relative',zIndex:2,padding:'32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
-        {(T?.structuralVariant === 'dashboard') ? <DashHeader label="Integra" /> : <Header q="INTEGRA" sub="V" color={T.gold} dim={T.goldDim} mark="✦" font={fCormorant} />}
+        {(T?.structuralVariant === 'dashboard') ? <DashHeader label="Rituale" /> : <Header q="INTEGRA" sub="V" color={T.gold} dim={T.goldDim} mark="✦" font={fCormorant} />}
 
         {!loaded && <Loading color={T.dim} />}
 
