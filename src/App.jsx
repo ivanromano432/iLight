@@ -1634,6 +1634,7 @@ function OggiPage({ theme, loaded, profile, weights, goal, meals, notes, water, 
 function PesoPage({ theme, loaded, weights, goal, updWeights, updGoal, meals, updMeals, openStats, profile, openSub }){
   // Tema dinamico: shadowing del Q globale del modulo per usare il tema attivo
   const Q = theme || { bg1: '#3A2818', bg2: '#1F140C', gold: '#C9A876', goldDim: '#8B7355', cream: '#E8D8B8', ink: '#1F140C' };
+  const isDashboard = Q.structuralVariant === 'dashboard';
   const [editing, setEditing] = useState(null);
   const [showGoal, setShowGoal] = useState(false);
   const [draft, setDraft] = useState({ w:'', bf:'', mu:'', wa:'' });
@@ -1815,8 +1816,20 @@ function PesoPage({ theme, loaded, weights, goal, updWeights, updGoal, meals, up
     <div style={{minHeight:'100vh',background:`radial-gradient(ellipse at top, ${Q.bg1} 0%, ${Q.bg2} 100%)`,color:Q.cream,fontFamily:fGaramond,position:'relative',overflow:'hidden'}}>
       <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${Q.gold}40`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
       <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${Q.gold}1A`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
-      <div style={{position:'relative',zIndex:2,padding:'32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
-        <Header q="PESO" sub="I" color={Q.gold} dim={Q.goldDim} mark="✦" />
+      <div style={{position:'relative',zIndex:2,padding: isDashboard ? '20px 18px 28px' : '32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
+        {isDashboard ? (
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+              <img src="/icon-192.png" alt="" style={{ width:28, height:28, borderRadius:8, display:'block' }} />
+              <div style={{ fontSize:16, fontWeight:800, letterSpacing:'-0.01em' }}>
+                <span style={{ color:'#9CC756' }}>Goal</span><span style={{ color:'#2A3942' }}>fit</span>
+              </div>
+            </div>
+            <div style={{ fontSize:10, color:'#9AA5AB', textTransform:'uppercase', letterSpacing:'0.18em', fontWeight:700, marginRight:44 }}>Peso</div>
+          </div>
+        ) : (
+          <Header q="PESO" sub="I" color={Q.gold} dim={Q.goldDim} mark="✦" />
+        )}
         {!loaded && <Loading color={Q.goldDim} />}
         {loaded && weights.length===0 && (
           <div style={{textAlign:'center',padding:'40px 8px 0'}}>
@@ -1826,11 +1839,11 @@ function PesoPage({ theme, loaded, weights, goal, updWeights, updGoal, meals, up
           </div>
         )}
         {loaded && weights.length>0 && (<>
-          <div style={{textAlign:'center',marginTop:14}}>
+          <div style={isDashboard ? {textAlign:'center', background:'#FFFFFF', border:'1px solid #E5EAEE', borderRadius:16, padding:'18px 16px 16px', marginBottom:14, boxShadow:'0 1px 3px rgba(42,57,66,0.04)'} : {textAlign:'center',marginTop:14}}>
             <div style={{fontFamily:fCinzel,fontSize:9,letterSpacing:'0.45em',color:Q.goldDim,textTransform:'uppercase'}}>
               {todayEntries.length>1?`OGGI · MEDIA DI ${todayEntries.length}`:todayEntries.length===1?'OGGI':latest?`ULTIMO · ${new Date(latest.ts).toLocaleDateString('it-IT',{day:'numeric',month:'short'})}`:''}
             </div>
-            <div style={{fontStyle:'italic',fontSize:78,lineHeight:1,color:Q.cream,marginTop:8,letterSpacing:'-0.02em'}}>{fmt(todayAvg ?? latest?.weight)}</div>
+            <div style={{fontStyle: isDashboard ? 'normal' : 'italic',fontWeight: isDashboard ? 800 : 'normal',fontSize:78,lineHeight:1,color: isDashboard ? '#9CC756' : Q.cream,marginTop:8,letterSpacing:'-0.02em'}}>{fmt(todayAvg ?? latest?.weight)}</div>
             <div style={{fontFamily:fCinzel,fontSize:10,letterSpacing:'0.4em',color:Q.goldDim,marginTop:4}}>CHILOGRAMMI</div>
             {delta!=null && <div style={{fontStyle:'italic',fontSize:14,color:delta<0?'#A5B889':delta>0?'#C99A7A':Q.goldDim,marginTop:8}}>{delta<0?'— ':delta>0?'+ ':''}{fmt(Math.abs(delta),1)} dal giorno precedente</div>}
           </div>
