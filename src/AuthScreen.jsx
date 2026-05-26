@@ -1,17 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabase.js';
 
-const W = { bg: '#E8E0D2', ink: '#3C3329', tan: '#8C6A4E', accent: '#8B5E3C', gold: '#8B6F3F', sage: '#5C6B4E', cream: '#F4F1E8' };
-const fCardo = "'Cardo',serif";
-const fCaveat = "'Caveat',cursive";
-const fCinzel = "'Cinzel',serif";
+const W = { bg: '#FFFFFF', ink: '#2A3942', tan: '#9AA5AB', accent: '#3F95A1', gold: '#3F95A1', sage: '#9CC756', cream: '#FAFAFA' };
+const fCardo = "'Inter',system-ui,sans-serif";
+const fCaveat = "'Inter',system-ui,sans-serif";
+const fCinzel = "'Inter',system-ui,sans-serif";
 
 function ensureFonts() {
   if (document.getElementById('auth-fonts')) return;
   const link = document.createElement('link');
   link.id = 'auth-fonts';
   link.rel = 'stylesheet';
-  link.href = 'https://fonts.googleapis.com/css2?family=Cardo:ital,wght@0,400;1,400&family=Caveat:wght@500;700&family=Cinzel:wght@400;500&display=swap';
+  link.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap';
   document.head.appendChild(link);
 }
 
@@ -89,17 +89,19 @@ export default function AuthScreen() {
     <div style={{
       minHeight: '100vh',
       background: W.bg,
-      backgroundImage: 'repeating-linear-gradient(0deg, rgba(120,100,80,0.04) 0px, transparent 1px, transparent 3px, rgba(120,100,80,0.04) 4px), repeating-linear-gradient(90deg, rgba(120,100,80,0.04) 0px, transparent 1px, transparent 3px, rgba(120,100,80,0.04) 4px)',
       color: W.ink,
       fontFamily: fCardo,
     }}>
 
       {/* === BAR TOP === */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 22px', borderBottom: `1px solid ${W.ink}11` }}>
-        <div style={{ fontFamily: fCinzel, fontSize: 12, letterSpacing: '0.35em', color: '#2BA8B5' }}>
-          <span style={{ color: '#9CC73A' }}>GOAL</span>FIT
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <img src="/icon-192.png" alt="" style={{ width: 28, height: 28, borderRadius: 8, display: 'block' }} />
+          <div style={{ fontSize: 17, fontWeight: 800, letterSpacing: '-0.01em' }}>
+            <span style={{ color: '#9CC756' }}>Goal</span><span style={{ color: '#2A3942' }}>fit</span>
+          </div>
         </div>
-        <button onClick={() => scrollToForm('signin')} style={{ background: 'none', border: `1px solid ${W.ink}44`, color: W.ink, fontFamily: fCardo, fontStyle: 'italic', fontSize: 14, padding: '6px 14px', cursor: 'pointer' }}>accedi</button>
+        <button onClick={() => scrollToForm('signin')} style={{ background: 'none', border: `1px solid ${W.accent}66`, color: W.accent, fontFamily: fCardo, fontWeight: 600, fontSize: 14, padding: '7px 16px', borderRadius: 999, cursor: 'pointer' }}>accedi</button>
       </div>
 
       {/* === HERO === */}
@@ -113,10 +115,10 @@ export default function AuthScreen() {
           Dimagrisci con la Dieta a Zona 40/30/30. Foto dei piatti riconosciute dall'IA, calorie e macronutrienti calcolati automaticamente, riflessioni personalizzate sul tuo percorso.
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-          <button onClick={() => scrollToForm('signup')} style={{ background: W.ink, color: W.bg, border: 'none', fontFamily: fCardo, fontStyle: 'italic', fontSize: 17, padding: '14px 28px', cursor: 'pointer', letterSpacing: 0.5 }}>
+          <button onClick={() => scrollToForm('signup')} style={{ background: W.sage, color: W.ink, border: 'none', fontFamily: fCardo, fontWeight: 700, fontSize: 16, padding: '14px 28px', borderRadius: 10, cursor: 'pointer', letterSpacing: 0.2 }}>
             ✦ inizia gratis (14 giorni)
           </button>
-          <button onClick={() => scrollToForm('signin')} style={{ background: 'transparent', color: W.ink, border: `1px solid ${W.ink}66`, fontFamily: fCardo, fontStyle: 'italic', fontSize: 17, padding: '14px 28px', cursor: 'pointer' }}>
+          <button onClick={() => scrollToForm('signin')} style={{ background: 'transparent', color: W.accent, border: `1px solid ${W.accent}66`, fontFamily: fCardo, fontWeight: 600, fontSize: 16, padding: '14px 28px', borderRadius: 10, cursor: 'pointer' }}>
             ho già un account
           </button>
         </div>
@@ -186,7 +188,7 @@ export default function AuthScreen() {
             Abbonamento mensile o annuale. Cancella quando vuoi. Diritto di recesso 14 giorni.
           </div>
           <div style={{ marginTop: 22, textAlign: 'center' }}>
-            <button onClick={() => scrollToForm('signup')} style={{ background: W.ink, color: W.bg, border: 'none', fontFamily: fCardo, fontStyle: 'italic', fontSize: 17, padding: '12px 26px', cursor: 'pointer' }}>
+            <button onClick={() => scrollToForm('signup')} style={{ background: W.sage, color: W.ink, border: 'none', fontFamily: fCardo, fontWeight: 700, fontSize: 16, padding: '13px 28px', borderRadius: 10, cursor: 'pointer' }}>
               inizia ora ✦
             </button>
           </div>
@@ -232,7 +234,7 @@ export default function AuthScreen() {
             </div>
           )}
 
-          <button type="submit" disabled={busy} style={{ marginTop: 6, background: W.ink, color: W.bg, border: 'none', fontFamily: fCardo, fontStyle: 'italic', fontSize: 18, padding: '14px 28px', cursor: busy ? 'wait' : 'pointer', letterSpacing: 0.5, opacity: busy ? 0.6 : 1 }}>
+          <button type="submit" disabled={busy} style={{ marginTop: 6, background: W.sage, color: W.ink, border: 'none', fontFamily: fCardo, fontWeight: 700, fontSize: 17, padding: '14px 28px', borderRadius: 10, cursor: busy ? 'wait' : 'pointer', letterSpacing: 0.2, opacity: busy ? 0.6 : 1 }}>
             {busy ? '...' : (isSignup ? '✦ registrati' : '✦ accedi')}
           </button>
         </form>
@@ -295,13 +297,13 @@ function Divider() {
 
 const inputStyle = {
   fontFamily: fCardo,
-  fontSize: 17,
-  padding: '12px 16px',
-  border: `1px solid ${W.ink}33`,
+  fontSize: 16,
+  padding: '13px 16px',
+  border: `1px solid ${W.accent}40`,
   background: '#fff',
   color: W.ink,
   outline: 'none',
-  borderRadius: 2,
+  borderRadius: 10,
   width: '100%',
   boxSizing: 'border-box',
 };
