@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef, lazy } from 'react';
+import { Home, Scale, Salad, ClipboardList, Hourglass, Pill, Activity, Moon, NotebookPen } from 'lucide-react';
 import {
   weightsRepo, profileRepo, waterRepo, sleepsRepo, diaryRepo, mealsRepo,
   workoutsRepo, workoutTypesRepo, supplementsRepo, suppTakenRepo, mindfulRepo, fastsRepo,
@@ -378,15 +379,15 @@ ATTENZIONE: se i dati sono scarsi (es. meno di 3 giorni con dati), nello "stato"
 }
 
 const PAGES = [
-  { id:'oggi', label:'home', roman:'✦' },
-  { id:'peso', label:'peso', roman:'I' },
-  { id:'pasti', label:'pasti', roman:'II' },
-  { id:'menu', label:'menù', roman:'III' },
-  { id:'digiuno', label:'digiuno', roman:'IV' },
-  { id:'integra', label:'rituale', roman:'V' },
-  { id:'respiro', label:'corpo', roman:'VI' },
-  { id:'sonno', label:'sonno', roman:'VII' },
-  { id:'sera', label:'diario', roman:'VIII' },
+  { id:'oggi', label:'home', roman:'✦', Icon:Home },
+  { id:'peso', label:'peso', roman:'I', Icon:Scale },
+  { id:'pasti', label:'pasti', roman:'II', Icon:Salad },
+  { id:'menu', label:'menù', roman:'III', Icon:ClipboardList },
+  { id:'digiuno', label:'digiuno', roman:'IV', Icon:Hourglass },
+  { id:'integra', label:'rituale', roman:'V', Icon:Pill },
+  { id:'respiro', label:'corpo', roman:'VI', Icon:Activity },
+  { id:'sonno', label:'sonno', roman:'VII', Icon:Moon },
+  { id:'sera', label:'diario', roman:'VIII', Icon:NotebookPen },
 ];
 const DEF_TYPES = [
   { id:'corsa', name:'Corsa', unit:'km' },
@@ -909,9 +910,9 @@ function BottomNav({ theme, currentIdx, onChange }){
   const NAV = theme ? { bg: theme.bg2, border: theme.border, dim: theme.dim, gold: theme.gold, cream: theme.cream } : { bg: '#1A1108', border: '#3A2818', dim: '#6B5D45', gold: '#C9A876', cream: '#E8D8B8' };
   return (
     <div style={{position:'fixed',left:0,right:0,bottom:0,background:NAV.bg,borderTop:`1px solid ${NAV.border}`,display:'flex',justifyContent:'space-around',alignItems:'center',paddingTop:10,paddingBottom:14,zIndex:50}}>
-      {PAGES.map((p,i)=>{const active=i===currentIdx; return (
-        <button key={p.id} onClick={()=>onChange(i)} style={{background:'transparent',border:'none',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:1,padding:'4px 2px',minWidth:30,flex:'1 0 auto'}}>
-          <span style={{fontFamily:fCinzel,fontSize:9,letterSpacing:'0.1em',color:active?NAV.gold:NAV.dim}}>{p.roman}</span>
+      {PAGES.map((p,i)=>{const active=i===currentIdx; const Ic=p.Icon; return (
+        <button key={p.id} onClick={()=>onChange(i)} style={{background:'transparent',border:'none',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:3,padding:'4px 2px',minWidth:30,flex:'1 0 auto'}}>
+          {Ic ? <Ic size={20} strokeWidth={active?2.4:1.8} color={active?NAV.gold:NAV.dim} /> : <span style={{fontFamily:fCinzel,fontSize:9,letterSpacing:'0.1em',color:active?NAV.gold:NAV.dim}}>{p.roman}</span>}
           <span style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:8.5,color:active?NAV.cream:NAV.dim}}>{p.label}</span>
         </button>
       );})}
