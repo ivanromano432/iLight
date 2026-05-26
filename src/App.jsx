@@ -30,8 +30,9 @@ const NAV = { bg: '#1A1108', border: '#3A2818', dim: '#6B5D45', gold: '#C9A876',
 const M = { bg1: '#EAE6D2', bg2: '#D8D4C0', ink: '#3A4339', accent: '#7A8E78', dim: '#9CA194', cream: '#F4F1E5' };
 const D = { bg1: '#1F2228', bg2: '#0E1115', cream: '#E8E4D5', accent: '#C9A876', amber: '#D4A23E', dim: '#6B6478', active: '#A8826E', danger: '#C99A7A' };
 const SUPP_COLORS = ['#4A5C4D','#A0524C','#C9A876','#5C6B7E','#8B5E83','#7A8C5E','#A8826E','#6B4A3D'];
-// Palette integratori dashboard: colori fluo nettamente distinti (hue spaziati sulla ruota).
-const SUPP_COLORS_DASH = ['#00E5FF','#FF2D95','#76FF03','#FF6D00','#AA00FF','#FFD600','#00E676','#FF1744'];
+// Palette integratori dashboard: armonizzata coi colori GoalFit (turchese+lime come ancore),
+// estesa con tinte coordinate ma nettamente distinte. Vivaci ma non neon, buone su bianco.
+const SUPP_COLORS_DASH = ['#3F95A1','#9CC756','#2EC4B6','#4C8DD6','#E0A33E','#6CC24A','#8E6FD6','#E0746A'];
 
 const fCinzel = "'Cinzel',serif", fGaramond = "'EB Garamond',serif", fCardo = "'Cardo',serif", fCaveat = "'Caveat',cursive";
 const fMarcellus = "'Marcellus',serif", fBodoni = "'Bodoni Moda',serif", fCormorant = "'Cormorant Garamond',serif";
