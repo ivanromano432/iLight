@@ -386,7 +386,7 @@ const PAGES = [
   { id:'integra', label:'rituale', roman:'V' },
   { id:'respiro', label:'corpo', roman:'VI' },
   { id:'sonno', label:'sonno', roman:'VII' },
-  { id:'sera', label:'sera', roman:'VIII' },
+  { id:'sera', label:'diario', roman:'VIII' },
 ];
 const DEF_TYPES = [
   { id:'corsa', name:'Corsa', unit:'km' },
@@ -1213,6 +1213,12 @@ function OggiPage({ theme, loaded, profile, weights, goal, meals, notes, water, 
                 </div>
                 <div style={{ fontSize: 14, fontWeight: 500, color: '#3F95A1' }}>kg</div>
               </div>
+
+              {todayWeights.length > 1 && (
+                <div style={{ fontSize: 11, fontWeight: 600, color: '#5AA8B3', marginBottom: 8 }}>
+                  mattina {fmt(todayWeights[0].weight)} · sera {fmt(todayWeights[todayWeights.length - 1].weight)} kg
+                </div>
+              )}
 
               <div style={{ fontSize: 12, fontWeight: 600, color: '#9CC756', marginBottom: 14 }}>
                 {(() => {
@@ -3697,22 +3703,11 @@ function SeraPage({ theme, loaded, weights, goal, notes, water, waterGoal, meals
       <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${N.gold}40`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
       <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${N.gold}1A`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
       <div style={{position:'relative',zIndex:2,padding:'32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
-        {(N?.structuralVariant === 'dashboard') ? <DashHeader label="Sera" /> : <Header q="SERA" sub="VIII" color={N.gold} dim={N.goldDim} mark="✦" font={fFraunces} />}
+        {(N?.structuralVariant === 'dashboard') ? <DashHeader label="Diario" /> : <Header q="DIARIO" sub="VIII" color={N.gold} dim={N.goldDim} mark="✦" font={fFraunces} />}
 
         {!loaded && <Loading color={N.dim} />}
 
         {loaded && (<>
-          <div style={(N?.structuralVariant === 'dashboard') ? {marginTop:14,textAlign:'left',background:'#FFFFFF',border:'1px solid #E5EAEE',borderRadius:16,padding:'8px 16px',boxShadow:'0 1px 3px rgba(42,57,66,0.04)'} : {marginTop:26,textAlign:'left'}}>
-            <Row theme={N} dot={sleepDot} label="sonno notte scorsa" value={lastNightDur!=null?fmtDur(lastNightDur):'—'} />
-            <Row theme={N} dot={pesoMattinaDot} label="peso · mattina" value={morning?fmt(morning.weight):'—'} unit="kg" />
-            <Row theme={N} dot={pesoSeraDot} label="peso · sera" value={evening&&evening!==morning?fmt(evening.weight):'—'} unit="kg" />
-            <Row theme={N} dot={calDot} label="calorie" value={`${fmt0(totalKcal)} / ${fmt0(kcalTarget)}`} unit="kcal" />
-            <Row theme={N} dot={waterDot} label="acqua" value={todayWater} unit={`/ ${waterGoal}`} />
-            <Row theme={N} dot={workoutDot} label="allenamenti" value={todayWorkouts.length||'—'} details={workoutDetails} />
-            <Row theme={N} dot={mindDot} label="meditazione" value={totalMindfulMin>0?fmt0(totalMindfulMin):'—'} unit={totalMindfulMin>0?'min':''} details={todayMindful.length>1?`${todayMindful.length} sessioni`:null} />
-            <Row theme={N} dot={suppDot} label="integratori" value={supps.length>0?`${suppsTakenToday} / ${supps.length}`:'—'} details={suppDetails} />
-          </div>
-
           {/* === SEZIONE DIARIO: timeline cronologica auto-popolata dai dati del giorno + note manuali === */}
           {(() => {
             // Costruisco la timeline degli eventi di oggi da tutte le aree dell'app
