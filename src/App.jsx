@@ -2392,12 +2392,12 @@ function PastiPage({ user, theme, loaded, meals, updMeals, notes, weights, goal 
       <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${J.gold}40`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
       <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${J.gold}1A`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
       <div style={{position:'relative',zIndex:2,padding:'32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
-        <Header q="PASTI" sub="II" color={J.gold} dim={J.goldDim} mark="✦" />
+        {(J?.structuralVariant === 'dashboard') ? <DashHeader label="Pasti" /> : <Header q="PASTI" sub="II" color={J.gold} dim={J.goldDim} mark="✦" />}
         {!loaded && <Loading color={J.sage} />}
         {loaded && (<>
           <DayStrip selectedKey={selectedDay} onSelect={setSelectedDay} ink={J.dark} tan={J.sage} count={14} fontA={fMarcellus} fontB={fGaramond} />
           <div style={{marginTop:12,fontFamily:fGaramond,fontStyle:'italic',fontSize:13,color:J.sage,textAlign:'center'}}>{dateLabel}</div>
-          <div style={{marginTop:18,padding:'14px 0',borderTop:`1px solid ${J.sage}66`,borderBottom:`1px solid ${J.sage}66`,display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8}}>
+          <div style={(J?.structuralVariant === 'dashboard') ? {marginTop:14,padding:'16px 14px',background:'#FFFFFF',border:'1px solid #E5EAEE',borderRadius:16,boxShadow:'0 1px 3px rgba(42,57,66,0.04)',display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8} : {marginTop:18,padding:'14px 0',borderTop:`1px solid ${J.sage}66`,borderBottom:`1px solid ${J.sage}66`,display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8}}>
             <Totale label="kcal" value={fmt0(totals.kcal)} dark={J.dark} sage={J.sage} font={fMarcellus} big={fGaramond} />
             <Totale label="prot." value={fmt0(totals.p)} unit="g" dark={J.dark} sage={J.sage} font={fMarcellus} big={fGaramond} />
             <Totale label="carb." value={fmt0(totals.c)} unit="g" dark={J.dark} sage={J.sage} font={fMarcellus} big={fGaramond} />
@@ -2655,7 +2655,7 @@ function MenuPage({ theme, loaded, meals, updMeals, weights, goal, profile, updP
       <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${J.dark}25`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
       <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${J.dark}10`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
       <div style={{position:'relative',zIndex:2,padding:'32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
-        <Header q="MENÙ" sub="III" color={J.dark} dim={J.sage} mark="✦" />
+        {(J?.structuralVariant === 'dashboard') ? <DashHeader label="Menù" /> : <Header q="MENÙ" sub="III" color={J.dark} dim={J.sage} mark="✦" />}
 
         {!loaded && <Loading color={J.sage} />}
 
@@ -3095,7 +3095,7 @@ function AllenaPage({ theme, loaded, workouts, types, updWorkouts, updTypes }){
       <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${A.gold}40`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
       <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${A.gold}1A`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
       <div style={{position:'relative',zIndex:2,padding:'32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
-        <Header q="ALLENA" sub="V" color={A.gold} dim={A.goldDim} mark="✦" font={fBodoni} />
+        {(A?.structuralVariant === 'dashboard') ? <DashHeader label="Allena" /> : <Header q="ALLENA" sub="V" color={A.gold} dim={A.goldDim} mark="✦" font={fBodoni} />}
 
         {!loaded && <Loading color={A.sage} />}
 
@@ -3307,7 +3307,7 @@ function IntegraPage({ theme, loaded, supps, taken, updSupps, updTaken }){
       <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${T.gold}40`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
       <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${T.gold}1A`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
       <div style={{position:'relative',zIndex:2,padding:'32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
-        <Header q="INTEGRA" sub="V" color={T.gold} dim={T.goldDim} mark="✦" font={fCormorant} />
+        {(T?.structuralVariant === 'dashboard') ? <DashHeader label="Integra" /> : <Header q="INTEGRA" sub="V" color={T.gold} dim={T.goldDim} mark="✦" font={fCormorant} />}
 
         {!loaded && <Loading color={T.dim} />}
 
@@ -3455,7 +3455,7 @@ function SonnoPage({ theme, loaded, sleeps, updSleeps }){
       <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${S.gold}40`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
       <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${S.gold}1A`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
       <div style={{position:'relative',zIndex:2,padding:'32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
-        <Header q="SONNO" sub="VII" color={S.gold} dim={S.goldDim} mark="✦" font={fFraunces} />
+        {(S?.structuralVariant === 'dashboard') ? <DashHeader label="Sonno" /> : <Header q="SONNO" sub="VII" color={S.gold} dim={S.goldDim} mark="✦" font={fFraunces} />}
 
         {!loaded && <Loading color={S.dim} />}
 
@@ -3686,7 +3686,7 @@ function SeraPage({ theme, loaded, weights, goal, notes, water, waterGoal, meals
       <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${N.gold}40`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
       <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${N.gold}1A`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
       <div style={{position:'relative',zIndex:2,padding:'32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
-        <Header q="SERA" sub="VIII" color={N.gold} dim={N.goldDim} mark="✦" font={fFraunces} />
+        {(N?.structuralVariant === 'dashboard') ? <DashHeader label="Sera" /> : <Header q="SERA" sub="VIII" color={N.gold} dim={N.goldDim} mark="✦" font={fFraunces} />}
 
         {!loaded && <Loading color={N.dim} />}
 
@@ -4055,7 +4055,7 @@ function DigiunoPage({ theme, loaded, fasts, updFasts }){
       <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${D.gold}40`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
       <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${D.gold}1A`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
       <div style={{position:'relative',zIndex:2,padding:'32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
-        <Header q="DIGIUNO" sub="IV" color={D.gold} dim={D.goldDim} mark="✦" font={fBodoni} />
+        {(D?.structuralVariant === 'dashboard') ? <DashHeader label="Digiuno" /> : <Header q="DIGIUNO" sub="IV" color={D.gold} dim={D.goldDim} mark="✦" font={fBodoni} />}
 
         {!loaded && <Loading color={D.dim} />}
 
@@ -4513,7 +4513,7 @@ function RespiroPage({ theme, loaded, sessions, updSessions, workouts, types, up
       <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${M.gold}40`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
       <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${M.gold}1A`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
       <div style={{position:'relative',zIndex:2,padding:'32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
-        <Header q="CORPO" sub="VI" color={M.gold} dim={M.goldDim} mark="✦" font={fCormorant} />
+        {(M?.structuralVariant === 'dashboard') ? <DashHeader label="Corpo" /> : <Header q="CORPO" sub="VI" color={M.gold} dim={M.goldDim} mark="✦" font={fCormorant} />}
 
         {!loaded && <Loading color={M.dim} />}
 
@@ -4660,6 +4660,22 @@ function RespiroPage({ theme, loaded, sessions, updSessions, workouts, types, up
       {/* Modal allenamenti (ex pagina Allena) */}
       {detailType && <TypeDetailModal type={detailType} workouts={workouts||[]} onClose={()=>setDetailTypeId(null)} updWorkouts={updWorkouts} onEditType={()=>{setDetailTypeId(null); setEditingType(detailType.id);}} />}
       {editingType && <TypeModal existing={editingT} onClose={()=>setEditingType(null)} onSave={saveType} onDelete={editingType!=='new'?delType:null} />}
+    </div>
+  );
+}
+
+// Header in stile dashboard (Cruscotto): logo + "Goalfit" bicolore + etichetta pagina.
+// Usato condizionalmente al posto del Header editoriale quando il tema è strutturale 'dashboard'.
+function DashHeader({ label }){
+  return (
+    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
+      <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+        <img src="/icon-192.png" alt="" style={{ width:28, height:28, borderRadius:8, display:'block' }} />
+        <div style={{ fontSize:16, fontWeight:800, letterSpacing:'-0.01em', fontFamily:"'Inter', system-ui, sans-serif" }}>
+          <span style={{ color:'#9CC756' }}>Goal</span><span style={{ color:'#2A3942' }}>fit</span>
+        </div>
+      </div>
+      <div style={{ fontSize:10, color:'#9AA5AB', textTransform:'uppercase', letterSpacing:'0.18em', fontWeight:700, marginRight:44, fontFamily:"'Inter', system-ui, sans-serif" }}>{label}</div>
     </div>
   );
 }
