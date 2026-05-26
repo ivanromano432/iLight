@@ -378,7 +378,7 @@ ATTENZIONE: se i dati sono scarsi (es. meno di 3 giorni con dati), nello "stato"
 }
 
 const PAGES = [
-  { id:'oggi', label:'oggi', roman:'✦' },
+  { id:'oggi', label:'home', roman:'✦' },
   { id:'peso', label:'peso', roman:'I' },
   { id:'pasti', label:'pasti', roman:'II' },
   { id:'menu', label:'menù', roman:'III' },
