@@ -985,6 +985,53 @@ function NavShell({ T, kicker, title, children }){
 }
 const navCard = (T) => ({ background:`${T.cream}0D`, border:`1px solid ${T.gold}40`, borderRadius:16 });
 
+// ---------- Elementi condivisi del nuovo stile (anello, numeri in riga, tappe, pulsanti) ----------
+function NavRing({ T, p, size=250, sw=14, children }){
+  const r=(size-sw)/2, c=2*Math.PI*r, h=size/2, pp=Math.max(0,Math.min(1,p||0));
+  return (
+    <div style={{position:'relative',width:size,height:size,margin:'0 auto'}}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} fill="none" aria-hidden="true">
+        <circle cx={h} cy={h} r={r} stroke={`${T.cream}22`} strokeWidth={sw} />
+        <circle cx={h} cy={h} r={r} stroke={T.gold} strokeWidth={sw} strokeLinecap="round" strokeDasharray={`${c*pp} ${c}`} transform={`rotate(-90 ${h} ${h})`} />
+      </svg>
+      <div style={{position:'absolute',inset:0,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:2,textAlign:'center'}}>{children}</div>
+    </div>
+  );
+}
+function NavStats({ T, items }){
+  return (
+    <div style={{display:'flex',padding:'6px 0'}}>
+      {items.map(([v,l],i)=>(
+        <div key={i} style={{flex:'1 1 0',minWidth:0,display:'flex',flexDirection:'column',alignItems:'center',gap:2,borderLeft:i?`1px solid ${T.cream}22`:'none',padding:'0 4px',textAlign:'center'}}>
+          <span style={{fontFamily:T.fontText||fGaramond,fontSize:24,fontWeight:500,lineHeight:1.1}}>{v}</span>
+          <span style={{fontSize:12,opacity:0.7}}>{l}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+function NavStep({ T, time, title, desc, state='done', last, onTap }){
+  const on = state!=='todo';
+  const inner = (<>
+    <div style={{width:22,flexShrink:0,display:'flex',flexDirection:'column',alignItems:'center',gap:4}}>
+      <span style={{width:22,height:22,borderRadius:'50%',background:on?T.gold:'transparent',border:`2px solid ${on?T.gold:`${T.cream}44`}`,boxSizing:'border-box',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{state==='done' && <Check size={13} strokeWidth={3.2} color={T.bg2} />}</span>
+      <span style={{width:2,flexGrow:1,minHeight:10,background:last?'transparent':`${T.cream}2E`}} />
+    </div>
+    <div style={{flex:1,minWidth:0,display:'flex',flexDirection:'column',gap:2,paddingBottom:16}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:8}}>
+        <span style={{fontFamily:T.fontText||fGaramond,fontSize:state==='now'?24:20,fontWeight:500,lineHeight:1.15,opacity:on?1:0.7}}>{title}</span>
+        <span style={{fontSize:12,opacity:0.7,whiteSpace:'nowrap'}}>{time}</span>
+      </div>
+      {desc && <span style={{fontSize:13,opacity:0.75,lineHeight:1.4}}>{desc}</span>}
+    </div>
+  </>);
+  const st = {display:'flex',gap:14,width:'100%',textAlign:'left',color:T.cream,fontFamily:fDmSans,background:'transparent',border:'none',padding:0};
+  return onTap ? <button onClick={onTap} style={{...st,cursor:'pointer'}}>{inner}</button> : <div style={st}>{inner}</div>;
+}
+const navBtn = (T, primary=true) => ({ minHeight:50, borderRadius:25, background:primary?T.gold:'transparent', border:`1px solid ${T.gold}`, color:primary?T.bg2:T.cream, fontFamily:fDmSans, fontSize:15, fontWeight:primary?700:500, cursor:'pointer', width:'100%' });
+const navChip = (T, on) => ({ minHeight:44, padding:'0 6px', borderRadius:22, background:on?T.gold:'transparent', border:`1px solid ${on?T.gold:`${T.cream}33`}`, color:on?T.bg2:T.cream, fontFamily:fDmSans, fontSize:14, fontWeight:600, cursor:'pointer' });
+const navKicker = { fontSize:11, letterSpacing:'0.14em', textTransform:'uppercase', opacity:0.7, fontWeight:600, padding:'0 2px 8px' };
+
 // ---------- AGGIORNA: elenco delle cose da fare oggi, un tocco per registrare ----------
 function AggiornaPage({ theme, loaded, weights, updWeights, supps, taken, updTaken, water, waterGoal, updWater, workouts, fasts, sleeps, meals, go }){
   const T = theme;
@@ -2235,311 +2282,90 @@ function PesoPage({ theme, loaded, weights, goal, updWeights, updGoal, meals, up
   const { path, area, points } = buildLineChart(dailyData.map(d=>d.avg), 280, 70);
   const bfChart = buildLineChart(dailyData.map(d=>d.bfAvg), 280, 70);
 
+  // --- Render nuovo stile: anello verso l'obiettivo, percorso a tappe, grafico, composizione, pesate ---
+  const T = Q;
+  const fTitle = T.fontText || fGaramond;
+  const start = sorted[0] || null;
+  const goalN = goal != null ? Number(goal) : null;
+  const losing = start && goalN != null ? goalN <= start.weight : true;
+  const total = start && goalN != null ? Math.abs(start.weight - goalN) : 0;
+  const done = start && latest ? (losing ? start.weight - latest.weight : latest.weight - start.weight) : 0;
+  const ringP = total > 0 ? done / total : 0;
+  const remaining = latest && goalN != null ? Math.abs(latest.weight - goalN) : null;
+  const goalReached = latest && goalN != null && (losing ? latest.weight <= goalN + 0.05 : latest.weight >= goalN - 0.05);
+  const changeIn = (days) => { if (!latest) return null; const cut = Date.now() - days*86400000; const base = [...sorted].reverse().find(e => new Date(e.ts).getTime() <= cut) || sorted.find(e => new Date(e.ts).getTime() > cut); return base && base.id !== latest.id ? latest.weight - base.weight : null; };
+  const sgn = (v) => v == null ? '—' : `${v > 0 ? '+' : v < 0 ? '−' : ''}${fmt(Math.abs(v))}`;
+  const dShort = (ts) => new Date(ts).toLocaleDateString('it-IT',{day:'numeric',month:'short'});
+  // Tappe automatiche ogni 2 kg tra partenza e obiettivo
+  const STEP_KG = 2;
+  const tappe = [];
+  if (start && goalN != null && total > STEP_KG) {
+    for (let k = 1; k * STEP_KG < total - 0.01; k++) {
+      const w = losing ? start.weight - k*STEP_KG : start.weight + k*STEP_KG;
+      const hit = sorted.find(e => losing ? e.weight <= w : e.weight >= w);
+      tappe.push({ k, w, hit });
+    }
+  }
+  const reached = tappe.filter(t => t.hit);
+  const nextT = tappe.find(t => !t.hit);
+  const latestComp = [...sorted].reverse().find(e => e.bodyFat != null || e.muscle != null || e.water != null);
+  const recent = [...sorted].reverse();
+  const openGoal = () => { setDraftGoal(goal ? String(goal).replace('.',',') : ''); setShowGoal(true); };
+  const kicker = !latest ? 'inizia dalla prima pesata' : goalN == null ? 'imposta il tuo obiettivo' : goalReached ? 'obiettivo raggiunto' : `${done > 0.05 ? `${losing ? 'persi' : 'presi'} ${fmt(done)} kg · ` : ''}ne mancano ${fmt(remaining)}`;
   return (
-    <div style={{minHeight:'100vh',background:`radial-gradient(ellipse at top, ${Q.bg1} 0%, ${Q.bg2} 100%)`,color:Q.cream,fontFamily:fGaramond,position:'relative',overflow:'hidden'}}>
-      <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${Q.gold}40`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
-      <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${Q.gold}1A`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
-      <div style={{position:'relative',zIndex:2,padding: isDashboard ? '20px 18px 28px' : '32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
-        {isDashboard ? (
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
-            <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-              <img src="/icon-192.png" alt="" style={{ width:28, height:28, borderRadius:8, display:'block' }} />
-              <div style={{ fontSize:16, fontWeight:800, letterSpacing:'-0.01em' }}>
-                <span style={{ color:'#9CC756' }}>Goal</span><span style={{ color:'#2A3942' }}>fit</span>
-              </div>
-            </div>
-            <div style={{ fontSize:10, color:'#9AA5AB', textTransform:'uppercase', letterSpacing:'0.18em', fontWeight:700, marginRight:44 }}>Peso</div>
-          </div>
-        ) : (
-          <Header q="PESO" sub="I" color={Q.gold} dim={Q.goldDim} mark="✦" />
-        )}
-        {!loaded && <Loading color={Q.goldDim} />}
-        {loaded && weights.length===0 && (
-          <div style={{textAlign:'center',padding:'40px 8px 0'}}>
-            <div style={{fontStyle:'italic',fontSize:22,color:Q.cream,marginBottom:18}}>Il diario è ancora vuoto.</div>
-            <div style={{fontStyle:'italic',fontSize:14,color:Q.goldDim,lineHeight:1.6,maxWidth:280,margin:'0 auto'}}>La prima pesata apre il sentiero.</div>
-            <button onClick={openNew} style={btnSolid(Q.gold,Q.ink)}>PRIMA PESATA</button>
-          </div>
-        )}
-        {loaded && weights.length>0 && (<>
-          <div style={isDashboard ? {textAlign:'center', background:'#FFFFFF', border:'1px solid #E5EAEE', borderRadius:16, padding:'18px 16px 16px', marginBottom:14, boxShadow:'0 1px 3px rgba(42,57,66,0.04)'} : {textAlign:'center',marginTop:14}}>
-            <div style={{fontFamily:fCinzel,fontSize:9,letterSpacing:'0.45em',color:Q.goldDim,textTransform:'uppercase'}}>
-              {todayEntries.length>1?`OGGI · MEDIA DI ${todayEntries.length}`:todayEntries.length===1?'OGGI':latest?`ULTIMO · ${new Date(latest.ts).toLocaleDateString('it-IT',{day:'numeric',month:'short'})}`:''}
-            </div>
-            <div style={{fontStyle: isDashboard ? 'normal' : 'italic',fontWeight: isDashboard ? 800 : 'normal',fontSize:78,lineHeight:1,color: isDashboard ? '#9CC756' : Q.cream,marginTop:8,letterSpacing:'-0.02em'}}>{fmt(todayAvg ?? latest?.weight)}</div>
-            <div style={{fontFamily:fCinzel,fontSize:10,letterSpacing:'0.4em',color:Q.goldDim,marginTop:4}}>CHILOGRAMMI</div>
-            {delta!=null && <div style={{fontStyle:'italic',fontSize:14,color:delta<0?'#A5B889':delta>0?'#C99A7A':Q.goldDim,marginTop:8}}>{delta<0?'— ':delta>0?'+ ':''}{fmt(Math.abs(delta),1)} dal giorno precedente</div>}
-          </div>
-          {latest && (latest.bodyFat!=null||latest.muscle!=null||latest.water!=null) && (
-            <div style={{display:'flex',justifyContent:'space-around',marginTop:14,padding:'10px 0',borderTop:`1px solid ${Q.gold}22`,borderBottom:`1px solid ${Q.gold}22`}}>
-              {latest.bodyFat!=null && <BodyStat label="grasso" value={`${fmt(latest.bodyFat,1)}%`} Q={Q} />}
-              {latest.muscle!=null && <BodyStat label="muscolo" value={`${fmt(latest.muscle,1)}%`} Q={Q} />}
-              {latest.water!=null && <BodyStat label="acqua" value={`${fmt(latest.water,1)}%`} Q={Q} />}
-            </div>
-          )}
-          <div style={{marginTop:18,padding:'12px 0 8px',borderTop:`1px solid ${Q.gold}33`,borderBottom:`1px solid ${Q.gold}33`}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
-              <div style={{display:'flex',gap:4}}>
-                {[
-                  {v:7, label:'7g'},
-                  {v:30, label:'30g'},
-                  {v:365, label:'1a'},
-                ].map(opt=>(
-                  <button key={opt.v} onClick={()=>setPeriod(opt.v)} style={{
-                    fontFamily:fCinzel,fontSize:9,letterSpacing:'0.3em',
-                    background:period===opt.v?`${Q.gold}1F`:'transparent',
-                    color:period===opt.v?Q.gold:Q.goldDim,
-                    border:`1px solid ${period===opt.v?Q.gold+'55':Q.gold+'22'}`,
-                    padding:'4px 10px',cursor:'pointer',textTransform:'uppercase',
-                  }}>{opt.label}</button>
-                ))}
-              </div>
-              <span style={{display:'flex',gap:10,alignItems:'baseline'}}>
-                <span style={{color:Q.gold,fontFamily:fGaramond,fontStyle:'italic',fontSize:13,letterSpacing:0}}>{weekDelta!=null?`${weekDelta<0?'— ':'+ '}${fmt(Math.abs(weekDelta),1)} kg`:'—'}</span>
-                {weekBfDelta!=null && <span style={{color:'#C99A7A',fontFamily:fGaramond,fontStyle:'italic',fontSize:12,letterSpacing:0}}>{`${weekBfDelta<0?'— ':'+ '}${fmt(Math.abs(weekBfDelta),1)}% grasso`}</span>}
-              </span>
-            </div>
-            <svg viewBox="0 0 280 70" width="100%" height={70} style={{display:'block'}}>
-              <defs><linearGradient id="qa" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor={Q.gold} stopOpacity="0.18"/><stop offset="100%" stopColor={Q.gold} stopOpacity="0"/></linearGradient></defs>
-              {points.length>1 && <path d={area} fill="url(#qa)" />}
-              {/* Linea media peso del periodo selezionato: orizzontale, cream del tema, tratteggio largo per non confondersi con quella del grasso */}
-              {(() => {
-                const validAvgs = dailyData.map(d=>d.avg).filter(v=>v!=null);
-                if (validAvgs.length < 2) return null;
-                const avgVal = validAvgs.reduce((a,b)=>a+b,0) / validAvgs.length;
-                const { min, max, padX, padY, chartH, chartW } = { min:Math.min(...validAvgs), max:Math.max(...validAvgs), padX:8, padY:14, chartH:70, chartW:280 };
-                const span = Math.max(max-min, 0.5);
-                const y = padY + (chartH - padY*2) * (1 - (avgVal - min) / span);
-                return <line x1={padX} x2={chartW-padX} y1={y} y2={y} stroke={Q.cream} strokeWidth="1" strokeDasharray="6,4" opacity="0.55" />;
-              })()}
-              {points.length>1 && <path d={path} stroke={Q.gold} strokeWidth="1.2" fill="none" />}
-              {bfChart.points.length>1 && <path d={bfChart.path} stroke="#C99A7A" strokeWidth="1.2" fill="none" strokeDasharray="3,2" opacity="0.85" />}
-              {points.map((p,i)=><circle key={i} cx={p.x} cy={p.y} r={i===points.length-1?3.5:2} fill={i===points.length-1?Q.cream:Q.gold}/>)}
-              {bfChart.points.map((p,i)=><circle key={`bf${i}`} cx={p.x} cy={p.y} r={i===bfChart.points.length-1?2.5:1.5} fill="#C99A7A" opacity="0.85"/>)}
-            </svg>
-            <div style={{display:'flex',justifyContent:'space-between',marginTop:4,fontFamily:fGaramond,fontStyle:'italic',fontSize:10,color:Q.goldDim,padding:'0 4px'}}>
-              {period === 7 && dailyData.map((d,i)=><span key={i} style={{opacity:i===dailyData.length-1?1:0.6}}>{d.date.toLocaleDateString('it-IT',{weekday:'narrow'}).toLowerCase()}</span>)}
-              {period === 30 && [0,7,14,21,29].map(i=>{const d=dailyData[i]; return d?<span key={i} style={{opacity:i===29?1:0.6}}>{d.date.toLocaleDateString('it-IT',{day:'numeric',month:'short'})}</span>:null;})}
-              {period === 365 && [0,13,26,39,51].map(i=>{const d=dailyData[i]; return d?<span key={i} style={{opacity:i===51?1:0.6}}>{d.date.toLocaleDateString('it-IT',{month:'short'})}</span>:null;})}
-            </div>
-            {(() => {
-              const validAvgs = dailyData.map(d=>d.avg).filter(v=>v!=null);
-              if (validAvgs.length < 2) return null;
-              const avgVal = validAvgs.reduce((a,b)=>a+b,0) / validAvgs.length;
-              const hasBf = bfChart.points.length > 0;
-              return (
-                <div style={{display:'flex',justifyContent:'center',gap:18,marginTop:8,fontFamily:fGaramond,fontStyle:'italic',fontSize:10,color:Q.goldDim,flexWrap:'wrap'}}>
-                  <span style={{display:'inline-flex',alignItems:'center',gap:5}}><span style={{display:'inline-block',width:14,height:1.5,background:Q.gold}}/>peso</span>
-                  <span style={{display:'inline-flex',alignItems:'center',gap:5}}><span style={{display:'inline-block',width:14,height:1.5,backgroundImage:`repeating-linear-gradient(90deg,${Q.cream} 0 4px,transparent 4px 7px)`,opacity:0.7}}/>media {fmt(avgVal,1)} kg</span>
-                  {hasBf && <span style={{display:'inline-flex',alignItems:'center',gap:5}}><span style={{display:'inline-block',width:14,height:1.5,backgroundImage:'repeating-linear-gradient(90deg,#C99A7A 0 3px,transparent 3px 5px)'}}/>% grasso</span>}
-                </div>
-              );
-            })()}
-            {quality && (
-              <div style={{marginTop:10,textAlign:'center',fontFamily:fGaramond,fontStyle:'italic',fontSize:12,color:quality.color,padding:'6px 10px',background:`${quality.color}11`,border:`1px solid ${quality.color}33`}}>
-                {quality.label}
-              </div>
-            )}
-            {(rate || eta) && (
-              <div style={{marginTop:10,padding:'10px 12px',background:`${Q.gold}0A`,border:`1px solid ${Q.gold}22`,display:'flex',flexDirection:'column',gap:6}}>
-                {rate && (
-                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline'}}>
-                    <span style={{fontFamily:fCinzel,fontSize:9,letterSpacing:'0.3em',color:Q.goldDim,textTransform:'uppercase'}}>VELOCITÀ MEDIA · 30 GIORNI</span>
-                    <span style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:14,color:rate.perWeek<0?'#A5B889':rate.perWeek>0?'#C99A7A':Q.gold}}>
-                      {rate.perWeek<0?'− ':rate.perWeek>0?'+ ':''}{fmt(Math.abs(rate.perWeek),2)} kg/sett.
-                    </span>
-                  </div>
-                )}
-                {eta && eta.reached && (
-                  <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:13,color:'#A5B889',textAlign:'center',marginTop:rate?4:0}}>
-                    ✦ obiettivo raggiunto
-                  </div>
-                )}
-                {eta && eta.stalled && (
-                  <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:12,color:Q.goldDim,textAlign:'center',marginTop:rate?4:0}}>
-                    al ritmo attuale non raggiungerai l'obiettivo
-                  </div>
-                )}
-                {eta && eta.date && (
-                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginTop:rate?4:0}}>
-                    <span style={{fontFamily:fCinzel,fontSize:9,letterSpacing:'0.3em',color:Q.goldDim,textTransform:'uppercase'}}>STIMA OBIETTIVO</span>
-                    <span style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:14,color:Q.gold,textAlign:'right'}}>
-                      {eta.date.toLocaleDateString('it-IT',{day:'numeric',month:'short',year:'numeric'})}
-                      <span style={{color:Q.goldDim,fontSize:11,marginLeft:8}}>~{eta.weeks} sett.</span>
-                    </span>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-          <div style={{display:'flex',justifyContent:'space-around',marginTop:16}}>
-            <Stat label="giorni" value={streak} color={Q.gold} dim={Q.goldDim} />
-            <Stat label="totale" value={totalDelta!=null?`${totalDelta<0?'−':'+'}${fmt(Math.abs(totalDelta),1)}`:'—'} color={Q.gold} dim={Q.goldDim} />
-            <Stat label="obiettivo" value={goal!=null?fmt(goal):'—'} color={Q.gold} dim={Q.goldDim} onTap={()=>{setDraftGoal(goal!=null?String(goal).replace('.',','):''); setShowGoal(true);}} />
-          </div>
-          {openStats && weights.length>0 && (
-            <div style={{textAlign:'center',marginTop:18}}>
-              <button onClick={openStats} style={{background:'transparent',color:Q.gold,border:`1px solid ${Q.gold}66`,fontFamily:fCinzel,fontSize:10,letterSpacing:'0.35em',padding:'10px 18px',cursor:'pointer',textTransform:'uppercase'}}>
-                ✦ STATISTICHE COMPLETE
-              </button>
-            </div>
-          )}
-          {/* Badge stato abbonamento */}
-          {profile && openSub && (() => {
-            const trialDays = profile.trial_ends_at ? Math.max(0, Math.ceil((new Date(profile.trial_ends_at) - new Date()) / 86400000)) : 0;
-            const isLifetimeFree = !!profile.is_lifetime_free;
-            const isTrial = profile.subscription_status === 'trial' && trialDays > 0;
-            const isActive = profile.subscription_status === 'active';
-            const isPastDue = profile.subscription_status === 'past_due';
-            let label = '✦ ABBONAMENTO';
-            let color = Q.goldDim;
-            if (isLifetimeFree) { label = '✦ ACCESSO LIFETIME'; color = '#C9A876'; }
-            else if (isActive) { label = '✦ PREMIUM ATTIVO'; color = '#A5B889'; }
-            else if (isTrial) { label = `✦ PROVA: ${trialDays} ${trialDays === 1 ? 'GIORNO' : 'GIORNI'}`; color = Q.gold; }
-            else if (isPastDue) { label = '✦ PAGAMENTO IN SOSPESO'; color = '#C99A7A'; }
-            return (
-              <div style={{textAlign:'center',marginTop:10}}>
-                <button onClick={openSub} style={{background:'transparent',color,border:`1px solid ${color}55`,fontFamily:fCinzel,fontSize:9,letterSpacing:'0.3em',padding:'6px 14px',cursor:'pointer',textTransform:'uppercase'}}>
-                  {label}
-                </button>
-              </div>
-            );
-          })()}
-          {(() => {
-            // Pesate degli ultimi 7 giorni, raggruppate per giorno (piu' recente in alto)
-            const now = new Date();
-            const cutoff = new Date(now); cutoff.setDate(cutoff.getDate() - 6); cutoff.setHours(0,0,0,0);
-            const recent = (weights || []).filter(e => new Date(e.ts) >= cutoff).slice().sort((a,b)=>new Date(b.ts)-new Date(a.ts));
-            if (recent.length === 0) return null;
-            // Raggruppa per dayKey
-            const groups = [];
-            const seen = new Map();
-            for (const e of recent) {
-              const d = new Date(e.ts);
-              const k = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-              if (!seen.has(k)) { seen.set(k, groups.length); groups.push({ date: d, entries: [] }); }
-              groups[seen.get(k)].entries.push(e);
-            }
-            const today = new Date();
-            const yest = new Date(); yest.setDate(yest.getDate()-1);
-            const dayLabel = (d) => {
-              if (sameDay(d, today)) return 'OGGI';
-              if (sameDay(d, yest)) return 'IERI';
-              return d.toLocaleDateString('it-IT',{weekday:'long', day:'numeric', month:'short'}).toUpperCase();
-            };
-            return (
-              <div style={{marginTop:22}}>
-                <div style={{fontFamily:fCinzel,fontSize:9,letterSpacing:'0.4em',color:Q.goldDim,textAlign:'center',textTransform:'uppercase',marginBottom:10}}>ULTIME PESATE</div>
-                <div style={{display:'flex',flexDirection:'column',gap:14}}>
-                  {groups.map((g,gi) => (
-                    <div key={gi}>
-                      <div style={{fontFamily:fCinzel,fontSize:9,letterSpacing:'0.3em',color:Q.gold,marginBottom:6,paddingLeft:2}}>{dayLabel(g.date)}</div>
-                      <div style={{display:'flex',flexDirection:'column',gap:6}}>
-                        {g.entries.map(e=>{const d=new Date(e.ts); return (
-                          <button key={e.id} onClick={()=>openEdit(e)} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 14px',background:`${Q.gold}0D`,border:`1px solid ${Q.gold}1F`,cursor:'pointer',textAlign:'left',width:'100%',borderRadius:0}}>
-                            <div>
-                              <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:18,color:Q.cream}}>{fmt(e.weight)} <span style={{fontSize:11,color:Q.goldDim,fontFamily:fCinzel,letterSpacing:'0.2em',fontStyle:'normal'}}>KG</span>{e.bodyFat!=null && <span style={{fontSize:12,color:Q.goldDim,marginLeft:10}}>· {fmt(e.bodyFat)}% grasso</span>}</div>
-                              <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:12,color:Q.goldDim,marginTop:2}}>{d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})} · {timeOfDay(d)}</div>
-                            </div>
-                            <span style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:12,color:Q.goldDim}}>modifica ›</span>
-                          </button>
-                        );})}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })()}
-          <div style={{textAlign:'center',marginTop:24}}>
-            <button onClick={openNew} style={btnSolid(Q.gold,Q.ink)}>+ REGISTRA PESO</button>
-          </div>
-
-          {/* Diario fotografico dei pasti — raggruppato per data, ultimi 30 giorni */}
-          <div style={{marginTop:28,paddingTop:18,borderTop:`1px solid ${Q.gold}33`}}>
-            <div style={{textAlign:'center',marginBottom:14}}>
-              <div style={{fontFamily:fCinzel,fontSize:10,letterSpacing:'0.4em',color:Q.gold,textTransform:'uppercase',marginBottom:4}}>✦ DIARIO FOTOGRAFICO</div>
-              <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:12,color:Q.goldDim}}>{mealsWithPhotos.length>0?'i pasti che hai immortalato · tocca per ingrandire':'aggiungi foto dei tuoi pasti, anche senza dettagli'}</div>
-            </div>
-            <input ref={photoFileRef} type="file" accept="image/*" onChange={uploadMealPhoto} style={{display:'none'}} />
-
-            {/* Tile aggiungi foto sempre visibile in alto */}
-            <div style={{display:'grid',gridTemplateColumns:'repeat(4, 1fr)',gap:6,marginBottom:18}}>
-              <button onClick={()=>photoFileRef.current?.click()} disabled={uploadingPhoto} style={{aspectRatio:'1',padding:0,border:`1px dashed ${Q.gold}66`,background:`${Q.gold}0D`,cursor:uploadingPhoto?'default':'pointer',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',color:Q.gold,fontFamily:fGaramond,fontStyle:'italic',fontSize:11,borderRadius:2,opacity:uploadingPhoto?0.5:1}}>
-                {uploadingPhoto ? '⋯' : (<><span style={{fontSize:24,lineHeight:1,marginBottom:2}}>+</span><span style={{fontSize:9,letterSpacing:'0.15em',textTransform:'uppercase',fontFamily:fCinzel,fontStyle:'normal'}}>foto</span></>)}
-              </button>
-            </div>
-
-            {(() => {
-              if (mealsWithPhotos.length === 0) return (
-                <div style={{textAlign:'center',marginTop:10,fontFamily:fGaramond,fontStyle:'italic',fontSize:12,color:Q.goldDim,opacity:0.7}}>Le foto del Refettorio compariranno qui</div>
-              );
-              const now = new Date();
-              const todayKey = dayKey(now);
-              const yesterday = new Date(now); yesterday.setDate(yesterday.getDate()-1);
-              const yesterdayKey = dayKey(yesterday);
-              const weekAgo = now.getTime() - 7*86400000;
-              const monthAgo = now.getTime() - 30*86400000;
-
-              const groups = { today: [], yesterday: [], thisWeek: [], thisMonth: [], older: [] };
-              for (const m of mealsWithPhotos) {
-                const ts = new Date(m.ts).getTime();
-                const dk = dayKey(new Date(m.ts));
-                if (dk === todayKey) groups.today.push(m);
-                else if (dk === yesterdayKey) groups.yesterday.push(m);
-                else if (ts > weekAgo) groups.thisWeek.push(m);
-                else if (ts > monthAgo) groups.thisMonth.push(m);
-                else groups.older.push(m);
-              }
-
-              const recentGroups = [
-                { key:'today', label:'OGGI', items: groups.today },
-                { key:'yesterday', label:'IERI', items: groups.yesterday },
-                { key:'thisWeek', label:'QUESTA SETTIMANA', items: groups.thisWeek },
-                { key:'thisMonth', label:'QUESTO MESE', items: groups.thisMonth },
-              ].filter(g => g.items.length > 0);
-
-              const renderGrid = (items) => (
-                <div style={{display:'grid',gridTemplateColumns:'repeat(4, 1fr)',gap:6}}>
-                  {items.map(m=>(
-                    <button key={m.id} onClick={()=>setPhotoView(m)} style={{aspectRatio:'1',padding:0,border:`1px solid ${Q.gold}33`,background:'transparent',cursor:'pointer',position:'relative',overflow:'hidden',borderRadius:2}}>
-                      <img src={m.photo_url || m.photo} alt="" style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}} loading="lazy" />
-                    </button>
-                  ))}
-                </div>
-              );
-
-              return (<>
-                {recentGroups.map(g => (
-                  <div key={g.key} style={{marginBottom:18}}>
-                    <div style={{fontFamily:fCinzel,fontSize:9,letterSpacing:'0.4em',color:Q.goldDim,textTransform:'uppercase',marginBottom:8}}>{g.label} · <span style={{color:Q.gold}}>{g.items.length}</span></div>
-                    {renderGrid(g.items)}
-                  </div>
-                ))}
-                {groups.older.length > 0 && (
-                  <div style={{marginTop:8}}>
-                    {!showAllPhotos ? (
-                      <div style={{textAlign:'center',padding:'10px 0'}}>
-                        <button onClick={()=>setShowAllPhotos(true)} style={{background:'transparent',border:`1px solid ${Q.gold}55`,color:Q.gold,fontFamily:fCinzel,fontSize:9,letterSpacing:'0.3em',padding:'8px 16px',cursor:'pointer',textTransform:'uppercase'}}>
-                          ✦ MOSTRA PIÙ VECCHIE ({groups.older.length})
-                        </button>
-                      </div>
-                    ) : (
-                      <div>
-                        <div style={{fontFamily:fCinzel,fontSize:9,letterSpacing:'0.4em',color:Q.goldDim,textTransform:'uppercase',marginBottom:8}}>PIÙ VECCHIE · <span style={{color:Q.gold}}>{groups.older.length}</span></div>
-                        {renderGrid(groups.older)}
-                        <div style={{textAlign:'center',marginTop:10}}>
-                          <button onClick={()=>setShowAllPhotos(false)} style={{background:'transparent',border:'none',color:Q.goldDim,fontFamily:fGaramond,fontStyle:'italic',fontSize:12,cursor:'pointer'}}>nascondi più vecchie ‹</button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </>);
-            })()}
-          </div>
-        </>)}
-      </div>
+    <div>
+    <NavShell T={T} kicker={kicker} title="Peso">
+      {!loaded && <Loading color={T.gold} />}
+      {loaded && weights.length===0 && (
+        <div style={{display:'flex',flexDirection:'column',gap:16,alignItems:'center',paddingTop:30,textAlign:'center'}}>
+          <div style={{fontFamily:fTitle,fontSize:26}}>Non hai ancora pesate.</div>
+          <div style={{fontSize:14,opacity:0.75,lineHeight:1.5,maxWidth:280}}>Registra la prima: da lì parte il tuo percorso.</div>
+          <button onClick={openNew} style={navBtn(T)}>registra il peso</button>
+          <button onClick={openGoal} style={navBtn(T,false)}>{goalN!=null?`obiettivo ${fmt(goalN)} kg · modifica`:'imposta obiettivo'}</button>
+        </div>
+      )}
+      {loaded && weights.length>0 && (<div style={{display:'flex',flexDirection:'column',gap:16}}>
+        <NavRing T={T} p={goalN!=null ? ringP : 0}>
+          <span style={{fontSize:13,opacity:0.75}}>{todayEntries.length>0 ? 'oggi' : `ultima pesata · ${dShort(latest.ts)}`}</span>
+          <span style={{fontFamily:fTitle,fontSize:64,fontWeight:500,lineHeight:1}}>{fmt(todayAvg ?? latest.weight)}</span>
+          <button onClick={openGoal} style={{background:'transparent',border:'none',color:T.cream,fontFamily:fDmSans,fontSize:13,opacity:0.85,cursor:'pointer',padding:'6px 10px',textDecoration:'underline',textUnderlineOffset:3}}>{goalN!=null ? `kg · obiettivo ${fmt(goalN)}` : 'kg · imposta obiettivo'}</button>
+        </NavRing>
+        {quality && <div style={{alignSelf:'center',background:T.gold,color:T.bg2,fontSize:13,fontWeight:600,padding:'6px 14px',borderRadius:14,textAlign:'center'}}>{quality.label}</div>}
+        <button onClick={openNew} style={navBtn(T)}>registra il peso</button>
+        <div style={{paddingTop:6}}>
+          <NavStep T={T} time={dShort(start.ts)} title={`Partenza · ${fmt(start.weight)} kg`} state="done" />
+          {reached.slice(-2).map(t => (
+            <NavStep key={t.k} T={T} time={dShort(t.hit.ts)} title={`Primi ${t.k*STEP_KG} kg`} desc={`${fmt(t.w)} kg raggiunti`} state="done" />
+          ))}
+          <NavStep T={T} time="adesso" title={`Oggi · ${fmt(latest.weight)} kg`} desc={rate ? `ritmo ${sgn(rate.perWeek)} kg a settimana` : 'servono più pesate per calcolare il ritmo'} state="now" last={goalN==null} />
+          {!goalReached && nextT && <NavStep T={T} time="" title={`Prossima tappa · ${fmt(nextT.w)} kg`} desc={`mancano ${fmt(Math.abs(latest.weight - nextT.w))} kg`} state="todo" />}
+          {goalN!=null && <NavStep T={T} time={goalReached ? '' : eta?.date ? eta.date.toLocaleDateString('it-IT',{day:'numeric',month:'short',year:'numeric'}) : ''} title={`Obiettivo · ${fmt(goalN)} kg`} desc={goalReached ? 'raggiunto' : eta?.stalled ? 'al ritmo attuale non lo raggiungi' : eta?.date ? `data stimata, tra circa ${eta.weeks} settimane` : ''} state={goalReached ? 'done' : 'todo'} last />}
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(3, minmax(0, 1fr))',gap:6}}>
+          {[[7,'7 giorni'],[30,'30 giorni'],[365,'1 anno']].map(([d,l])=>(<button key={d} onClick={()=>setPeriod(d)} style={navChip(T, period===d)}>{l}</button>))}
+        </div>
+        {points.length>1 ? (
+          <svg viewBox="0 0 280 70" role="img" aria-label="Andamento del peso" style={{width:'100%',height:'auto',display:'block'}}>
+            <path d={area} fill={T.gold} fillOpacity="0.12" />
+            <path d={path} fill="none" stroke={T.gold} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            <circle cx={points[points.length-1].x} cy={points[points.length-1].y} r="4.5" fill={T.cream} />
+          </svg>
+        ) : <div style={{fontSize:13,opacity:0.7,textAlign:'center',padding:'10px 0'}}>Servono almeno due pesate in questo periodo per disegnare il grafico.</div>}
+        <NavStats T={T} items={[[sgn(changeIn(7)),'kg · settimana'],[sgn(changeIn(30)),'kg · mese'],[sgn(totalDelta),'kg · in totale']]} />
+        {latestComp && <NavStats T={T} items={[[latestComp.bodyFat!=null?`${fmt(latestComp.bodyFat)}%`:'—','grasso'],[latestComp.muscle!=null?`${fmt(latestComp.muscle)}%`:'—','muscolo'],[latestComp.water!=null?`${fmt(latestComp.water)}%`:'—','acqua']]} />}
+        <div>
+          <div style={navKicker}>pesate · tocca per correggere</div>
+          {(showAllPhotos ? recent : recent.slice(0,5)).map(e => (
+            <button key={e.id} onClick={()=>openEdit(e)} style={{display:'flex',alignItems:'baseline',gap:12,padding:'11px 2px',minHeight:44,width:'100%',background:'transparent',border:'none',borderBottom:`1px solid ${T.cream}22`,color:T.cream,fontFamily:fDmSans,cursor:'pointer',textAlign:'left'}}>
+              <span style={{fontSize:13,fontWeight:700,width:64,flexShrink:0}}>{sameDay(new Date(e.ts),new Date()) ? 'oggi' : dShort(e.ts)}</span>
+              <span style={{flex:1,fontSize:15}}>{fmt(e.weight)} kg{e.bodyFat!=null?` · grasso ${fmt(e.bodyFat)}%`:''}</span>
+              <span style={{fontSize:13,opacity:0.7}}>{new Date(e.ts).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})} ›</span>
+            </button>
+          ))}
+          {recent.length>5 && <button onClick={()=>setShowAllPhotos(!showAllPhotos)} style={{...navBtn(T,false),marginTop:12}}>{showAllPhotos ? 'mostra meno' : `mostra tutte (${recent.length})`}</button>}
+        </div>
+      </div>)}
+    </NavShell>
 
       {/* Visualizzatore foto ingrandita */}
       {photoView && (
@@ -2567,8 +2393,8 @@ function PesoPage({ theme, loaded, weights, goal, updWeights, updGoal, meals, up
         <ModalQ Q={Q} onClose={()=>setEditing(null)} title={editing==='new'?'REGISTRA PESO':'MODIFICA PESO'} subtitle={editing==='new'?new Date().toLocaleString('it-IT',{weekday:'long',day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'}):'aggiorna o elimina'}>
           <InputBig value={draft.w} onChange={v=>{setDraft({...draft,w:v}); setError('');}} onEnter={save} placeholder="74,2" unit="CHILOGRAMMI" Q={Q} />
           {error && <div style={{color:'#C99A7A',fontStyle:'italic',fontSize:13,marginTop:10,textAlign:'center'}}>{error}</div>}
-          <button onClick={()=>setExpanded(!expanded)} style={{marginTop:18,background:'transparent',border:'none',color:Q.goldDim,fontFamily:fGaramond,fontStyle:'italic',fontSize:13,cursor:'pointer',width:'100%',textAlign:'center'}}>
-            {expanded?'— composizione corporea —':'+ composizione corporea (RENPHO)'}
+          <button onClick={()=>setExpanded(!expanded)} style={{marginTop:18,minHeight:44,background:'transparent',border:'none',color:Q.gold,fontFamily:fDmSans,fontSize:14,fontWeight:600,cursor:'pointer',width:'100%',textAlign:'left',padding:0}}>
+            {expanded?'− composizione corporea':'+ aggiungi grasso, muscolo e acqua'}
           </button>
           {expanded && (
             <div style={{marginTop:10,padding:'12px 0',borderTop:`1px solid ${Q.gold}22`,borderBottom:`1px solid ${Q.gold}22`}}>
@@ -2604,8 +2430,8 @@ function BodyStat({ label, value, Q }){
 function DarkField({ label, value, onChange, placeholder, Q }){
   return (
     <div>
-      <div style={{fontFamily:fCinzel,fontSize:8,letterSpacing:'0.3em',color:Q.goldDim,textTransform:'uppercase',marginBottom:4}}>{label}</div>
-      <input type="text" inputMode="decimal" value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} style={{width:'100%',background:'transparent',border:'none',borderBottom:`1px solid ${Q.gold}66`,color:Q.cream,fontFamily:fGaramond,fontStyle:'italic',fontSize:18,padding:'4px 0',outline:'none',textAlign:'center'}} />
+      <div style={{fontFamily:fDmSans,fontSize:12,color:Q.cream,opacity:0.75,marginBottom:4}}>{label}</div>
+      <input type="text" inputMode="decimal" value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} style={{width:'100%',background:'transparent',border:'none',borderBottom:`1px solid ${Q.gold}66`,color:Q.cream,fontFamily:fGaramond,fontSize:22,padding:'4px 0',outline:'none',textAlign:'center'}} />
     </div>
   );
 }
@@ -5190,16 +5016,13 @@ function SimpleModal({ children, onClose, bg, border, wide }){
 }
 
 function ModalQ({ children, onClose, title, subtitle, Q }){
+  const t = String(title||'').toLowerCase();
   return (
-    <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(10,6,2,0.78)',backdropFilter:'blur(4px)',WebkitBackdropFilter:'blur(4px)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
-      <div onClick={e=>e.stopPropagation()} style={{background:`linear-gradient(180deg, ${Q.bg1} 0%, ${Q.bg2} 100%)`,border:`1px solid ${Q.gold}55`,maxWidth:380,width:'100%',padding:'28px 24px',position:'relative',borderRadius:4,maxHeight:'90vh',overflowY:'auto'}}>
-        <div style={{position:'absolute',inset:8,border:`1px solid ${Q.gold}22`,pointerEvents:'none',borderRadius:2}} />
-        <div style={{position:'relative'}}>
-          <div style={{color:Q.gold,fontSize:22,textAlign:'center',marginBottom:4}}>❦</div>
-          <h2 style={{fontFamily:fCinzel,fontSize:14,letterSpacing:'0.3em',color:Q.gold,textAlign:'center',margin:0,fontWeight:500}}>{title}</h2>
-          <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:13,color:Q.goldDim,textAlign:'center',marginTop:6}}>{subtitle}</div>
-          {children}
-        </div>
+    <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(4,12,28,0.7)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:'#142A4C',border:'1px solid #34506F',maxWidth:380,width:'100%',padding:'24px 22px',borderRadius:24,maxHeight:'90vh',overflowY:'auto',boxShadow:'0 12px 32px rgba(0,0,0,0.45)',color:Q.cream,fontFamily:fDmSans,boxSizing:'border-box'}}>
+        <h2 style={{fontFamily:Q.fontText||fGaramond,fontSize:26,fontWeight:500,margin:0,lineHeight:1.1}}>{t.charAt(0).toUpperCase()+t.slice(1)}</h2>
+        {subtitle && <div style={{fontSize:13,opacity:0.75,marginTop:6}}>{subtitle}</div>}
+        {children}
       </div>
     </div>
   );
@@ -5207,20 +5030,21 @@ function ModalQ({ children, onClose, title, subtitle, Q }){
 
 function InputBig({ value, onChange, onEnter, placeholder, unit, Q }){
   return (
-    <div style={{marginTop:24,textAlign:'center'}}>
-      <input type="text" inputMode="decimal" value={value} onChange={e=>onChange(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')onEnter();}} autoFocus placeholder={placeholder} style={{width:'100%',background:'transparent',border:'none',borderBottom:`1px solid ${Q.gold}66`,color:Q.cream,fontFamily:fGaramond,fontStyle:'italic',fontSize:54,textAlign:'center',padding:'4px 0 8px',outline:'none'}} />
-      <div style={{fontFamily:fCinzel,fontSize:10,letterSpacing:'0.4em',color:Q.goldDim,marginTop:4}}>{unit}</div>
+    <div style={{marginTop:20,display:'flex',alignItems:'baseline',gap:8}}>
+      <input type="text" inputMode="decimal" value={value} onChange={e=>onChange(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')onEnter();}} autoFocus placeholder={placeholder} aria-label={String(unit||'valore').toLowerCase()} style={{flex:1,minWidth:0,background:'transparent',border:'none',borderBottom:`2px solid ${Q.gold}`,color:Q.cream,fontFamily:Q.fontText||fGaramond,fontSize:48,outline:'none',padding:'4px 0'}} />
+      <span style={{fontSize:14,opacity:0.8}}>{String(unit||'').toLowerCase()}</span>
     </div>
   );
 }
 
 function EditButtons({ onCancel, onSave, onDelete, Q }){
+  const b = { minHeight:46, borderRadius:23, fontFamily:fDmSans, fontSize:15, cursor:'pointer', padding:'0 18px' };
   return (
-    <div style={{display:'flex',gap:10,marginTop:32,justifyContent:'space-between',alignItems:'center'}}>
-      {onDelete ? <button onClick={onDelete} style={{background:'transparent',color:'#C99A7A',border:`1px solid #C99A7A66`,fontFamily:fCinzel,fontSize:10,letterSpacing:'0.3em',padding:'12px 16px',cursor:'pointer',borderRadius:0}}>ELIMINA</button> : <span />}
+    <div style={{display:'flex',gap:10,marginTop:26,justifyContent:'space-between',alignItems:'center',flexWrap:'wrap'}}>
+      {onDelete ? <button onClick={onDelete} style={{...b,background:'transparent',color:'#F0B9A0',border:'1px solid #F0B9A088'}}>elimina</button> : <span />}
       <div style={{display:'flex',gap:10}}>
-        <button onClick={onCancel} style={{background:'transparent',color:Q.goldDim,border:`1px solid ${Q.goldDim}66`,fontFamily:fCinzel,fontSize:10,letterSpacing:'0.35em',padding:'12px 18px',cursor:'pointer',borderRadius:0}}>ANNULLA</button>
-        <button onClick={onSave} style={{background:Q.gold,color:Q.ink,border:`1px solid ${Q.gold}`,fontFamily:fCinzel,fontSize:10,letterSpacing:'0.35em',padding:'12px 24px',cursor:'pointer',borderRadius:0}}>SALVA</button>
+        <button onClick={onCancel} style={{...b,background:'transparent',color:Q.cream,border:`1px solid ${Q.cream}66`}}>annulla</button>
+        <button onClick={onSave} style={{...b,background:Q.gold,color:Q.bg2,border:`1px solid ${Q.gold}`,fontWeight:700}}>salva</button>
       </div>
     </div>
   );
