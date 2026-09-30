@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, lazy } from 'react';
-import { Home, Scale, Salad, ClipboardList, Hourglass, Pill, Activity, Moon, NotebookPen } from 'lucide-react';
+import { Home, Scale, Salad, ClipboardList, Hourglass, Pill, Activity, Moon, NotebookPen, MessageCircle, ListChecks, Camera, Utensils, ChartColumn, Send, Check } from 'lucide-react';
 import {
   weightsRepo, profileRepo, waterRepo, sleepsRepo, diaryRepo, mealsRepo,
   workoutsRepo, workoutTypesRepo, supplementsRepo, suppTakenRepo, mindfulRepo, fastsRepo,
@@ -388,7 +388,20 @@ const PAGES = [
   { id:'respiro', label:'corpo', roman:'VI', Icon:Activity },
   { id:'sonno', label:'sonno', roman:'VII', Icon:Moon },
   { id:'sera', label:'diario', roman:'VIII', Icon:NotebookPen },
+  { id:'coach', label:'coach', roman:'', Icon:MessageCircle },
+  { id:'aggiorna', label:'aggiorna', roman:'', Icon:ListChecks },
+  { id:'foto', label:'foto', roman:'', Icon:Camera },
 ];
+// Barra in basso: solo 5 voci. 'stats' apre la pagina Statistiche; tutte le altre pagine stanno nel menu del profilo.
+const NAV_ITEMS = [
+  { id:'coach', label:'coach', Icon:MessageCircle },
+  { id:'aggiorna', label:'aggiorna', Icon:ListChecks },
+  { id:'foto', label:'foto', Icon:Camera, center:true },
+  { id:'pasti', label:'pasti', Icon:Utensils },
+  { id:'stats', label:'statistiche', Icon:ChartColumn },
+];
+const MENU_PAGE_IDS = ['oggi','peso','menu','digiuno','integra','respiro','sonno','sera'];
+const MENU_PAGE_LABELS = { oggi:'Home', peso:'Peso', menu:'Menù', digiuno:'Digiuno', integra:'Rituale', respiro:'Corpo', sonno:'Sonno', sera:'Diario' };
 const DEF_TYPES = [
   { id:'corsa', name:'Corsa', unit:'km' },
   { id:'camminata', name:'Camminata', unit:'km' },
@@ -407,7 +420,8 @@ const MEAL_TYPES = [
 
 export default function App({ user, onLogout }){
   useGoogleFonts();
-  const [pageIdx, setPageIdx] = useState(0);
+  const [pageIdx, setPageIdx] = useState(() => Math.max(0, PAGES.findIndex(p => p.id === 'aggiorna')));
+  const [photoSeed, setPhotoSeed] = useState(null);
   // Scroll automatico in cima quando si cambia tab della nav
   useEffect(() => {
     try { window.scrollTo({ top: 0, behavior: 'auto' }); } catch (_) { try { window.scrollTo(0, 0); } catch (__) {} }
@@ -685,6 +699,14 @@ export default function App({ user, onLogout }){
   };
 
   const page = PAGES[pageIdx].id;
+  // Navigazione per id: chiude le pagine a tutto schermo e apre la pagina richiesta ('stats' = Statistiche)
+  const goPage = (id) => {
+    setShowAccountMenu(false); setShowSub(false); setShowGuida(false); setShowProfile(false); setShowLayout(false);
+    if (id === 'stats') { setShowStats(true); try { window.scrollTo(0, 0); } catch (_) {} return; }
+    setShowStats(false);
+    const idx = PAGES.findIndex(p => p.id === id);
+    if (idx >= 0) setPageIdx(idx);
+  };
 
   // Gate paywall: se la prova è terminata e l'abbonamento non è attivo, mostra solo la pagina abbonamento
   // is_lifetime_free bypassa tutto (accesso eterno gratuito per creatore/omaggi)
@@ -815,6 +837,14 @@ export default function App({ user, onLogout }){
                 {subState.label}
               </div>
 
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 6, marginBottom: 10, paddingBottom: 10, borderBottom: `1px solid ${accent}40` }}>
+                {MENU_PAGE_IDS.map(id => (
+                  <button key={id} onClick={() => goPage(id)}
+                    style={{ background: (!showStats && page === id) ? `${accent}26` : 'transparent', color: ink, border: btnBorder, borderRadius: btnRadius, fontFamily, fontStyle: labelStyle, fontSize: 14, fontWeight: btnFontWeight, padding: '10px 12px', minHeight: 44, cursor: 'pointer', textAlign: 'left' }}>
+                    {MENU_PAGE_LABELS[id]}
+                  </button>
+                ))}
+              </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <button onClick={() => { setShowAccountMenu(false); setShowProfile(true); }}
                   style={{ background: 'transparent', color: ink, border: btnBorder, borderRadius: btnRadius, fontFamily, fontStyle: labelStyle, fontSize: 14, fontWeight: btnFontWeight, padding: '8px 12px', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
@@ -869,6 +899,7 @@ export default function App({ user, onLogout }){
   if (showStats) {
     return (
       <>
+        <div style={{paddingBottom:90}}>
         <StatistichePage
           weights={weights} meals={meals} sleeps={sleeps} water={waterByDay}
           workouts={workouts} workoutTypes={workoutTypes}
@@ -879,18 +910,23 @@ export default function App({ user, onLogout }){
           profile={profile}
           onClose={() => setShowStats(false)}
         />
+        </div>
+        <BottomNav theme={getTheme(profile?.theme)} currentId="stats" onGo={goPage} />
         {renderAccountMenu()}
       </>
     );
   }
   return (
     <div style={{minHeight:'100vh', background:'#000', position:'relative'}}>
-      <div style={{paddingBottom:76}}>
+      <div style={{paddingBottom:90}}>
         {(() => { const __theme = getTheme(profile?.theme); return (<>
         <ThemeStyles theme={__theme} />
         {page==='oggi' && <OggiPage theme={__theme} loaded={loaded} profile={profile} weights={weights} goal={goal} meals={meals} notes={foodNotes} water={waterByDay} waterGoal={waterGoal} workouts={workouts} sleeps={sleeps} fasts={fasts} supps={supplements} taken={suppTaken} updWater={updWater} setPage={setPageIdx} />}
         {page==='peso' && <PesoPage theme={__theme} loaded={loaded} weights={weights} goal={goal} updWeights={updWeights} updGoal={updGoal} meals={meals} updMeals={updMeals} openStats={() => setShowStats(true)} profile={profile} openSub={() => setShowSub(true)} />}
-        {page==='pasti' && <PastiPage user={user} theme={__theme} loaded={loaded} meals={meals} updMeals={updMeals} notes={foodNotes} weights={weights} goal={goal} />}
+        {page==='coach' && <CoachPage theme={__theme} loaded={loaded} profile={profile} weights={weights} goal={goal} meals={meals} water={waterByDay} waterGoal={waterGoal} workouts={workouts} workoutTypes={workoutTypes} sleeps={sleeps} fasts={fasts} supps={supplements} taken={suppTaken} notes={foodNotes} mindful={mindfulSessions} />}
+        {page==='aggiorna' && <AggiornaPage theme={__theme} loaded={loaded} weights={weights} updWeights={updWeights} supps={supplements} taken={suppTaken} updTaken={updTaken} water={waterByDay} waterGoal={waterGoal} updWater={updWater} workouts={workouts} fasts={fasts} sleeps={sleeps} meals={meals} go={goPage} />}
+        {page==='foto' && <FotoPage theme={__theme} loaded={loaded} meals={meals} onPhoto={(b64) => { setPhotoSeed(b64 || 'manual'); goPage('pasti'); }} />}
+        {page==='pasti' && <PastiPage profile={profile} seedPhotoInit={photoSeed} clearSeedPhoto={() => setPhotoSeed(null)} user={user} theme={__theme} loaded={loaded} meals={meals} updMeals={updMeals} notes={foodNotes} weights={weights} goal={goal} />}
         {page==='menu' && <MenuPage theme={__theme} loaded={loaded} meals={meals} updMeals={updMeals} weights={weights} goal={goal} profile={profile} updProfile={updProfile} />}
         {page==='integra' && <IntegraPage theme={__theme} loaded={loaded} supps={supplements} taken={suppTaken} updSupps={updSupps} updTaken={updTaken} />}
         {page==='digiuno' && <DigiunoPage theme={__theme} loaded={loaded} fasts={fasts} updFasts={updFasts} />}
@@ -899,24 +935,331 @@ export default function App({ user, onLogout }){
         {page==='sera' && <SeraPage theme={__theme} loaded={loaded} weights={weights} goal={goal} notes={foodNotes} water={waterByDay} waterGoal={waterGoal} meals={meals} workouts={workouts} workoutTypes={workoutTypes} supps={supplements} taken={suppTaken} sleeps={sleeps} mindful={mindfulSessions} updNotes={updFoodNotes} profile={profile} />}
         </>); })()}
       </div>
-      <BottomNav theme={getTheme(profile?.theme)} currentIdx={pageIdx} onChange={setPageIdx} />
+      <BottomNav theme={getTheme(profile?.theme)} currentId={page} onGo={goPage} />
       {renderAccountMenu()}
     </div>
   );
 }
 
-function BottomNav({ theme, currentIdx, onChange }){
+function BottomNav({ theme, currentId, onGo }){
   // Tema dinamico: bottom nav usa colori del tema attivo
   const NAV = theme ? { bg: theme.bg2, border: theme.border, dim: theme.dim, gold: theme.gold, cream: theme.cream } : { bg: '#1A1108', border: '#3A2818', dim: '#6B5D45', gold: '#C9A876', cream: '#E8D8B8' };
   return (
-    <div style={{position:'fixed',left:0,right:0,bottom:0,background:NAV.bg,borderTop:`1px solid ${NAV.border}`,display:'flex',justifyContent:'space-around',alignItems:'center',paddingTop:10,paddingBottom:14,zIndex:50}}>
-      {PAGES.map((p,i)=>{const active=i===currentIdx; const Ic=p.Icon; return (
-        <button key={p.id} onClick={()=>onChange(i)} style={{background:'transparent',border:'none',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:3,padding:'4px 2px',minWidth:30,flex:'1 0 auto'}}>
-          {Ic ? <Ic size={20} strokeWidth={active?2.4:1.8} color={active?NAV.gold:NAV.dim} /> : <span style={{fontFamily:fCinzel,fontSize:9,letterSpacing:'0.1em',color:active?NAV.gold:NAV.dim}}>{p.roman}</span>}
-          <span style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:8.5,color:active?NAV.cream:NAV.dim}}>{p.label}</span>
-        </button>
-      );})}
+    <nav aria-label="navigazione principale" style={{position:'fixed',left:0,right:0,bottom:0,background:NAV.bg,borderTop:`1px solid ${NAV.border}55`,display:'flex',justifyContent:'space-around',alignItems:'flex-start',paddingTop:8,paddingBottom:'calc(10px + env(safe-area-inset-bottom, 0px))',zIndex:50}}>
+      {NAV_ITEMS.map(p=>{const active=p.id===currentId; const Ic=p.Icon;
+        if (p.center) return (
+          <button key={p.id} onClick={()=>onGo(p.id)} aria-label="diario fotografico dei pasti" style={{width:62,height:62,marginTop:-30,borderRadius:'50%',background:NAV.gold,border:`4px solid ${NAV.bg}`,boxShadow:active?`0 0 0 2px ${NAV.gold}`:'0 2px 8px rgba(0,0,0,0.25)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',padding:0,flexShrink:0}}>
+            <Ic size={27} strokeWidth={2} color={NAV.bg} />
+          </button>
+        );
+        return (
+          <button key={p.id} onClick={()=>onGo(p.id)} style={{background:'transparent',border:'none',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:4,padding:'4px 2px',minWidth:58,minHeight:46,flex:'1 1 0'}}>
+            <Ic size={23} strokeWidth={active?2.4:1.7} color={active?NAV.gold:NAV.cream} style={{opacity:active?1:0.7}} />
+            <span style={{fontFamily:fDmSans,fontSize:10.5,fontWeight:active?700:500,color:active?NAV.gold:NAV.cream,opacity:active?1:0.75}}>{p.label}</span>
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
+// ============================================================================
+// NUOVA NAVIGAZIONE — pagine della barra a 5 voci: Coach · Aggiorna · Foto
+// (Pasti e Statistiche riusano le pagine esistenti)
+// ============================================================================
+function NavShell({ T, kicker, title, children }){
+  const fTitle = T.fontText || fGaramond;
+  return (
+    <div style={{minHeight:'100vh',background:`radial-gradient(ellipse at top, ${T.bg1} 0%, ${T.bg2} 100%)`,color:T.cream,fontFamily:fDmSans,position:'relative'}}>
+      <div style={{padding:'30px 22px 28px',maxWidth:480,margin:'0 auto'}}>
+        <div style={{paddingRight:48,marginBottom:14}}>
+          <div style={{fontSize:11,letterSpacing:'0.14em',textTransform:'uppercase',color:T.gold,fontWeight:600}}>{kicker}</div>
+          <h1 style={{margin:'4px 0 0',fontFamily:fTitle,fontSize:36,fontWeight:500,lineHeight:1.05,color:T.cream}}>{title}</h1>
+        </div>
+        {children}
+      </div>
     </div>
+  );
+}
+const navCard = (T) => ({ background:`${T.cream}0D`, border:`1px solid ${T.gold}40`, borderRadius:16 });
+
+// ---------- AGGIORNA: elenco delle cose da fare oggi, un tocco per registrare ----------
+function AggiornaPage({ theme, loaded, weights, updWeights, supps, taken, updTaken, water, waterGoal, updWater, workouts, fasts, sleeps, meals, go }){
+  const T = theme;
+  const now = new Date();
+  const tk = dayKey(now);
+  const [weightOpen, setWeightOpen] = useState(false);
+  const [weightVal, setWeightVal] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const todayWeights = (weights||[]).filter(w=>sameDay(new Date(w.ts), now)).sort((a,b)=>new Date(a.ts)-new Date(b.ts));
+  const takenToday = (taken||{})[tk] || [];
+  const todayWater = (water||{})[tk] || 0;
+  const mealsToday = (meals||[]).filter(m=>m.status!=='planned' && sameDay(new Date(m.ts), now)).length;
+  const workoutToday = (workouts||[]).some(w=>sameDay(new Date(w.ts), now));
+  const activeFast = (fasts||[]).find(f=>!f.ended_ts);
+  const fastDoneToday = (fasts||[]).some(f=>f.ended_ts && sameDay(new Date(f.ended_ts), now));
+  const sleepToday = (sleeps||[]).some(s=>s.wakeDate===tk);
+
+  async function saveWeight(){
+    const n = parseNum(weightVal, 20, 400);
+    if (n == null || saving) return;
+    setSaving(true);
+    try { await updWeights([...(weights||[]), { id:newId(), ts:new Date().toISOString(), weight:n }]); } finally { setSaving(false); }
+    setWeightOpen(false); setWeightVal('');
+  }
+  async function toggleSupp(id){
+    const next = { ...(taken||{}), [tk]: takenToday.includes(id) ? takenToday.filter(x=>x!==id) : [...takenToday, id] };
+    await updTaken(next);
+  }
+
+  const groups = [
+    { label:'mattina', items:[
+      { id:'peso1', title:'Peso del mattino', sub: todayWeights[0] ? `registrato alle ${new Date(todayWeights[0].ts).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})}` : 'tocca e scrivi il peso', done: todayWeights.length>0, right: todayWeights[0] ? `${fmt(todayWeights[0].weight)} kg` : null, onTap: ()=>setWeightOpen(true) },
+      { id:'sonno', title:'Sonno di stanotte', sub: sleepToday ? 'registrato' : 'da registrare', done: sleepToday, onTap: ()=>go('sonno') },
+    ]},
+    { label:'integratori', items: (supps||[]).map(s=>({ id:'s_'+s.id, title:s.name, sub: takenToday.includes(s.id) ? 'preso' : 'tocca quando lo prendi', done: takenToday.includes(s.id), onTap: ()=>toggleSupp(s.id) })) },
+    { label:'giornata', items:[
+      { id:'acqua', title:'Acqua', sub:`${todayWater} bicchieri su ${waterGoal}`, done: todayWater>=waterGoal, right:'+1', onTap: ()=>updWater({ ...(water||{}), [tk]: Math.min(100, todayWater+1) }) },
+      { id:'pasti', title:'Pasti', sub: mealsToday ? `${mealsToday} ${mealsToday===1?'registrato':'registrati'} oggi` : 'nessuno registrato', done: mealsToday>=3, onTap: ()=>go('pasti') },
+      { id:'allena', title:'Allenamento', sub: workoutToday ? 'fatto oggi' : 'da registrare', done: workoutToday, onTap: ()=>go('respiro') },
+      { id:'digiuno', title:'Digiuno', sub: activeFast ? 'in corso' : fastDoneToday ? 'concluso oggi' : 'nessun digiuno attivo', done: fastDoneToday, onTap: ()=>go('digiuno') },
+    ]},
+    { label:'sera', items:[
+      { id:'peso2', title:'Peso della sera', sub: todayWeights.length>1 ? 'registrato' : 'tocca e scrivi il peso', done: todayWeights.length>1, right: todayWeights.length>1 ? `${fmt(todayWeights[todayWeights.length-1].weight)} kg` : null, onTap: ()=>setWeightOpen(true) },
+      { id:'diario', title:'Diario', sub:'riepilogo e note della giornata', done:false, noCheck:true, onTap: ()=>go('sera') },
+    ]},
+  ].filter(g=>g.items.length>0);
+  const all = groups.flatMap(g=>g.items).filter(i=>!i.noCheck);
+  const doneN = all.filter(i=>i.done).length;
+  const dateLabel = now.toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long'});
+
+  return (
+    <NavShell T={T} kicker={`${dateLabel} · ${doneN} di ${all.length} fatti`} title="Oggi">
+      {!loaded && <Loading color={T.gold} />}
+      {loaded && (<>
+        <div style={{height:8,borderRadius:4,background:`${T.cream}22`,marginBottom:6}}>
+          <div style={{width:`${all.length?Math.round(doneN/all.length*100):0}%`,height:8,borderRadius:4,background:T.gold,transition:'width .3s'}} />
+        </div>
+        {groups.map(g=>(
+          <div key={g.label} style={{marginTop:16}}>
+            <div style={{fontSize:11,letterSpacing:'0.14em',textTransform:'uppercase',color:T.cream,opacity:0.7,fontWeight:600,padding:'0 4px 8px'}}>{g.label}</div>
+            <div style={{display:'flex',flexDirection:'column',gap:8}}>
+              {g.items.map(it=>(
+                <button key={it.id} onClick={it.onTap} style={{...navCard(T),display:'flex',alignItems:'center',gap:14,padding:'12px 14px',minHeight:62,cursor:'pointer',textAlign:'left',width:'100%',boxSizing:'border-box',color:T.cream,fontFamily:fDmSans,opacity:it.done?0.75:1}}>
+                  {!it.noCheck && <span style={{width:28,height:28,borderRadius:'50%',flexShrink:0,background:it.done?T.gold:'transparent',border:`2px solid ${T.gold}`,display:'flex',alignItems:'center',justifyContent:'center'}}>{it.done && <Check size={17} strokeWidth={3} color={T.bg2} />}</span>}
+                  <span style={{flex:1,minWidth:0,display:'flex',flexDirection:'column',gap:2}}>
+                    <span style={{fontSize:16,fontWeight:600}}>{it.title}</span>
+                    <span style={{fontSize:12,opacity:0.75}}>{it.sub}</span>
+                  </span>
+                  <span style={{fontSize:14,fontWeight:700,color:it.right?T.cream:T.gold,whiteSpace:'nowrap'}}>{it.right || (it.done ? '' : 'tocca')}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+        {(supps||[]).length===0 && (
+          <button onClick={()=>go('integra')} style={{marginTop:16,background:'transparent',border:`1px dashed ${T.gold}80`,borderRadius:16,padding:'12px 14px',width:'100%',color:T.cream,fontFamily:fDmSans,fontSize:14,cursor:'pointer',textAlign:'left'}}>Aggiungi i tuoi integratori per vederli qui</button>
+        )}
+      </>)}
+      {weightOpen && (
+        <div onClick={()=>setWeightOpen(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.65)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:T.bg2,border:`1px solid ${T.gold}`,borderRadius:20,padding:22,width:'100%',maxWidth:320,color:T.cream,fontFamily:fDmSans}}>
+            <div style={{fontFamily:T.fontText||fGaramond,fontSize:24,marginBottom:12}}>Il tuo peso adesso</div>
+            <div style={{display:'flex',alignItems:'baseline',gap:8}}>
+              <input autoFocus inputMode="decimal" value={weightVal} onChange={e=>setWeightVal(e.target.value)} onKeyDown={e=>{ if(e.key==='Enter') saveWeight(); }} placeholder="0,0" aria-label="peso in kg"
+                style={{flex:1,minWidth:0,background:'transparent',border:'none',borderBottom:`2px solid ${T.gold}`,color:T.cream,fontFamily:T.fontText||fGaramond,fontSize:44,outline:'none',padding:'4px 0'}} />
+              <span style={{fontSize:18,opacity:0.8}}>kg</span>
+            </div>
+            <div style={{display:'flex',gap:10,marginTop:20}}>
+              <button onClick={()=>setWeightOpen(false)} style={{flex:1,minHeight:46,background:'transparent',border:`1px solid ${T.cream}66`,borderRadius:23,color:T.cream,fontFamily:fDmSans,fontSize:15,cursor:'pointer'}}>annulla</button>
+              <button onClick={saveWeight} disabled={saving || parseNum(weightVal,20,400)==null} style={{flex:1,minHeight:46,background:T.gold,border:`1px solid ${T.gold}`,borderRadius:23,color:T.bg2,fontFamily:fDmSans,fontSize:15,fontWeight:700,cursor:'pointer',opacity:parseNum(weightVal,20,400)==null?0.5:1}}>{saving?'…':'salva'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </NavShell>
+  );
+}
+
+// ---------- FOTO: diario fotografico dei pasti, vista griglia o linea del giorno ----------
+function FotoPage({ theme, loaded, meals, onPhoto }){
+  const T = theme;
+  const [view, setView] = useState(()=>{ try { return localStorage.getItem('goalfit_foto_view')==='linea' ? 'linea' : 'griglia'; } catch(_) { return 'griglia'; } });
+  const [limit, setLimit] = useState(14);
+  const [open, setOpen] = useState(null);
+  const [preparing, setPreparing] = useState(false);
+  const fileRef = useRef(null);
+  function pickView(v){ setView(v); try { localStorage.setItem('goalfit_foto_view', v); } catch(_) {} }
+  async function onPick(e){
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setPreparing(true);
+    try { const b64 = await resizeImage(file, 480, 0.7); onPhoto(b64); } catch(_) { onPhoto(null); } finally { setPreparing(false); }
+  }
+  const days = useMemo(()=>{
+    const map = {};
+    (meals||[]).forEach(m=>{ if(m.status==='planned' || !(m.photo_url||m.photo)) return; const k=dayKey(new Date(m.ts)); (map[k]=map[k]||[]).push(m); });
+    return Object.keys(map).sort().reverse().map(k=>({ key:k, list: map[k].sort((a,b)=>new Date(a.ts)-new Date(b.ts)) }));
+  },[meals]);
+  const shown = days.slice(0, limit);
+  const tk = dayKey(new Date());
+  const dayLabel = k => k===tk ? 'oggi' : parseDayKey(k).toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long'});
+  const hhmm = ts => new Date(ts).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
+  const typeName = m => MEAL_TYPES.find(t=>t.id===m.type)?.name || 'Pasto';
+  const seg = (id,label) => (
+    <button onClick={()=>pickView(id)} style={{flex:1,minHeight:44,borderRadius:22,border:'none',background:view===id?T.gold:'transparent',color:view===id?T.bg2:T.cream,fontFamily:fDmSans,fontSize:14,fontWeight:600,cursor:'pointer'}}>{label}</button>
+  );
+  return (
+    <NavShell T={T} kicker="diario fotografico" title="I tuoi piatti">
+      <input ref={fileRef} type="file" accept="image/*" onChange={onPick} style={{display:'none'}} />
+      <button onClick={()=>fileRef.current?.click()} disabled={preparing} style={{width:'100%',minHeight:52,borderRadius:26,background:T.gold,border:`1px solid ${T.gold}`,color:T.bg2,fontFamily:fDmSans,fontSize:16,fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:10}}>
+        <Camera size={20} strokeWidth={2.2} color={T.bg2} /> {preparing ? 'preparo la foto…' : 'fotografa il pasto'}
+      </button>
+      <div style={{...navCard(T),borderRadius:26,padding:4,display:'flex',gap:4,margin:'12px 0 4px'}}>{seg('griglia','griglia')}{seg('linea','linea del giorno')}</div>
+      {!loaded && <Loading color={T.gold} />}
+      {loaded && days.length===0 && <div style={{marginTop:40,textAlign:'center',fontSize:15,opacity:0.8,lineHeight:1.5}}>Ancora nessuna foto.<br/>Fotografa il prossimo pasto per iniziare il diario.</div>}
+      {loaded && shown.map(d=>(
+        <div key={d.key} style={{marginTop:18}}>
+          <div style={{fontSize:11,letterSpacing:'0.14em',textTransform:'uppercase',opacity:0.75,fontWeight:600,padding:'0 4px 8px'}}>{dayLabel(d.key)} · {d.list.length} {d.list.length===1?'pasto':'pasti'}</div>
+          {view==='griglia' ? (
+            <div style={{display:'grid',gridTemplateColumns:'repeat(3, minmax(0, 1fr))',gap:8}}>
+              {d.list.map(m=>(
+                <button key={m.id} onClick={()=>setOpen(m)} aria-label={`${typeName(m)} delle ${hhmm(m.ts)}`} style={{position:'relative',padding:0,border:'none',background:'transparent',cursor:'pointer',aspectRatio:'1 / 1',borderRadius:12,overflow:'hidden'}}>
+                  <img src={m.photo_url||m.photo} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}} />
+                  <span style={{position:'absolute',left:6,bottom:6,background:'rgba(8,18,36,0.78)',color:'#F4EFE2',fontFamily:fDmSans,fontSize:11,fontWeight:600,padding:'2px 7px',borderRadius:8}}>{hhmm(m.ts)}</span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div>
+              {d.list.map(m=>(
+                <div key={m.id} style={{display:'flex',gap:12}}>
+                  <div style={{width:44,flexShrink:0,display:'flex',flexDirection:'column',alignItems:'center',gap:6}}>
+                    <span style={{fontSize:13,fontWeight:700}}>{hhmm(m.ts)}</span>
+                    <span style={{width:2,flexGrow:1,background:`${T.gold}55`}} />
+                  </div>
+                  <button onClick={()=>setOpen(m)} style={{flex:1,minWidth:0,padding:'0 0 16px',border:'none',background:'transparent',cursor:'pointer',textAlign:'left',color:T.cream}}>
+                    <img src={m.photo_url||m.photo} alt="" loading="lazy" style={{width:'100%',height:170,objectFit:'cover',borderRadius:18,display:'block'}} />
+                    <span style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:8,marginTop:6}}>
+                      <span style={{fontFamily:T.fontText||fGaramond,fontSize:21,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{m.description || typeName(m)}</span>
+                      {m.kcal!=null && <span style={{fontFamily:fDmSans,fontSize:13,opacity:0.8,whiteSpace:'nowrap'}}>{fmt0(m.kcal)} kcal</span>}
+                    </span>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+      {loaded && days.length>limit && <button onClick={()=>setLimit(limit+14)} style={{marginTop:20,width:'100%',minHeight:46,background:'transparent',border:`1px solid ${T.gold}80`,borderRadius:23,color:T.cream,fontFamily:fDmSans,fontSize:14,cursor:'pointer'}}>mostra giorni precedenti</button>}
+      {open && (
+        <div onClick={()=>setOpen(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.9)',zIndex:210,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:20,cursor:'pointer'}}>
+          <img src={open.photo_url||open.photo} alt="" style={{maxWidth:'100%',maxHeight:'70vh',borderRadius:16}} />
+          <div style={{color:'#F4EFE2',fontFamily:fDmSans,fontSize:15,marginTop:14,textAlign:'center',lineHeight:1.5}}>
+            <div style={{fontWeight:700}}>{open.description || typeName(open)}</div>
+            <div style={{opacity:0.8,fontSize:13}}>{typeName(open)} · {hhmm(open.ts)}{open.kcal!=null?` · ${fmt0(open.kcal)} kcal`:''}</div>
+          </div>
+        </div>
+      )}
+    </NavShell>
+  );
+}
+
+// ---------- COACH: chat con l'IA che riceve un riepilogo degli ultimi 30 giorni ----------
+function buildCoachContext({ profile, weights, goal, meals, water, waterGoal, workouts, workoutTypes, sleeps, fasts, supps, taken, notes, mindful }){
+  const now = new Date();
+  const cutoff = new Date(now.getTime() - 30*86400000);
+  const recent = ts => { const d=new Date(ts); return d>=cutoff && d<=now; };
+  const dk = ts => dayKey(new Date(ts));
+  const L = [];
+  L.push(`Data di oggi: ${dayKey(now)}`);
+  const p = profile || {};
+  L.push(`Profilo: sesso ${p.sex||'n.d.'}, anno di nascita ${p.birth_year||'n.d.'}, altezza ${p.height_cm||'n.d.'} cm, peso obiettivo ${goal!=null?goal+' kg':'n.d.'}`);
+  const t = computeNutritionTarget(profile, weights, goal);
+  L.push(`Target giornalieri: ${t.kcal} kcal, proteine ${t.protein} g, carboidrati ${t.carbs} g, grassi ${t.fat} g`);
+  const ws = (weights||[]).filter(w=>recent(w.ts)).sort((a,b)=>new Date(a.ts)-new Date(b.ts));
+  L.push(`Peso (kg): ${ws.map(w=>`${dk(w.ts)} ${w.weight}`).join('; ') || 'nessun dato'}`);
+  const byDay = {};
+  (meals||[]).filter(m=>m.status!=='planned' && recent(m.ts)).forEach(m=>{ const k=dk(m.ts); const o=byDay[k]=byDay[k]||{kcal:0,p:0,c:0,g:0,d:[]}; o.kcal+=m.kcal||0; o.p+=m.p||0; o.c+=m.c||0; o.g+=m.g||0; if(m.description) o.d.push(m.description); });
+  const weekAgo = dayKey(new Date(now.getTime() - 7*86400000));
+  L.push('Pasti per giorno (kcal / proteine / carboidrati / grassi):');
+  Object.keys(byDay).sort().forEach(k=>{ const o=byDay[k]; L.push(`  ${k}: ${Math.round(o.kcal)} kcal / ${Math.round(o.p)} / ${Math.round(o.c)} / ${Math.round(o.g)}${k>=weekAgo && o.d.length ? ' — ' + o.d.join(', ').slice(0,300) : ''}`); });
+  if (Object.keys(byDay).length===0) L.push('  nessun dato');
+  const wk = Object.keys(water||{}).filter(k=>k>=dayKey(cutoff)).sort();
+  L.push(`Acqua (bicchieri, obiettivo ${waterGoal}): ${wk.map(k=>`${k} ${water[k]}`).join('; ') || 'nessun dato'}`);
+  const wo = (workouts||[]).filter(w=>recent(w.ts));
+  L.push(`Allenamenti: ${wo.map(w=>{ const ty=(workoutTypes||[]).find(x=>x.id===w.typeId); return `${dk(w.ts)} ${ty?.name||'attività'} ${w.qty??''} ${ty?.unit||''}`.trim(); }).join('; ') || 'nessun dato'}`);
+  const sl = (sleeps||[]).filter(s=>s.wakeDate && s.wakeDate>=dayKey(cutoff));
+  L.push(`Sonno: ${sl.map(s=>`${s.wakeDate} ${s.bedtime||'?'}-${s.waketime||'?'}${s.quality!=null?' qualità '+s.quality:''}`).join('; ') || 'nessun dato'}`);
+  const fs = (fasts||[]).filter(f=>f.started_ts && recent(f.started_ts));
+  L.push(`Digiuni: ${fs.map(f=>`${dk(f.started_ts)} ${f.ended_ts ? Math.round((new Date(f.ended_ts)-new Date(f.started_ts))/3600000)+'h' : 'in corso'}${f.planned_hours?' (previste '+f.planned_hours+'h)':''}`).join('; ') || 'nessun dato'}`);
+  const suppLine = (supps||[]).map(s=>{ let c=0; Object.keys(taken||{}).forEach(k=>{ if(k>=dayKey(cutoff) && (taken[k]||[]).includes(s.id)) c++; }); return `${s.name} ${c}/30 giorni`; });
+  L.push(`Integratori: ${suppLine.join('; ') || 'nessuno'}`);
+  const mi = (mindful||[]).filter(m=>recent(m.ts));
+  L.push(`Respirazione/mindfulness: ${mi.length} sessioni`);
+  const nt = (notes||[]).filter(n=>recent(n.ts)).slice(-10);
+  if (nt.length) L.push(`Note di diario recenti: ${nt.map(n=>`${dk(n.ts)} "${String(n.text||'').slice(0,200)}"`).join('; ')}`);
+  return L.join('\n');
+}
+function CoachPage(props){
+  const T = props.theme;
+  const [msgs, setMsgs] = useState([]);
+  const [input, setInput] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const endRef = useRef(null);
+  useEffect(()=>{ try { endRef.current?.scrollIntoView({ block:'end' }); } catch(_) {} }, [msgs, busy]);
+  async function send(text){
+    const q = (text ?? input).trim();
+    if (!q || busy) return;
+    const next = [...msgs, { role:'user', content:q }];
+    setMsgs(next); setInput(''); setErr(''); setBusy(true);
+    try {
+      const system = 'Sei il coach di GoalFit, un\'app italiana per il controllo del peso. Parli in italiano, in modo diretto, caldo e concreto, con risposte brevi (massimo 6-8 frasi, niente elenchi lunghi). '
+        + 'Dai consigli generali su alimentazione, peso e abitudini basandoti sui dati reali dell\'utente riportati qui sotto: citali quando servono e non inventare dati che non ci sono. '
+        + 'Non fai diagnosi e non sostituisci medico o nutrizionista: per problemi di salute, farmaci, gravidanza o obiettivi di peso estremi invita a rivolgersi a un professionista.\n\n'
+        + 'DATI DELL\'UTENTE (ultimi 30 giorni):\n' + buildCoachContext(props);
+      const res = await fetch('/api/anthropic', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ model:'claude-sonnet-4-6', max_tokens:900, system, messages: next.slice(-12) }) });
+      if (!res.ok) { let d=''; try { const j=await res.json(); d=j?.error?.message||j?.error||''; } catch(_) {} throw new Error('HTTP '+res.status+(d?' '+(typeof d==='string'?d:JSON.stringify(d)):'')); }
+      const data = await res.json();
+      const txt = data.content?.find(c=>c.type==='text')?.text || '';
+      if (!txt) throw new Error('risposta vuota');
+      setMsgs([...next, { role:'assistant', content:txt }]);
+    } catch (e) {
+      setErr('Il coach non ha risposto. Riprova tra poco. (' + (e?.message||'errore') + ')');
+    } finally { setBusy(false); }
+  }
+  const chips = ['Come sta andando il mio peso?', 'Cosa mangio stasera?', 'Dove posso migliorare questa settimana?'];
+  return (
+    <NavShell T={T} kicker="vede i tuoi dati degli ultimi 30 giorni" title="Coach">
+      <div style={{display:'flex',flexDirection:'column',gap:10,paddingBottom:150}}>
+        {msgs.length===0 && (
+          <div style={{...navCard(T),padding:'14px 16px',fontSize:15,lineHeight:1.5}}>Chiedimi del tuo peso, dei pasti o di cosa migliorare. Rispondo guardando quello che hai registrato nell'app. Sono consigli generali: non sostituiscono medico o nutrizionista.</div>
+        )}
+        {msgs.map((m,i)=>(
+          <div key={i} style={{alignSelf:m.role==='user'?'flex-end':'flex-start',maxWidth:'86%',padding:'11px 14px',borderRadius:18,background:m.role==='user'?T.gold:`${T.cream}14`,border:m.role==='user'?'none':`1px solid ${T.gold}33`,color:m.role==='user'?T.bg2:T.cream,fontSize:15,lineHeight:1.45,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{m.content}</div>
+        ))}
+        {busy && <div style={{alignSelf:'flex-start',padding:'11px 14px',borderRadius:18,background:`${T.cream}14`,fontSize:15,opacity:0.8}}>sto guardando i tuoi dati…</div>}
+        {err && <div style={{fontSize:13,color:T.danger||'#C99A7A'}}>{err}</div>}
+        {msgs.length===0 && (
+          <div style={{display:'flex',flexDirection:'column',gap:8,marginTop:6}}>
+            {chips.map(c=>(<button key={c} onClick={()=>send(c)} disabled={busy||!props.loaded} style={{minHeight:46,padding:'0 16px',borderRadius:23,background:'transparent',border:`1px solid ${T.gold}`,color:T.cream,fontFamily:fDmSans,fontSize:14,textAlign:'left',cursor:'pointer'}}>{c}</button>))}
+          </div>
+        )}
+        <div ref={endRef} />
+      </div>
+      <div style={{position:'fixed',left:0,right:0,bottom:82,zIndex:40,padding:'0 16px'}}>
+        <div style={{maxWidth:448,margin:'0 auto',display:'flex',alignItems:'center',gap:8,background:T.bg2,border:`1px solid ${T.gold}80`,borderRadius:26,padding:'4px 4px 4px 18px',boxShadow:'0 4px 16px rgba(0,0,0,0.25)'}}>
+          <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{ if(e.key==='Enter') send(); }} placeholder="Scrivi al coach…" aria-label="Scrivi al coach"
+            style={{flex:1,minWidth:0,border:'none',background:'transparent',fontFamily:fDmSans,fontSize:16,color:T.cream,outline:'none',height:44}} />
+          <button onClick={()=>send()} disabled={busy||!input.trim()||!props.loaded} aria-label="Invia" style={{width:44,height:44,borderRadius:'50%',background:T.gold,border:'none',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',flexShrink:0,opacity:(busy||!input.trim())?0.5:1}}>
+            <Send size={19} strokeWidth={2.2} color={T.bg2} />
+          </button>
+        </div>
+      </div>
+    </NavShell>
   );
 }
 
@@ -2207,7 +2550,7 @@ function ToggleRow({ children, checked, onToggle, ink }){
   );
 }
 
-function PastiPage({ user, theme, loaded, meals, updMeals, notes, weights, goal }){
+function PastiPage({ user, theme, loaded, meals, updMeals, notes, weights, goal, profile, seedPhotoInit, clearSeedPhoto }){
   // Tema dinamico: shadowing del J globale del modulo
   const J = theme || { bg: '#E5E3D5', dark: '#2D3A2E', sage: '#5C6B4E', light: '#8FA288' };
   const [selectedDay, setSelectedDay] = useState(dayKey(new Date()));
@@ -2216,6 +2559,13 @@ function PastiPage({ user, theme, loaded, meals, updMeals, notes, weights, goal 
   const [photoIaSeed, setPhotoIaSeed] = useState(null);
   const [preparingPhoto, setPreparingPhoto] = useState(false);
   const photoIaRef = useRef(null);
+  // Foto scattata dalla pagina Foto (barra in basso): apre subito il MealModal con la foto pronta
+  useEffect(() => {
+    if (!seedPhotoInit) return;
+    if (seedPhotoInit !== 'manual') setPhotoIaSeed(seedPhotoInit);
+    setEditing('new');
+    clearSeedPhoto && clearSeedPhoto();
+  }, [seedPhotoInit]);
   // Bulk stima nutrienti
   const [bulkEstimating, setBulkEstimating] = useState(false);
   const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0 });
@@ -2407,12 +2757,33 @@ function PastiPage({ user, theme, loaded, meals, updMeals, notes, weights, goal 
         {loaded && (<>
           <DayStrip selectedKey={selectedDay} onSelect={setSelectedDay} ink={J.dark} tan={J.sage} count={14} fontA={fMarcellus} fontB={fGaramond} />
           <div style={{marginTop:12,fontFamily:fGaramond,fontStyle:'italic',fontSize:13,color:J.sage,textAlign:'center'}}>{dateLabel}</div>
+          {/* Copertina: foto dell'ultimo pasto del giorno */}
+          {(() => { const withPhoto = [...eatenMeals].filter(m => m.photo_url || m.photo).sort((a,b) => new Date(b.ts) - new Date(a.ts)); const h = withPhoto[0]; if (!h) return null; return (
+            <button onClick={() => setEditing(h.id)} style={{position:'relative',display:'block',width:'100%',marginTop:14,padding:0,border:'none',background:'transparent',cursor:'pointer',borderRadius:22,overflow:'hidden'}}>
+              <img src={h.photo_url || h.photo} alt="" style={{width:'100%',height:210,objectFit:'cover',display:'block'}} />
+              <span style={{position:'absolute',left:12,bottom:12,background:'rgba(8,18,36,0.78)',color:'#F4EFE2',padding:'7px 13px',borderRadius:14,textAlign:'left',fontFamily:fDmSans,fontSize:12,maxWidth:'80%'}}>
+                <span style={{display:'block',fontFamily:fGaramond,fontSize:20,lineHeight:1.15}}>{h.description || MEAL_TYPES.find(t => t.id === h.type)?.name || 'Pasto'}</span>
+                {new Date(h.ts).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})}{h.kcal != null ? ` · ${fmt0(h.kcal)} kcal` : ''}
+              </span>
+            </button>
+          ); })()}
           <div style={(J?.structuralVariant === 'dashboard') ? {marginTop:14,padding:'16px 14px',background:'#FFFFFF',border:'1px solid #E5EAEE',borderRadius:16,boxShadow:'0 1px 3px rgba(42,57,66,0.04)',display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8} : {marginTop:18,padding:'14px 0',borderTop:`1px solid ${J.sage}66`,borderBottom:`1px solid ${J.sage}66`,display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8}}>
             <Totale label="kcal" value={fmt0(totals.kcal)} dark={J.dark} sage={J.sage} font={fMarcellus} big={fGaramond} />
             <Totale label="prot." value={fmt0(totals.p)} unit="g" dark={J.dark} sage={J.sage} font={fMarcellus} big={fGaramond} />
             <Totale label="carb." value={fmt0(totals.c)} unit="g" dark={J.dark} sage={J.sage} font={fMarcellus} big={fGaramond} />
             <Totale label="gras." value={fmt0(totals.g)} unit="g" dark={J.dark} sage={J.sage} font={fMarcellus} big={fGaramond} />
           </div>
+          {/* Obiettivi del giorno: calorie e nutrienti rispetto al target */}
+          {(() => { const tg = computeNutritionTarget(profile, weights, goal); const rows = [['calorie', totals.kcal, tg.kcal, 'kcal'], ['proteine', totals.p, tg.protein, 'g'], ['carboidrati', totals.c, tg.carbs, 'g'], ['grassi', totals.g, tg.fat, 'g']]; return (
+            <div style={{marginTop:12,display:'flex',flexDirection:'column',gap:8}}>
+              {rows.map(([lab,val,tot,u]) => (
+                <div key={lab}>
+                  <div style={{display:'flex',justifyContent:'space-between',fontFamily:fDmSans,fontSize:12,color:J.cream}}><span style={{opacity:0.8}}>{lab}</span><span><b>{fmt0(val)}</b> su {fmt0(tot)} {u}</span></div>
+                  <div style={{height:7,borderRadius:4,background:`${J.sage}33`,marginTop:3}}><div style={{width:`${Math.min(100, tot ? Math.round(val/tot*100) : 0)}%`,height:7,borderRadius:4,background:val>tot?(J.danger||'#C99A7A'):J.sage}} /></div>
+                </div>
+              ))}
+            </div>
+          ); })()}
 
           {/* PastiPage ora mostra solo i pasti EFFETTIVAMENTE FATTI di oggi (i pianificati stanno nella pagina Menù) */}
           {true && (

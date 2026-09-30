@@ -207,6 +207,24 @@ export const THEMES = {
     structuralVariant: 'diario',         // identificatore variante (per styling specifico)
   },
 
+  // 13. PLANETARIO — blu notte + verde petrolio in alto + oro + crema
+  // Tema scuro: tutte le chiavi "testo" (ink, dark, cream, pale, body) sono chiare, come nei temi chiari sono tutte scure.
+  planetario: {
+    id: 'planetario',
+    name: 'Planetario',
+    desc: 'blu notte, petrolio e oro',
+    isDark: true,
+    swatch: ['#0E2240', '#C9A55A', '#F4EFE2'],
+    bg: '#0E2240', bg1: '#3E5F5C', bg2: '#0E2240',
+    ink: '#F4EFE2', dark: '#F4EFE2',
+    cream: '#F4EFE2', pale: '#F4EFE2', body: '#F4EFE2',
+    gold: '#C9A55A', sage: '#C9A55A', silver: '#C9A55A', accent: '#C9A55A', amber: '#C9A55A', active: '#C9A55A',
+    goldDim: '#B4BFCC', light: '#B4BFCC', dim: '#B4BFCC', tan: '#B4BFCC',
+    border: '#C9A55A',
+    danger: DANGER,
+    fontText: "'EB Garamond', serif",
+  },
+
   // 12. CRUSCOTTO — stessa palette di Foglio Bianco, layout dashboard moderno (font Inter)
   cruscotto: {
     id: 'cruscotto',
@@ -234,11 +252,11 @@ export const THEMES = {
 };
 
 export const THEME_ORDER = [
-  'giardino', 'bersaglio', 'foglioBianco', 'cruscotto', 'refettorio', 'biblioteca', 'alba', 'cuoio',
+  'planetario', 'giardino', 'bersaglio', 'foglioBianco', 'cruscotto', 'refettorio', 'biblioteca', 'alba', 'cuoio',
   'sera_viola', 'notte_blu', 'bosco_pastello', 'notturno_ambra',
 ];
 
-export const DEFAULT_THEME = 'cruscotto';
+export const DEFAULT_THEME = 'planetario';
 
 export function getTheme(themeId) {
   return THEMES[themeId] || THEMES[DEFAULT_THEME];
