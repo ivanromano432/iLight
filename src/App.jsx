@@ -2878,148 +2878,95 @@ function MenuPage({ theme, loaded, meals, updMeals, weights, goal, profile, updP
     await updMeals((meals||[]).filter(m => m.id !== mealId));
   }
 
-  // Componenti helper per progress bar
-  function ProgressRow({ label, current, target, unit, color }) {
-    const pct = target > 0 ? Math.min(150, (current / target) * 100) : 0;
-    const over = pct > 105;
-    const ok = pct >= 95 && pct <= 105;
-    const barColor = over ? '#C8763C' : (ok ? '#A5B889' : color || J.sage);
-    return (
-      <div style={{marginBottom:10}}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:4}}>
-          <span style={{fontFamily:fMarcellus,fontSize:10,letterSpacing:'0.3em',color:J.dark,textTransform:'uppercase'}}>{label}</span>
-          <span style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:14,color:over?'#C8763C':(ok?'#6B8060':J.dark)}}>
-            {fmt0(current)}<span style={{fontSize:11,color:J.sage,opacity:0.7}}> / {fmt0(target)} {unit}</span>
-          </span>
-        </div>
-        <div style={{height:5,background:`${J.sage}22`,borderRadius:2,overflow:'hidden'}}>
-          <div style={{height:'100%',width:`${Math.min(100,pct)}%`,background:barColor,transition:'width 0.3s ease'}} />
-        </div>
-      </div>
-    );
-  }
-
+  // --- Render nuovo stile: piatto a zona (ciambella), pasti a schede o a linea del giorno, proposte IA ---
+  const T = J;
+  const fTitle = T.fontText || fGaramond;
+  const [view, setView] = useState(()=>{ try { return localStorage.getItem('goalfit_menu_view')==='linea' ? 'linea' : 'schede'; } catch(_) { return 'schede'; } });
+  const pickView = v => { setView(v); try { localStorage.setItem('goalfit_menu_view', v); } catch(_) {} };
+  const ord = m => MEAL_TYPES.find(t=>t.id===m.type)?.order ?? 99;
+  const dayList = [...todayMeals].sort((a,b)=> ord(a)-ord(b) || new Date(a.ts)-new Date(b.ts));
+  const firstPlanned = dayList.find(m=>m.status==='planned');
+  const typeName = m => MEAL_TYPES.find(t=>t.id===m.type)?.name || 'Pasto';
+  const macroLine = m => `${m.qty_g?`${fmt0(m.qty_g)} g · `:''}${fmt0(m.kcal)} kcal · P ${fmt0(m.p)} · C ${fmt0(m.c)} · G ${fmt0(m.g)}`;
+  const frac = (a,b) => b > 0 ? Math.min(1, a/b) : 0;
+  const segs = [
+    { share:0.30, p:frac(totals.protein,target.protein), op:1,    label:'proteine',    cur:totals.protein, tot:target.protein },
+    { share:0.40, p:frac(totals.carbs,target.carbs),     op:0.7,  label:'carboidrati', cur:totals.carbs,   tot:target.carbs },
+    { share:0.30, p:frac(totals.fat,target.fat),         op:0.45, label:'grassi',      cur:totals.fat,     tot:target.fat },
+  ];
+  const DS=240, DW=30, DR=(DS-DW)/2, DC=2*Math.PI*DR, DH=DS/2, GAP=6;
+  let acc = 0;
+  const arcs = segs.map((g,i)=>{ const off = acc; acc += g.share; const len = DC*g.share - GAP; return (
+    <g key={i} transform={`rotate(-90 ${DH} ${DH})`}>
+      <circle cx={DH} cy={DH} r={DR} stroke={`${T.cream}1F`} strokeWidth={DW} strokeDasharray={`${len} ${DC}`} strokeDashoffset={-DC*off} />
+      <circle cx={DH} cy={DH} r={DR} stroke={T.gold} strokeOpacity={g.op} strokeWidth={DW} strokeDasharray={`${len*g.p} ${DC}`} strokeDashoffset={-DC*off} />
+    </g>
+  ); });
+  const seg = (id,label) => (<button onClick={()=>pickView(id)} style={{flex:1,minHeight:44,borderRadius:22,border:'none',background:view===id?T.gold:'transparent',color:view===id?T.bg2:T.cream,fontFamily:fDmSans,fontSize:14,fontWeight:600,cursor:'pointer'}}>{label}</button>);
+  const cardSt = { background:'#142A4C', border:'1px solid #34506F', borderRadius:22, padding:'16px 18px', display:'flex', flexDirection:'column', gap:8 };
+  const tag = { fontSize:12, color:T.gold, fontWeight:600, letterSpacing:'0.1em', textTransform:'uppercase' };
   return (
-    <div style={{minHeight:'100vh',background:`radial-gradient(ellipse at top, ${J.bg||'#E5E3D5'} 0%, ${J.bg2||'#CFCDB7'} 100%)`,color:J.dark,fontFamily:fGaramond,position:'relative',overflow:'hidden'}}>
-      <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${J.dark}25`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
-      <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${J.dark}10`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
-      <div style={{position:'relative',zIndex:2,padding:'32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
-        {(J?.structuralVariant === 'dashboard') ? <DashHeader label="Menù" /> : <Header q="MENÙ" sub="III" color={J.dark} dim={J.sage} mark="✦" />}
-
-        {!loaded && <Loading color={J.sage} />}
-
-        {loaded && (<>
-          {/* === SEZIONE TOTALI / TARGET — cliccabile per modificare === */}
-          <div onClick={()=>setEditingTargets(true)} style={{marginTop:22,padding:'14px 14px 8px',background:`${J.sage}10`,border:`1px solid ${J.sage}33`,cursor:'pointer',position:'relative'}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
-              <div style={{fontFamily:fMarcellus,fontSize:10,letterSpacing:'0.4em',color:J.sage,textTransform:'uppercase'}}>obiettivo del giorno · zona 40/30/30</div>
-              <span style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:11,color:J.sage,opacity:0.75}}>tocca per modificare ›</span>
+    <div>
+    <NavShell T={T} kicker="il tuo piatto a zona" title="Menù">
+      {!loaded && <Loading color={T.gold} />}
+      {loaded && (<div style={{display:'flex',flexDirection:'column',gap:14}}>
+        <div style={{position:'relative',width:DS,height:DS,margin:'0 auto'}}>
+          <svg width={DS} height={DS} viewBox={`0 0 ${DS} ${DS}`} fill="none" role="img" aria-label="Piatto a zona: proteine, carboidrati e grassi rispetto all'obiettivo">{arcs}</svg>
+          <button onClick={()=>setEditingTargets(true)} aria-label="modifica obiettivi del giorno" style={{position:'absolute',inset:DW+6,borderRadius:'50%',background:'transparent',border:'none',color:T.cream,cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:2,padding:0}}>
+            <span style={{fontFamily:fTitle,fontSize:46,fontWeight:500,lineHeight:1}}>{fmt0(totals.kcal)}</span>
+            <span style={{fontFamily:fDmSans,fontSize:13,opacity:0.8}}>di {fmt0(target.kcal)} kcal</span>
+            <span style={{fontFamily:fDmSans,fontSize:11,opacity:0.7,textDecoration:'underline',textUnderlineOffset:3,marginTop:4}}>modifica obiettivi</span>
+          </button>
+        </div>
+        <div style={{display:'flex',justifyContent:'space-between',gap:8}}>
+          {segs.map(g=>(
+            <div key={g.label} style={{display:'flex',alignItems:'center',gap:7,minWidth:0}}>
+              <span style={{width:14,height:14,borderRadius:4,background:T.gold,opacity:g.op,flexShrink:0}} />
+              <span style={{fontSize:12,lineHeight:1.25}}>{g.label}<br/><b>{fmt0(g.cur)}</b> di {fmt0(g.tot)} g</span>
             </div>
-            <ProgressRow label="calorie" current={totals.kcal} target={target.kcal} unit="kcal" />
-            <ProgressRow label="proteine · 30%" current={totals.protein} target={target.protein} unit="g" />
-            <ProgressRow label="carboidrati · 40%" current={totals.carbs} target={target.carbs} unit="g" />
-            <ProgressRow label="grassi · 30%" current={totals.fat} target={target.fat} unit="g" />
-            {(eatenKcal > 0 || plannedKcal > 0) && (
-              <div style={{marginTop:6,fontFamily:fGaramond,fontStyle:'italic',fontSize:11,color:J.sage,textAlign:'center',opacity:0.85}}>
-                {eatenKcal > 0 && <span><span style={{fontWeight:600}}>{fmt0(eatenKcal)}</span> mangiate</span>}
-                {eatenKcal > 0 && plannedKcal > 0 && <span> · </span>}
-                {plannedKcal > 0 && <span><span style={{fontWeight:600}}>{fmt0(plannedKcal)}</span> in piano</span>}
-              </div>
-            )}
-            {targetReached && (
-              <div style={{marginTop:6,padding:'8px 10px',background:`#A5B88922`,border:`1px solid #A5B889`,fontFamily:fGaramond,fontStyle:'italic',fontSize:12,color:'#6B8060',textAlign:'center'}}>
-                ✓ obiettivo del giorno raggiunto
+          ))}
+        </div>
+        {(eatenKcal > 0 || plannedKcal > 0) && <div style={{fontSize:13,opacity:0.75,textAlign:'center'}}>{fmt0(eatenKcal)} kcal mangiate · {fmt0(plannedKcal)} in piano</div>}
+        {targetReached && <div style={{alignSelf:'center',background:T.gold,color:T.bg2,fontSize:13,fontWeight:600,padding:'6px 14px',borderRadius:14}}>obiettivo del giorno raggiunto</div>}
+        <div style={{background:'#142A4C',border:'1px solid #34506F',borderRadius:26,padding:4,display:'flex',gap:4}}>{seg('schede','schede')}{seg('linea','linea del giorno')}</div>
+        {dayList.length === 0 && <div style={{textAlign:'center',fontSize:14,opacity:0.75,lineHeight:1.5,padding:'6px 10px'}}>Ancora nessun pasto per oggi. Chiedi una proposta all'IA e aggiungila al menù.</div>}
+        {view==='schede' && dayList.map(m => (
+          <div key={m.id} style={cardSt}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:8}}><span style={tag}>{typeName(m)}</span><span style={{fontSize:12,opacity:0.75}}>{m.status==='planned' ? 'in piano' : 'mangiato'}</span></div>
+            <span style={{fontFamily:fTitle,fontSize:24,fontWeight:500,lineHeight:1.15}}>{m.description || '(senza descrizione)'}</span>
+            <span style={{fontSize:13,opacity:0.75}}>{macroLine(m)}</span>
+            {m.status==='planned' && (
+              <div style={{display:'flex',gap:8,marginTop:4}}>
+                <button onClick={()=>markAsEaten(m.id)} style={{...navBtn(T),minHeight:44,flex:2}}>l'ho mangiato</button>
+                <button onClick={()=>removeFromMenu(m.id)} style={{...navBtn(T,false),minHeight:44,flex:1}}>togli</button>
               </div>
             )}
           </div>
-
-          {/* === IL MIO MENÙ === */}
-          <div style={{marginTop:24}}>
-            <div style={{display:'flex',alignItems:'center',gap:14,marginBottom:14}}>
-              <div style={{flex:1,height:1,background:`linear-gradient(90deg, transparent, ${J.dark}55)`}} />
-              <span style={{fontFamily:fMarcellus,fontSize:10,letterSpacing:'0.4em',color:J.dark,textTransform:'uppercase'}}>il mio menù</span>
-              <div style={{flex:1,height:1,background:`linear-gradient(90deg, ${J.dark}55, transparent)`}} />
-            </div>
-            {plannedMeals.length === 0 ? (
-              <div style={{textAlign:'center',fontFamily:fGaramond,fontStyle:'italic',fontSize:13,color:J.sage,padding:'10px 4px 0',lineHeight:1.5,opacity:0.85}}>
-                Nessun pasto pianificato. Tocca un suggerimento qui sotto per aggiungerlo.
-              </div>
-            ) : MEAL_TYPES.map(type => {
-              const mealsOfType = plannedMeals.filter(m => m.type === type.id);
-              if (mealsOfType.length === 0) return null;
-              const amber = isDashboard ? '#3F95A1' : '#B89548', amberBg = isDashboard ? '#EAF4F5' : '#F2E8D0';
-              return (
-                <div key={type.id} style={{marginTop:14}}>
-                  <div style={{padding:'6px 0',borderBottom:`1px solid ${amber}55`}}>
-                    <span style={{fontFamily:fMarcellus,fontSize:11,letterSpacing:'0.35em',color:amber,textTransform:'uppercase'}}>{type.name}</span>
-                  </div>
-                  {mealsOfType.map(m => (
-                    <div key={m.id} style={{display:'flex',gap:8,alignItems:'stretch',marginTop:8}}>
-                      <button onClick={()=>markAsEaten(m.id)} style={{flex:1,display:'flex',gap:10,alignItems:'flex-start',padding:'12px 14px',background:amberBg,border:`1px solid ${amber}`,borderLeft:`3px solid ${amber}`,color:amber,cursor:'pointer',textAlign:'left',borderRadius:0}}>
-                        <div style={{flex:1,minWidth:0}}>
-                          <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:15,color:J.dark,lineHeight:1.25}}>{m.description||'(senza descrizione)'}</div>
-                          <div style={{fontFamily:fMarcellus,fontSize:9,letterSpacing:'0.2em',marginTop:4,textTransform:'uppercase',opacity:0.9}}>{m.qty_g?`${fmt0(m.qty_g)}g · `:''}{fmt0(m.kcal)} kcal · P {fmt0(m.p)} · C {fmt0(m.c)} · G {fmt0(m.g)}</div>
-                          <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:11,marginTop:4,opacity:0.7}}>↳ tocca quando l'hai mangiato</div>
-                        </div>
-                      </button>
-                      <button onClick={()=>removeFromMenu(m.id)} style={{padding:'0 12px',background:'transparent',border:`1px solid ${amber}55`,color:amber,fontFamily:fMarcellus,fontSize:14,cursor:'pointer'}} title="rimuovi dal menù">×</button>
-                    </div>
-                  ))}
-                </div>
-              );
-            })}
+        ))}
+        {view==='linea' && dayList.length>0 && (
+          <div style={{paddingTop:6}}>
+            {dayList.map((m,i) => (
+              <NavStep key={m.id} T={T} time={`${fmt0(m.kcal)} kcal`} title={typeName(m)} desc={`${m.description || '(senza descrizione)'} · ${m.status==='planned' ? 'in piano, tocca quando l’hai mangiato' : 'mangiato'}`} state={m.status!=='planned' ? 'done' : (firstPlanned && firstPlanned.id===m.id ? 'now' : 'todo')} last={i===dayList.length-1} onTap={m.status==='planned' ? ()=>markAsEaten(m.id) : undefined} />
+            ))}
           </div>
-
-          {/* === PROPOSTE IA — sempre visibili e cliccabili === */}
-          <div style={{marginTop:30}}>
-            <div style={{display:'flex',alignItems:'center',gap:14,marginBottom:14}}>
-              <div style={{flex:1,height:1,background:`linear-gradient(90deg, transparent, ${iaColor}66)`}} />
-              <span style={{fontFamily:fMarcellus,fontSize:10,letterSpacing:'0.4em',color:iaColor,textTransform:'uppercase'}}>proposte ia</span>
-              <div style={{flex:1,height:1,background:`linear-gradient(90deg, ${iaColor}66, transparent)`}} />
+        )}
+        {suggestLoading && <div style={{textAlign:'center',fontSize:14,opacity:0.8,padding:'8px 0'}}>sto pensando ai tuoi pasti…</div>}
+        {suggestError && !suggestLoading && <div style={{fontSize:13,color:'#F0B9A0',textAlign:'center'}}>{suggestError}</div>}
+        {suggestions && suggestions.length>0 && !suggestLoading && (<>
+          <div style={{...navKicker,paddingBottom:0}}>proposte dell'ia</div>
+          {suggestions.map((m,i) => (
+            <div key={i} style={cardSt}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:8}}><span style={tag}>{typeName(m)}</span><span style={{fontSize:12,opacity:0.75}}>proposta</span></div>
+              <span style={{fontFamily:fTitle,fontSize:24,fontWeight:500,lineHeight:1.15}}>{m.description}</span>
+              <span style={{fontSize:13,opacity:0.75}}>{macroLine(m)}</span>
+              {m.perche && <span style={{fontSize:13,opacity:0.75,lineHeight:1.4}}>{m.perche}</span>}
+              <button onClick={()=>addSuggestion(m)} style={{...navBtn(T,false),minHeight:44,marginTop:4}}>aggiungi al menù</button>
             </div>
-
-            {!suggestions && !suggestLoading && !suggestError && (
-              <div style={{textAlign:'center'}}>
-                <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:13,color:J.sage,marginBottom:12,lineHeight:1.5,maxWidth:340,margin:'0 auto 12px'}}>L'IA propone pasti bilanciati Zona 40/30/30 con alimenti che favoriscono il dimagrimento, in base ai macro che ti mancano.</div>
-                <button onClick={loadSuggestions} style={{background:'transparent',color:iaColor,border:`1px solid ${iaColor}`,fontFamily:fMarcellus,fontSize:10,letterSpacing:'0.35em',padding:'12px 24px',cursor:'pointer',textTransform:'uppercase'}}>chiedi suggerimenti</button>
-              </div>
-            )}
-            {suggestLoading && <div style={{textAlign:'center',padding:'14px 0',fontFamily:fGaramond,fontStyle:'italic',fontSize:14,color:J.sage}}>⋯ sto pensando ai tuoi pasti</div>}
-            {suggestError && !suggestLoading && (
-              <div style={{textAlign:'center'}}>
-                <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:13,color:'#A04848',marginBottom:8}}>{suggestError}</div>
-                <button onClick={loadSuggestions} style={{background:'transparent',color:J.sage,border:`1px solid ${J.sage}66`,fontFamily:fGaramond,fontStyle:'italic',fontSize:13,padding:'6px 16px',cursor:'pointer'}}>riprova</button>
-              </div>
-            )}
-            {suggestions && suggestions.length > 0 && (
-              <>
-                <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:12,color:isDashboard?'#5AA8B3':'#A8623E',textAlign:'center',marginBottom:10}}>tocca un piatto per aggiungerlo al menù · i totali si aggiornano</div>
-                <div>
-                  {suggestions.map((m, i) => {
-                    const tName = MEAL_TYPES.find(t=>t.id===m.type)?.name || m.type;
-                    const orange = isDashboard ? '#3F95A1' : '#C8763C', orangeBg = isDashboard ? '#EAF4F5' : '#F2E0CC';
-                    return (
-                      <button key={i} onClick={()=>addSuggestion(m)} style={{width:'100%',display:'flex',gap:10,alignItems:'flex-start',padding:'12px 14px',marginBottom:8,background:orangeBg,border:`1px solid ${orange}`,borderLeft:`3px solid ${orange}`,color:orange,cursor:'pointer',textAlign:'left',borderRadius:0}}>
-                        <div style={{flex:1,minWidth:0}}>
-                          <div style={{fontFamily:fMarcellus,fontSize:9,letterSpacing:'0.35em',textTransform:'uppercase',opacity:0.9}}>{tName}{m.qty_g?` · ${fmt0(m.qty_g)}g`:''}</div>
-                          <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:15,marginTop:3,lineHeight:1.25,color:J.dark}}>{m.description}</div>
-                          <div style={{fontFamily:fMarcellus,fontSize:9,letterSpacing:'0.2em',marginTop:3,textTransform:'uppercase',opacity:0.85}}>{fmt0(m.kcal)} kcal · P {fmt0(m.p)} · C {fmt0(m.c)} · G {fmt0(m.g)}</div>
-                          {m.perche && <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:12,marginTop:4,lineHeight:1.4,opacity:0.85}}>· {m.perche}</div>}
-                        </div>
-                        <span style={{fontFamily:fMarcellus,fontSize:18,opacity:0.7,marginLeft:8}}>+</span>
-                      </button>
-                    );
-                  })}
-                </div>
-                <div style={{textAlign:'center',marginTop:12}}>
-                  <button onClick={loadSuggestions} style={{background:'transparent',color:J.sage,border:`1px solid ${J.sage}66`,fontFamily:fGaramond,fontStyle:'italic',fontSize:12,padding:'6px 14px',cursor:'pointer'}}>altri suggerimenti</button>
-                </div>
-              </>
-            )}
-          </div>
+          ))}
         </>)}
-      </div>
-
+        <button onClick={loadSuggestions} disabled={suggestLoading} style={{...navBtn(T),opacity:suggestLoading?0.6:1}}>{suggestions ? 'altre proposte dell’ia' : suggestError ? 'riprova' : 'chiedi suggerimenti all’ia'}</button>
+      </div>)}
+    </NavShell>
       {editingTargets && <TargetsModal J={J} target={target} updProfile={updProfile} onClose={()=>setEditingTargets(false)} />}
     </div>
   );
@@ -3080,8 +3027,8 @@ function TargetsModal({ J, target, updProfile, onClose }) {
 
   return (
     <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.65)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:200,padding:16}}>
-      <div onClick={e=>e.stopPropagation()} style={{background:J.bg||'#E5E3D5',border:`1px solid ${J.dark}55`,padding:'22px 20px',maxWidth:380,width:'100%',maxHeight:'90vh',overflowY:'auto'}}>
-        <div style={{fontFamily:fMarcellus,fontSize:12,letterSpacing:'0.4em',color:J.dark,textAlign:'center',marginBottom:6,textTransform:'uppercase'}}>obiettivo del giorno</div>
+      <div onClick={e=>e.stopPropagation()} style={{background:'#142A4C',border:'1px solid #34506F',borderRadius:24,padding:'24px 22px',maxWidth:380,width:'100%',maxHeight:'90vh',overflowY:'auto',boxSizing:'border-box',boxShadow:'0 12px 32px rgba(0,0,0,0.45)'}}>
+        <div style={{fontFamily:J.fontText||fGaramond,fontSize:26,color:J.cream,marginBottom:6}}>Obiettivo del giorno</div>
         <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:12,color:J.sage,textAlign:'center',marginBottom:18,lineHeight:1.4}}>Dieta a Zona 40/30/30 per dimagrimento: <b>40% carboidrati · 30% proteine · 30% grassi</b>.</div>
 
         <div style={{marginBottom:14}}>
