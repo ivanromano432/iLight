@@ -23,7 +23,7 @@ import { supabase } from './supabase.js';
 const Q = { bg1: '#3A2818', bg2: '#1F140C', gold: '#C9A876', goldDim: '#8B7355', cream: '#E8D8B8', ink: '#1F140C' };
 const W = { bg: '#E8E0D2', ink: '#3C3329', tan: '#8C6A4E' };
 const J = { bg: '#E5E3D5', dark: '#2D3A2E', sage: '#5C6B4E', light: '#8FA288' };
-const A = { bg1: '#F4F0E6', bg2: '#E8E2D2', ink: '#1F2724', sage: '#4A5C4D' };
+const A = { bg1: '#142A4C', bg2: '#0E2240', ink: '#F4EFE2', sage: '#C9A55A' };
 const T = { bg: '#F2EBDC', ink: '#1F1A12', dim: '#6B5D45' };
 const S = { bg1: '#1E1A2E', bg2: '#0F0D1A', silver: '#B8B0C9', pale: '#F2E8D0', gold: '#C9A876', dim: '#6B6478' };
 const N = { bg1: '#2C3340', bg2: '#14171F', cream: '#F2E8D0', dim: '#8A8270', gold: '#C9A876', body: '#DDD3C2' };
@@ -392,6 +392,7 @@ const PAGES = [
   { id:'aggiorna', label:'aggiorna', roman:'', Icon:ListChecks },
   { id:'foto', label:'foto', roman:'', Icon:Camera },
   { id:'stats', label:'statistiche', roman:'', Icon:ChartColumn },
+  { id:'allena', label:'allenamenti', roman:'', Icon:Activity },
 ];
 // Barra in basso: solo 5 voci. 'stats' apre la pagina Statistiche; tutte le altre pagine stanno nel menu del profilo.
 const NAV_ITEMS = [
@@ -401,8 +402,8 @@ const NAV_ITEMS = [
   { id:'pasti', label:'pasti', Icon:Utensils },
   { id:'stats', label:'statistiche', Icon:ChartColumn },
 ];
-const MENU_PAGE_IDS = ['oggi','peso','menu','digiuno','integra','respiro','sonno','sera'];
-const MENU_PAGE_LABELS = { oggi:'Home', peso:'Peso', menu:'Menù', digiuno:'Digiuno', integra:'Rituale', respiro:'Corpo', sonno:'Sonno', sera:'Diario' };
+const MENU_PAGE_IDS = ['peso','menu','digiuno','integra','allena','respiro','sonno','sera'];
+const MENU_PAGE_LABELS = { oggi:'Home', peso:'Peso', menu:'Menù', digiuno:'Digiuno', integra:'Integrazione', allena:'Allenamenti', respiro:'Respiro', sonno:'Sonno', sera:'Diario' };
 const DEF_TYPES = [
   { id:'corsa', name:'Corsa', unit:'km' },
   { id:'camminata', name:'Camminata', unit:'km' },
@@ -908,6 +909,7 @@ export default function App({ user, onLogout }){
         {page==='foto' && <FotoPage theme={__theme} loaded={loaded} meals={meals} />}
         {page==='pasti' && <PastiPage profile={profile} seedPhotoInit={photoSeed} clearSeedPhoto={() => setPhotoSeed(null)} user={user} theme={__theme} loaded={loaded} meals={meals} updMeals={updMeals} notes={foodNotes} weights={weights} goal={goal} />}
         {page==='menu' && <MenuPage theme={__theme} loaded={loaded} meals={meals} updMeals={updMeals} weights={weights} goal={goal} profile={profile} updProfile={updProfile} />}
+        {page==='allena' && <AllenaPage theme={__theme} loaded={loaded} workouts={workouts} types={workoutTypes} updWorkouts={updWorkouts} updTypes={updWorkoutTypes} />}
         {page==='integra' && <IntegraPage theme={__theme} loaded={loaded} supps={supplements} taken={suppTaken} updSupps={updSupps} updTaken={updTaken} />}
         {page==='digiuno' && <DigiunoPage theme={__theme} loaded={loaded} fasts={fasts} updFasts={updFasts} />}
         {page==='respiro' && <RespiroPage theme={__theme} loaded={loaded} sessions={mindfulSessions} updSessions={updMindful} workouts={workouts} types={workoutTypes} updWorkouts={updWorkouts} updTypes={updWorkoutTypes} />}
@@ -1071,7 +1073,7 @@ function AggiornaPage({ theme, loaded, weights, updWeights, supps, taken, updTak
     { label:'giornata', items:[
       { id:'acqua', title:'Acqua', sub:`${todayWater} bicchieri su ${waterGoal}`, done: todayWater>=waterGoal, right:'+1', onTap: ()=>updWater({ ...(water||{}), [tk]: Math.min(100, todayWater+1) }) },
       { id:'pasti', title:'Pasti', sub: mealsToday ? `${mealsToday} ${mealsToday===1?'registrato':'registrati'} oggi` : 'nessuno registrato', done: mealsToday>=3, onTap: ()=>go('pasti') },
-      { id:'allena', title:'Allenamento', sub: workoutToday ? 'fatto oggi' : 'da registrare', done: workoutToday, onTap: ()=>go('respiro') },
+      { id:'allena', title:'Allenamento', sub: workoutToday ? 'fatto oggi' : 'da registrare', done: workoutToday, onTap: ()=>go('allena') },
       { id:'digiuno', title:'Digiuno', sub: activeFast ? 'in corso' : fastDoneToday ? 'concluso oggi' : 'nessun digiuno attivo', done: fastDoneToday, onTap: ()=>go('digiuno') },
     ]},
     { label:'sera', items:[
@@ -3266,81 +3268,82 @@ function MealModal({ existing, onClose, onSave, onDelete, J, seedPhoto }){
 }
 
 function AllenaPage({ theme, loaded, workouts, types, updWorkouts, updTypes }){
-  const T = theme || { bg: '#F2EBDC', ink: '#1F1A12', dim: '#6B5D45' };
-  // Alias per shadow delle var globali del modulo (Allena originariamente usava A=Alba)
-  const A = T;
+  const T = theme;
+  const fTitle = T.fontText || fGaramond;
   const [detailTypeId, setDetailTypeId] = useState(null);
   const [editingType, setEditingType] = useState(null);
+  const [choosing, setChoosing] = useState(false);
+  const [logType, setLogType] = useState(null);
+  const ws = workouts || [], ts = types || [];
 
   async function saveType(data){
-    if(editingType==='new') await updTypes([...types,{id:newId(),name:data.name,unit:data.unit}]);
-    else await updTypes(types.map(t=>t.id===editingType?{...t,name:data.name,unit:data.unit}:t));
+    if(editingType==='new') await updTypes([...ts,{id:newId(),name:data.name,unit:data.unit}]);
+    else await updTypes(ts.map(t=>t.id===editingType?{...t,name:data.name,unit:data.unit}:t));
     setEditingType(null);
   }
   async function delType(){
-    if(workouts.some(w=>w.typeId===editingType)) await updWorkouts(workouts.filter(w=>w.typeId!==editingType));
-    await updTypes(types.filter(t=>t.id!==editingType));
+    if(ws.some(w=>w.typeId===editingType)) await updWorkouts(ws.filter(w=>w.typeId!==editingType));
+    await updTypes(ts.filter(t=>t.id!==editingType));
     setEditingType(null);
   }
-
-  const editingT = editingType && editingType!=='new' ? types.find(t=>t.id===editingType) : null;
-  const detailType = detailTypeId ? types.find(t=>t.id===detailTypeId) : null;
-
+  async function quickLog(data){
+    await updWorkouts([...ws,{id:newId(),ts:new Date().toISOString(),typeId:logType.id,qty:data.qty,notes:data.notes}]);
+    setLogType(null); setChoosing(false);
+  }
+  const editingT = editingType && editingType!=='new' ? ts.find(t=>t.id===editingType) : null;
+  const detailType = detailTypeId ? ts.find(t=>t.id===detailTypeId) : null;
+  const DAY = 86400000, now = Date.now();
+  const weekCount = ws.filter(w => now - new Date(w.ts).getTime() < 7*DAY).length;
+  const cardSt = { background:'#142A4C', border:'1px solid #34506F', borderRadius:22, padding:'16px 18px', display:'flex', flexDirection:'column', gap:10, width:'100%', boxSizing:'border-box', color:T.cream, fontFamily:fDmSans, textAlign:'left', cursor:'pointer' };
   return (
-    <div style={{minHeight:'100vh',background:`radial-gradient(ellipse at top, ${A.bg1} 0%, ${A.bg2} 100%)`,color:A.cream,fontFamily:fBodoni,position:'relative',overflow:'hidden'}}>
-      <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${A.gold}40`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
-      <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${A.gold}1A`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
-      <div style={{position:'relative',zIndex:2,padding:'32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
-        {(A?.structuralVariant === 'dashboard') ? <DashHeader label="Allena" /> : <Header q="ALLENA" sub="V" color={A.gold} dim={A.goldDim} mark="✦" font={fBodoni} />}
-
-        {!loaded && <Loading color={A.sage} />}
-
-        {loaded && (<>
-          <div style={{marginTop:22,padding:'12px 0',borderTop:`1px solid ${A.ink}`,display:'flex',justifyContent:'space-between',alignItems:'baseline'}}>
-            <span style={{fontFamily:fDmSans,fontSize:9,letterSpacing:'0.35em',color:A.sage,textTransform:'uppercase'}}>tipo · 30 g.</span>
-            <span style={{fontFamily:fDmSans,fontSize:9,letterSpacing:'0.35em',color:A.sage,textTransform:'uppercase'}}>tendenza</span>
+    <div>
+    <NavShell T={T} kicker={`questa settimana · ${weekCount} ${weekCount===1?'sessione':'sessioni'}`} title="Allenamenti">
+      {!loaded && <Loading color={T.gold} />}
+      {loaded && (<div style={{display:'flex',flexDirection:'column',gap:12}}>
+        {ts.length>0 && <button onClick={()=>setChoosing(!choosing)} style={navBtn(T)}>registra allenamento</button>}
+        {choosing && (
+          <div style={{display:'grid',gridTemplateColumns:'repeat(3, minmax(0, 1fr))',gap:6}}>
+            {ts.map(t=>(<button key={t.id} onClick={()=>setLogType(t)} style={{...navChip(T,false),overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{t.name}</button>))}
           </div>
-
-          <div>
-            {types.length===0 ? (
-              <div style={{textAlign:'center',padding:'24px 0',fontFamily:fBodoni,fontStyle:'italic',fontSize:14,color:A.sage}}>Nessun tipo di allenamento.</div>
-            ) : types.map(t=>{
-              const tw = workouts.filter(w=>w.typeId===t.id);
-              const last30 = tw.filter(w=>(Date.now()-new Date(w.ts).getTime()) < 30*86400000);
-              const totalQty = last30.reduce((a,w)=>a+(w.qty||0),0);
-              const today=new Date(); const sparkVals=[];
-              for(let i=29;i>=0;i--){ const d=new Date(today); d.setDate(d.getDate()-i); const dk=dayKey(d); const sum=tw.filter(w=>dayKey(new Date(w.ts))===dk).reduce((a,w)=>a+(w.qty||0),0); sparkVals.push(sum>0?sum:null); }
-              const spark = buildLineChart(sparkVals,90,30);
-              return (
-                <button key={t.id} onClick={()=>setDetailTypeId(t.id)} style={{display:'flex',alignItems:'center',gap:14,width:'100%',padding:'14px 4px',background:'transparent',border:'none',borderBottom:`1px solid ${A.ink}1A`,cursor:'pointer',textAlign:'left'}}>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontFamily:fBodoni,fontStyle:'italic',fontSize:19,color:A.ink}}>{t.name}</div>
-                    <div style={{fontFamily:fDmSans,fontSize:10,letterSpacing:'0.15em',color:A.sage,marginTop:2}}>{last30.length} sessioni · {fmt0(totalQty)} {t.unit}</div>
-                  </div>
-                  <svg viewBox="0 0 90 30" width="90" height="30" style={{flexShrink:0}}>
-                    {spark.points.length>1 && <path d={spark.path} stroke={A.sage} strokeWidth="1.4" fill="none" />}
-                    {spark.points.length>0 && <circle cx={spark.points[spark.points.length-1].x} cy={spark.points[spark.points.length-1].y} r="2.2" fill={A.sage} />}
-                    {spark.points.length===0 && <line x1="0" y1="15" x2="90" y2="15" stroke={A.sage} strokeWidth="0.5" strokeDasharray="2 2" opacity="0.3" />}
-                  </svg>
-                  <span style={{fontFamily:fBodoni,fontStyle:'italic',fontSize:14,color:A.sage,marginLeft:8}}>›</span>
-                </button>
-              );
-            })}
-          </div>
-
-          <div style={{textAlign:'center',marginTop:18}}>
-            <button onClick={()=>setEditingType('new')} style={{background:'transparent',color:A.sage,border:`1px dashed ${A.sage}`,fontFamily:fDmSans,fontSize:10,letterSpacing:'0.35em',padding:'10px 22px',cursor:'pointer',textTransform:'uppercase'}}>+ nuovo tipo</button>
-          </div>
-
-          <div style={{marginTop:22,padding:12,fontFamily:fBodoni,fontStyle:'italic',fontSize:12,color:A.sage,lineHeight:1.5,background:`${A.sage}0D`,border:`1px solid ${A.sage}22`}}>
-            <div style={{fontFamily:fDmSans,fontStyle:'normal',fontSize:9,letterSpacing:'0.4em',color:A.ink,textTransform:'uppercase',marginBottom:4}}>→ Correlazione IA</div>
-            In arrivo: l'IA analizzerà quale tipo di allenamento ha più impatto sulla perdita di peso. Servono 20-30 giorni di dati incrociati.
-          </div>
-        </>)}
-      </div>
-
-      {detailType && <TypeDetailModal type={detailType} workouts={workouts} onClose={()=>setDetailTypeId(null)} updWorkouts={updWorkouts} onEditType={()=>{setDetailTypeId(null); setEditingType(detailType.id);}} />}
+        )}
+        {ts.length===0 && <div style={{textAlign:'center',fontSize:14,opacity:0.75,lineHeight:1.5,padding:'20px 10px'}}>Non hai ancora attività. Aggiungi la prima, ad esempio corsa o pesi.</div>}
+        {ts.map(t=>{
+          const tw = ws.filter(w=>w.typeId===t.id);
+          const last30 = tw.filter(w => now - new Date(w.ts).getTime() < 30*DAY);
+          const totalQty = last30.reduce((a,w)=>a+(w.qty||0),0);
+          const sumIn = (a,b) => tw.filter(w => { const d = now - new Date(w.ts).getTime(); return d >= a*DAY && d < b*DAY; }).reduce((s,w)=>s+(w.qty||0),0);
+          const recentQ = sumIn(0,15), prevQ = sumIn(15,30);
+          const trend = (recentQ===0 && prevQ===0) ? '' : recentQ > prevQ*1.1 ? 'in crescita' : recentQ < prevQ*0.9 ? 'in calo' : 'stabile';
+          const lastW = [...tw].sort((a,b)=>new Date(b.ts)-new Date(a.ts))[0];
+          const today = new Date(); const vals=[];
+          for(let i=29;i>=0;i--){ const d=new Date(today); d.setDate(d.getDate()-i); const dk=dayKey(d); const sum=tw.filter(w=>dayKey(new Date(w.ts))===dk).reduce((a,w)=>a+(w.qty||0),0); vals.push(sum>0?sum:null); }
+          const spark = buildLineChart(vals,120,36);
+          return (
+            <button key={t.id} onClick={()=>setDetailTypeId(t.id)} style={cardSt}>
+              <span style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10}}>
+                <span style={{display:'flex',flexDirection:'column',gap:2,minWidth:0}}>
+                  <span style={{fontFamily:fTitle,fontSize:26,fontWeight:500,lineHeight:1.1}}>{t.name}</span>
+                  <span style={{fontSize:12,opacity:0.75}}>{lastW ? `ultima: ${sameDay(new Date(lastW.ts),new Date()) ? 'oggi' : new Date(lastW.ts).toLocaleDateString('it-IT',{day:'numeric',month:'short'})}` : 'nessuna sessione'}</span>
+                </span>
+                <svg viewBox="0 0 120 36" width="120" height="36" style={{flexShrink:0}} aria-hidden="true">
+                  {spark.points.length>1 && <path d={spark.path} stroke={T.gold} strokeWidth="2.2" fill="none" strokeLinecap="round" strokeLinejoin="round" />}
+                  {spark.points.length>0 && <circle cx={spark.points[spark.points.length-1].x} cy={spark.points[spark.points.length-1].y} r="3" fill={T.cream} />}
+                  {spark.points.length===0 && <line x1="0" y1="18" x2="120" y2="18" stroke={T.cream} strokeWidth="1" strokeDasharray="3 4" opacity="0.3" />}
+                </svg>
+              </span>
+              <span style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:8}}>
+                <span style={{fontSize:15,fontWeight:700}}>{fmt0(totalQty)} {t.unit} · 30 giorni · {last30.length} {last30.length===1?'sessione':'sessioni'}</span>
+                <span style={{fontSize:12,color:T.gold,fontWeight:600,whiteSpace:'nowrap'}}>{trend}</span>
+              </span>
+            </button>
+          );
+        })}
+        <button onClick={()=>setEditingType('new')} style={navBtn(T,false)}>nuova attività</button>
+      </div>)}
+    </NavShell>
+      {detailType && <TypeDetailModal type={detailType} workouts={ws} onClose={()=>setDetailTypeId(null)} updWorkouts={updWorkouts} onEditType={()=>{setDetailTypeId(null); setEditingType(detailType.id);}} />}
       {editingType && <TypeModal existing={editingT} onClose={()=>setEditingType(null)} onSave={saveType} onDelete={editingType!=='new'?delType:null} />}
+      {logType && <WorkoutModal existing={null} unit={logType.unit} typeName={logType.name} onClose={()=>setLogType(null)} onSave={quickLog} onDelete={null} />}
     </div>
   );
 }
@@ -3504,104 +3507,68 @@ function IntegraPage({ theme, loaded, supps, taken, updSupps, updTaken }){
   }
   function consistency(suppId){ let c=0; days.forEach(d=>{if((taken[dayKey(d)]||[]).includes(suppId)) c++;}); return Math.round((c/28)*100); }
 
+  // --- Render nuovo stile: calendario degli ultimi 28 giorni, integratori di oggi, costanza ---
+  const fTitle = T.fontText || fGaramond;
+  const takenToday = taken[todayK] || [];
+  const dayState = d => { const l = (taken[dayKey(d)]||[]).filter(id => supps.some(s=>s.id===id)); return supps.length>0 && l.length>=supps.length ? 2 : l.length>0 ? 1 : 0; };
+  const fullDays = days.filter(d=>dayState(d)===2).length;
+  let streakFull = 0; for (let i=days.length-1;i>=0;i--){ if (dayState(days[i])===2) streakFull++; else if (i===days.length-1) continue; else break; }
+  const avgCons = supps.length ? Math.round(supps.reduce((a,s)=>a+consistency(s.id),0)/supps.length) : 0;
   return (
-    <div style={{minHeight:'100vh',background:`radial-gradient(ellipse at top, ${T.bg1} 0%, ${T.bg2} 100%)`,color:T.cream,fontFamily:fCormorant,position:'relative',overflow:'hidden'}}>
-      <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${T.gold}40`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
-      <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${T.gold}1A`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
-      <div style={{position:'relative',zIndex:2,padding:'32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
-        {(T?.structuralVariant === 'dashboard') ? <DashHeader label="Rituale" /> : <Header q="INTEGRA" sub="V" color={T.gold} dim={T.goldDim} mark="✦" font={fCormorant} />}
-
-        {!loaded && <Loading color={T.dim} />}
-
-        {loaded && (<>
-          <div style={{marginTop:18}}>
-            <div style={{fontFamily:fCormorant,fontStyle:'italic',fontSize:14,color:T.dim,textAlign:'center',marginBottom:10}}>tocca un giorno per registrare</div>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:0}}>
-              {days.map(d=>{
-                const k = dayKey(d);
-                const takenList = taken[k] || [];
-                const isToday = k===todayK;
-                const maxTracks = Math.min(suppsWithColor.length, 5);
-                return (
-                  <button key={k} onClick={()=>setEditingDay(k)} style={{aspectRatio:'1',display:'flex',flexDirection:'column',padding:0,background:'transparent',border:'none',cursor:'pointer',position:'relative'}}>
-                    <div style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                      <span style={{fontFamily:fCormorant,fontStyle:'italic',fontSize:12,color:T.dim}}>{d.getDate()}</span>
-                    </div>
-                    {maxTracks>0 && (
-                      <div style={{display:'flex',flexDirection:'column',gap:1,paddingBottom:3,paddingLeft:1,paddingRight:1}}>
-                        {suppsWithColor.slice(0,maxTracks).map(s=>(
-                          <div key={s.id} style={{height:3,background:takenList.includes(s.id)?s.color:`${T.dim}1A`,borderRadius:0}} />
-                        ))}
-                      </div>
-                    )}
-                    {isToday && <div style={{position:'absolute',inset:1,border:`1px solid ${T.ink}`,borderRadius:3,pointerEvents:'none'}} />}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {suppsWithColor.length>0 && (
-            <div style={{marginTop:20,paddingTop:14,borderTop:`1px solid ${T.ink}1A`}}>
-              <div style={{fontFamily:fCormorant,fontStyle:'italic',fontSize:14,color:T.dim,textAlign:'center',marginBottom:10}}>continuità · 28 giorni</div>
-              {suppsWithColor.map(s=><ContinuityRow key={s.id} supp={s} days={days} taken={taken} consistency={consistency(s.id)} onOpen={()=>openEditSupp(s)} />)}
-            </div>
-          )}
-
-          <div style={{textAlign:'center',marginTop:16}}>
-            <button onClick={()=>{setEditingSupp('new'); setName('');}} style={btnOutlineThin(T.ink)}>+ aggiungi integratore</button>
-          </div>
-
-          <div style={{marginTop:22,padding:14,fontFamily:fCormorant,fontStyle:'italic',fontSize:13,color:T.dim,lineHeight:1.5,background:`${T.ink}08`,border:`1px solid ${T.ink}22`}}>
-            <div style={{fontFamily:fCormorant,fontStyle:'normal',fontSize:10,letterSpacing:'0.4em',color:T.ink,textTransform:'uppercase',marginBottom:4}}>⟡ Correlazione IA</div>
-            In arrivo: l'IA confronterà ciascun integratore con il tuo peso per dirti se ti aiuta a dimagrire. Servono 20-30 giorni di dati.
-          </div>
-        </>)}
-      </div>
-
-      {editingSupp && (
-        <SimpleModal onClose={()=>{setEditingSupp(null); setName('');}} bg={T.bg} border={T.ink}>
-          <h2 style={{fontFamily:fCormorant,fontStyle:'italic',fontSize:22,color:T.ink,margin:0,textAlign:'center'}}>{editingSupp==='new'?'Nuovo integratore':'Modifica integratore'}</h2>
-          <input type="text" value={name} onChange={e=>setName(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')saveSupp();}} autoFocus placeholder="es. Vitamina D" style={{width:'100%',background:'transparent',border:'none',borderBottom:`1px solid ${T.ink}66`,fontFamily:fCormorant,fontStyle:'italic',fontSize:20,color:T.ink,padding:'8px 0',marginTop:16,outline:'none',textAlign:'center'}} />
-          <div style={{display:'flex',gap:8,marginTop:20,justifyContent:'space-between'}}>
-            {editingSupp!=='new' ? <button onClick={delSupp} style={{background:'transparent',color:'#A04848',border:`1px solid #A0484866`,fontFamily:fCormorant,fontStyle:'italic',fontSize:13,padding:'8px 16px',cursor:'pointer'}}>elimina</button> : <span />}
-            <div style={{display:'flex',gap:8}}>
-              <button onClick={()=>{setEditingSupp(null); setName('');}} style={btnOutlineThin(T.dim)}>annulla</button>
-              <button onClick={saveSupp} style={btnSolid(T.ink,T.bg)}>SALVA</button>
-            </div>
-          </div>
-        </SimpleModal>
-      )}
-
-      {editingDay && (
-        <SimpleModal onClose={()=>setEditingDay(null)} bg={T.bg} border={T.ink}>
-          <h2 style={{fontFamily:fCormorant,fontStyle:'italic',fontSize:22,color:T.ink,margin:0,textAlign:'center'}}>{parseDayKey(editingDay).toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long'})}</h2>
-          <div style={{fontFamily:fCormorant,fontSize:11,letterSpacing:'0.3em',color:T.dim,textAlign:'center',marginTop:4,textTransform:'uppercase'}}>quali integratori hai preso?</div>
-          <div style={{marginTop:18}}>
-            {suppsWithColor.length===0 ? (
-              <div style={{textAlign:'center',fontFamily:fCormorant,fontStyle:'italic',fontSize:14,color:T.dim,padding:'12px 0'}}>Aggiungi prima i tuoi integratori.</div>
-            ) : suppsWithColor.map(s=>{
-              const taken_ = (taken[editingDay]||[]).includes(s.id);
-              return (
-                <button key={s.id} onClick={()=>toggleDaySupp(s.id, editingDay)} style={{display:'flex',alignItems:'center',justifyContent:'space-between',width:'100%',padding:'12px 4px',background:'transparent',border:'none',borderBottom:`1px solid ${T.ink}1A`,cursor:'pointer'}}>
-                  <div style={{display:'flex',alignItems:'center',gap:10}}>
-                    <span style={{width:10,height:10,borderRadius:'50%',background:s.color}} />
-                    <span style={{fontFamily:fCormorant,fontStyle:'italic',fontSize:17,color:T.ink}}>{s.name}</span>
-                  </div>
-                  <span style={{width:26,height:26,borderRadius:'50%',background:taken_?s.color:'transparent',border:`1px solid ${s.color}`}} />
+    <div>
+    <NavShell T={T} kicker={`ultimi 28 giorni · ${fullDays} ${fullDays===1?'giorno completo':'giorni completi'}`} title="Integrazione">
+      {!loaded && <Loading color={T.gold} />}
+      {loaded && (<div style={{display:'flex',flexDirection:'column',gap:16}}>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(7, minmax(0, 1fr))',gap:8}}>
+          {days.map(d=>{ const k=dayKey(d), st=dayState(d), isT=k===todayK; return (
+            <button key={k} onClick={()=>setEditingDay(k)} aria-label={d.toLocaleDateString('it-IT',{day:'numeric',month:'long'})} style={{aspectRatio:'1 / 1',borderRadius:'50%',background:st===2?T.gold:'transparent',border:`2px solid ${st>0?T.gold:`${T.cream}33`}`,boxSizing:'border-box',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:fDmSans,fontSize:12,fontWeight:isT?800:600,color:st===2?T.bg2:T.cream,cursor:'pointer',padding:0,boxShadow:isT?`0 0 0 2px ${T.bg2}, 0 0 0 4px ${T.cream}`:'none'}}>{d.getDate()}</button>
+          ); })}
+        </div>
+        <div style={{display:'flex',gap:14,flexWrap:'wrap',fontSize:12,opacity:0.75}}><span>pieno: tutti presi</span><span>bordo oro: alcuni</span><span>vuoto: nessuno</span><span>tocca un giorno per correggerlo</span></div>
+        <div>
+          <div style={navKicker}>oggi · {takenToday.filter(id=>supps.some(s=>s.id===id)).length} di {supps.length} presi</div>
+          {supps.length===0 && <div style={{fontSize:14,opacity:0.75,lineHeight:1.5,padding:'6px 2px 12px'}}>Aggiungi i tuoi integratori per spuntarli ogni giorno.</div>}
+          <div style={{display:'flex',flexDirection:'column',gap:8}}>
+            {supps.map(s=>{ const on = takenToday.includes(s.id); return (
+              <div key={s.id} style={{display:'flex',gap:8,alignItems:'stretch'}}>
+                <button onClick={()=>toggleDaySupp(s.id, todayK)} style={{flex:1,minWidth:0,display:'flex',alignItems:'center',gap:14,padding:'12px 14px',minHeight:62,background:'#142A4C',border:'1px solid #34506F',borderRadius:16,cursor:'pointer',textAlign:'left',color:T.cream,fontFamily:fDmSans,opacity:on?0.8:1}}>
+                  <span style={{width:28,height:28,borderRadius:'50%',flexShrink:0,background:on?T.gold:'transparent',border:`2px solid ${T.gold}`,display:'flex',alignItems:'center',justifyContent:'center'}}>{on && <Check size={17} strokeWidth={3} color={T.bg2} />}</span>
+                  <span style={{flex:1,minWidth:0,display:'flex',flexDirection:'column',gap:2}}>
+                    <span style={{fontSize:16,fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{s.name}</span>
+                    <span style={{fontSize:12,opacity:0.75}}>{on ? 'preso' : 'tocca quando lo prendi'} · costanza {consistency(s.id)}%</span>
+                  </span>
                 </button>
-              );
-            })}
+                <button onClick={()=>openEditSupp(s)} aria-label={`modifica ${s.name}`} style={{width:48,background:'transparent',border:'1px solid #34506F',borderRadius:16,color:T.cream,fontSize:18,cursor:'pointer'}}>›</button>
+              </div>
+            ); })}
           </div>
-          <div style={{display:'flex',justifyContent:'center',marginTop:18}}>
-            <button onClick={()=>setEditingDay(null)} style={btnSolid(T.ink,T.bg)}>FATTO</button>
+        </div>
+        {supps.length>0 && <NavStats T={T} items={[[streakFull,'giorni completi di fila'],[`${avgCons}%`,'costanza · 28 giorni']]} />}
+        <button onClick={()=>{setEditingSupp('new'); setName('');}} style={navBtn(T,false)}>aggiungi integratore</button>
+      </div>)}
+    </NavShell>
+      {editingSupp && (
+        <ModalQ Q={T} onClose={()=>{setEditingSupp(null); setName('');}} title={editingSupp==='new'?'Nuovo integratore':'Modifica integratore'} subtitle="">
+          <input type="text" value={name} onChange={e=>setName(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')saveSupp();}} autoFocus placeholder="es. Vitamina D" aria-label="nome dell'integratore" style={{width:'100%',marginTop:18,background:'transparent',border:'none',borderBottom:`2px solid ${T.gold}`,color:T.cream,fontFamily:fTitle,fontSize:26,outline:'none',padding:'4px 0',boxSizing:'border-box'}} />
+          <EditButtons Q={T} onCancel={()=>{setEditingSupp(null); setName('');}} onSave={saveSupp} onDelete={editingSupp!=='new'?delSupp:null} />
+        </ModalQ>
+      )}
+      {editingDay && (
+        <ModalQ Q={T} onClose={()=>setEditingDay(null)} title={parseDayKey(editingDay).toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long'})} subtitle="quali integratori hai preso?">
+          <div style={{marginTop:14,display:'flex',flexDirection:'column'}}>
+            {supps.length===0 ? <div style={{fontSize:14,opacity:0.75,padding:'10px 0'}}>Aggiungi prima i tuoi integratori.</div> : supps.map(s=>{ const on=(taken[editingDay]||[]).includes(s.id); return (
+              <button key={s.id} onClick={()=>toggleDaySupp(s.id, editingDay)} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,width:'100%',minHeight:52,padding:'8px 2px',background:'transparent',border:'none',borderBottom:`1px solid ${T.cream}22`,color:T.cream,fontFamily:fDmSans,fontSize:16,cursor:'pointer',textAlign:'left'}}>
+                <span>{s.name}</span>
+                <span style={{width:28,height:28,borderRadius:'50%',flexShrink:0,background:on?T.gold:'transparent',border:`2px solid ${T.gold}`,display:'flex',alignItems:'center',justifyContent:'center'}}>{on && <Check size={17} strokeWidth={3} color={T.bg2} />}</span>
+              </button>
+            ); })}
           </div>
-        </SimpleModal>
+          <button onClick={()=>setEditingDay(null)} style={{...navBtn(T),marginTop:20}}>fatto</button>
+        </ModalQ>
       )}
     </div>
   );
 }
-
 function ContinuityRow({ supp, days, taken, consistency, onOpen }){
   const dotR = 3.5, gap = 5, stride = 2*dotR+gap;
   const W_ = days.length*stride, H_ = 14;
@@ -4699,158 +4666,82 @@ function RespiroPage({ theme, loaded, sessions, updSessions, workouts, types, up
   }
   const recent = [...sessions].sort((a,b)=>new Date(b.ts)-new Date(a.ts)).slice(0,12);
 
+  // --- Render nuovo stile: cerchio del respiro con durata a scelta, sessione salvata da sola a fine tempo ---
+  const T = M;
+  const fTitle = T.fontText || fGaramond;
+  const [durMin, setDurMin] = useState(3);
+  const [endsAt, setEndsAt] = useState(null);
+  const [leftS, setLeftS] = useState(0);
+  const sessRef = useRef(sessions); sessRef.current = sessions;
+  useEffect(()=>{
+    if (!breathingOpen || !endsAt) return;
+    const id = setInterval(()=>{
+      const left = Math.max(0, Math.round((endsAt - Date.now())/1000));
+      setLeftS(left);
+      if (left <= 0) {
+        clearInterval(id);
+        setBreathingOpen(false); setEndsAt(null);
+        updSessions([...sessRef.current,{ id:newId(), ts:new Date().toISOString(), type:'respirazione', duration_min:durMin, note:null }]);
+      }
+    }, 500);
+    return ()=>clearInterval(id);
+  },[breathingOpen, endsAt]);
+  const startBreath = () => { setEndsAt(Date.now() + durMin*60000); setLeftS(durMin*60); setBreathingOpen(true); };
+  const stopBreath = () => { setBreathingOpen(false); setEndsAt(null); };
+  const mmss = s => `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
+  const circle = breathingOpen ? 0.62 + 0.38*((scale-0.35)/0.65) : 0.74;
   return (
-    <div style={{minHeight:'100vh',background:`radial-gradient(ellipse at top, ${M.bg1} 0%, ${M.bg2} 100%)`,color:M.cream,fontFamily:fCormorant,position:'relative',overflow:'hidden'}}>
-      <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${M.gold}40`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
-      <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${M.gold}1A`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
-      <div style={{position:'relative',zIndex:2,padding:'32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
-        {(M?.structuralVariant === 'dashboard') ? <DashHeader label="Corpo" /> : <Header q="CORPO" sub="VI" color={M.gold} dim={M.goldDim} mark="✦" font={fCormorant} />}
-
-        {!loaded && <Loading color={M.dim} />}
-
-        {loaded && (<>
-          {/* Stats sessioni mindful */}
-          <div style={(M?.structuralVariant === 'dashboard') ? {display:'flex',justifyContent:'space-around',marginTop:14,padding:'16px 0',background:'#FFFFFF',border:'1px solid #E5EAEE',borderRadius:16,boxShadow:'0 1px 3px rgba(42,57,66,0.04)'} : {display:'flex',justifyContent:'space-around',marginTop:18,padding:'14px 0',borderTop:`1px solid ${M.accent}44`,borderBottom:`1px solid ${M.accent}44`}}>
-            <Stat label="oggi" value={todayCount} color={M.accent} dim={M.dim} />
-            <Stat label="min · 7g" value={fmt0(weekMin)} color={M.accent} dim={M.dim} />
-            <Stat label="streak" value={streak} color={M.accent} dim={M.dim} />
-          </div>
-
-          {/* === SEZIONE MOVIMENTO (ex pagina Allena, fusa qui) === */}
-          <div style={{marginTop:26}}>
-            <div style={{padding:'10px 0',borderBottom:`1px solid ${M.accent}33`,display:'flex',justifyContent:'space-between',alignItems:'baseline'}}>
-              <span style={{fontFamily:fDmSans,fontSize:9,letterSpacing:'0.4em',color:M.accent,textTransform:'uppercase'}}>movimento</span>
-              <span style={{fontFamily:fDmSans,fontSize:9,letterSpacing:'0.35em',color:M.dim,textTransform:'uppercase'}}>30 g · tendenza</span>
-            </div>
-            <div>
-              {(types||[]).length===0 ? (
-                <div style={{textAlign:'center',padding:'18px 0',fontFamily:fCormorant,fontStyle:'italic',fontSize:14,color:M.dim}}>Nessun tipo di allenamento.</div>
-              ) : (types||[]).map(t=>{
-                const tw = (workouts||[]).filter(w=>w.typeId===t.id);
-                const last30 = tw.filter(w=>(Date.now()-new Date(w.ts).getTime()) < 30*86400000);
-                const totalQty = last30.reduce((a,w)=>a+(w.qty||0),0);
-                const today=new Date(); const sparkVals=[];
-                for(let i=29;i>=0;i--){ const d=new Date(today); d.setDate(d.getDate()-i); const dk=dayKey(d); const sum=tw.filter(w=>dayKey(new Date(w.ts))===dk).reduce((a,w)=>a+(w.qty||0),0); sparkVals.push(sum>0?sum:null); }
-                const spark = buildLineChart(sparkVals,90,30);
-                return (
-                  <button key={t.id} onClick={()=>setDetailTypeId(t.id)} style={{display:'flex',alignItems:'center',gap:14,width:'100%',padding:'12px 4px',background:'transparent',border:'none',borderBottom:`1px solid ${M.accent}1A`,cursor:'pointer',textAlign:'left'}}>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontFamily:fCormorant,fontStyle:'italic',fontSize:18,color:M.ink}}>{t.name}</div>
-                      <div style={{fontFamily:fDmSans,fontSize:10,letterSpacing:'0.15em',color:M.dim,marginTop:2}}>{last30.length} sessioni · {fmt0(totalQty)} {t.unit}</div>
-                    </div>
-                    <svg viewBox="0 0 90 30" width="90" height="30" style={{flexShrink:0}}>
-                      {spark.points.length>1 && <path d={spark.path} stroke={M.accent} strokeWidth="1.4" fill="none" />}
-                      {spark.points.length>0 && <circle cx={spark.points[spark.points.length-1].x} cy={spark.points[spark.points.length-1].y} r="2.2" fill={M.accent} />}
-                      {spark.points.length===0 && <line x1="0" y1="15" x2="90" y2="15" stroke={M.accent} strokeWidth="0.5" strokeDasharray="2 2" opacity="0.3" />}
-                    </svg>
-                    <span style={{fontFamily:fCormorant,fontStyle:'italic',fontSize:14,color:M.dim,marginLeft:6}}>›</span>
-                  </button>
-                );
-              })}
-            </div>
-            <div style={{textAlign:'center',marginTop:14}}>
-              <button onClick={()=>setEditingType('new')} style={{background:'transparent',color:M.accent,border:`1px dashed ${M.accent}99`,fontFamily:fDmSans,fontSize:10,letterSpacing:'0.35em',padding:'9px 20px',cursor:'pointer',textTransform:'uppercase'}}>+ nuovo tipo</button>
-            </div>
-          </div>
-          {/* === FINE SEZIONE MOVIMENTO === */}
-
-          {/* Divisore decorativo tra MOVIMENTO e RESPIRO */}
-          <div style={{display:'flex',alignItems:'center',gap:14,marginTop:36,marginBottom:8}}>
-            <div style={{flex:1,height:1,background:`linear-gradient(90deg, transparent, ${M.accent}55)`}} />
-            <span style={{fontFamily:fCormorant,fontSize:18,color:M.accent,opacity:0.7}}>✦</span>
-            <div style={{flex:1,height:1,background:`linear-gradient(90deg, ${M.accent}55, transparent)`}} />
-          </div>
-
-          {/* === SEZIONE RESPIRO === */}
-          <div style={{padding:'10px 0 0',display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:10}}>
-            <span style={{fontFamily:fDmSans,fontSize:9,letterSpacing:'0.4em',color:M.accent,textTransform:'uppercase'}}>respiro</span>
-            <span style={{fontFamily:fDmSans,fontSize:9,letterSpacing:'0.35em',color:M.dim,textTransform:'uppercase'}}>mente · presenza</span>
-          </div>
-
-          {/* Esercizio respiro */}
-          <div style={{textAlign:'center',marginTop:6,padding:'18px 14px',background:`${M.accent}1A`,border:`1px solid ${M.accent}33`}}>
-            <div style={{fontFamily:fDmSans,fontSize:9,letterSpacing:'0.4em',color:M.accent,textTransform:'uppercase',marginBottom:8}}>respira ora</div>
-            <div style={{fontFamily:fCormorant,fontStyle:'italic',fontSize:14,color:M.ink,lineHeight:1.5,marginBottom:14}}>respirazione quadrata · 4 secondi per fase<br/><span style={{fontSize:12,color:M.dim}}>per calmare la mente, anche solo 1 minuto</span></div>
-            <button onClick={()=>setBreathingOpen(true)} style={{background:M.gold||M.ink,color:M.bg1||M.cream,border:`1px solid ${M.gold||M.ink}`,fontFamily:fDmSans,fontSize:10,letterSpacing:'0.4em',padding:'12px 24px',cursor:'pointer',textTransform:'uppercase'}}>inizia</button>
-          </div>
-
-          {/* Registra sessione */}
-          <div style={{marginTop:24}}>
-            <div style={{fontFamily:fDmSans,fontSize:9,letterSpacing:'0.4em',color:M.dim,textAlign:'center',textTransform:'uppercase',marginBottom:12}}>registra sessione</div>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-              {MINDFUL_TYPES.map(t=>(
-                <button key={t.id} onClick={()=>{ setLogging(t.id); setDraftMin(''); setDraftNote(''); }} style={{padding:'14px 10px',background:'transparent',border:`1px solid ${M.accent}55`,color:M.ink,cursor:'pointer',display:'flex',alignItems:'center',gap:8,justifyContent:'center'}}>
-                  <span style={{fontSize:18,color:M.accent}}>{t.sym}</span>
-                  <span style={{fontFamily:fCormorant,fontStyle:'italic',fontSize:15}}>{t.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Storico */}
-          {recent.length>0 && (
-            <div style={{marginTop:28,paddingTop:18,borderTop:`1px solid ${M.accent}33`}}>
-              <div style={{fontFamily:fDmSans,fontSize:9,letterSpacing:'0.4em',color:M.dim,textAlign:'center',textTransform:'uppercase',marginBottom:12}}>sessioni recenti</div>
-              {recent.map(s=>{
-                const type = MINDFUL_TYPES.find(t=>t.id===s.type) || { label:s.type, sym:'·' };
-                return (
-                  <button key={s.id} onClick={()=>{ if(confirmDelSess===s.id){ deleteSession(s.id); } else { setConfirmDelSess(s.id); } }} style={{width:'100%',display:'flex',alignItems:'flex-start',gap:10,padding:'10px 0',borderBottom:`1px solid ${M.accent}22`,background:confirmDelSess===s.id?`${M.accent}1A`:'transparent',border:'none',cursor:'pointer',textAlign:'left',color:M.ink}}>
-                    <span style={{fontSize:18,color:M.accent,minWidth:24,marginTop:2}}>{type.sym}</span>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontFamily:fCormorant,fontStyle:'italic',fontSize:15,color:M.ink}}>{type.label} · {fmt(s.duration_min)} min{confirmDelSess===s.id?<span style={{color:'#A04848',marginLeft:8,fontSize:12}}>tocca ancora ✗</span>:null}</div>
-                      <div style={{fontFamily:fDmSans,fontSize:9,letterSpacing:'0.15em',color:M.dim,marginTop:2,textTransform:'uppercase'}}>{new Date(s.ts).toLocaleDateString('it-IT',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</div>
-                      {s.note && <div style={{fontFamily:fCormorant,fontStyle:'italic',fontSize:13,color:M.dim,marginTop:3,lineHeight:1.3}}>{s.note}</div>}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </>)}
-      </div>
-
-      {/* Modal registra sessione */}
-      {logging && (
-        <SimpleModal onClose={()=>setLogging(null)} bg={M.cream} border={M.accent}>
-          <div style={{textAlign:'center'}}>
-            <div style={{fontFamily:fDmSans,fontSize:9,letterSpacing:'0.5em',color:M.accent,textTransform:'uppercase',marginBottom:4}}>nuova sessione</div>
-            <div style={{fontFamily:fCormorant,fontStyle:'italic',fontSize:22,color:M.ink}}>{MINDFUL_TYPES.find(t=>t.id===logging)?.label}</div>
-          </div>
-          <div style={{marginTop:18}}>
-            <label style={{display:'block',fontFamily:fDmSans,fontSize:9,letterSpacing:'0.3em',color:M.dim,textTransform:'uppercase',marginBottom:6}}>durata (minuti)</label>
-            <input autoFocus type="text" inputMode="decimal" value={draftMin} onChange={e=>setDraftMin(e.target.value)} placeholder="es. 15" style={{width:'100%',background:'transparent',border:`1px solid ${M.accent}55`,fontFamily:fCormorant,fontStyle:'italic',fontSize:22,color:M.ink,padding:'10px 14px',outline:'none',boxSizing:'border-box'}} />
-          </div>
-          <div style={{marginTop:14}}>
-            <label style={{display:'block',fontFamily:fDmSans,fontSize:9,letterSpacing:'0.3em',color:M.dim,textTransform:'uppercase',marginBottom:6}}>nota (opzionale)</label>
-            <textarea value={draftNote} onChange={e=>setDraftNote(e.target.value)} placeholder="come ti sei sentito…" rows={3} style={{width:'100%',background:'transparent',border:`1px solid ${M.accent}55`,fontFamily:fCormorant,fontStyle:'italic',fontSize:14,color:M.ink,padding:'10px 14px',outline:'none',boxSizing:'border-box',resize:'none'}} />
-          </div>
-          <div style={{display:'flex',gap:8,marginTop:18}}>
-            <button onClick={()=>setLogging(null)} style={{flex:1,background:'transparent',color:M.dim,border:`1px solid ${M.dim}66`,fontFamily:fDmSans,fontSize:10,letterSpacing:'0.3em',padding:'12px',cursor:'pointer',textTransform:'uppercase'}}>annulla</button>
-            <button onClick={saveSession} disabled={!draftMin} style={{flex:1,background:M.ink,color:M.cream,border:'none',fontFamily:fDmSans,fontSize:10,letterSpacing:'0.3em',padding:'12px',cursor:draftMin?'pointer':'default',opacity:draftMin?1:0.5,textTransform:'uppercase'}}>salva</button>
-          </div>
-        </SimpleModal>
-      )}
-
-      {/* Modal respirazione */}
-      {breathingOpen && (
-        <div onClick={()=>setBreathingOpen(false)} style={{position:'fixed',inset:0,background:`linear-gradient(180deg, ${M.cream} 0%, ${M.bg1} 100%)`,zIndex:210,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:20,cursor:'pointer'}}>
-          <div onClick={e=>e.stopPropagation()} style={{textAlign:'center',cursor:'default'}}>
-            <div style={{fontFamily:fDmSans,fontSize:10,letterSpacing:'0.5em',color:M.accent,textTransform:'uppercase',marginBottom:24}}>respirazione quadrata</div>
-            <div style={{position:'relative',width:240,height:240,margin:'0 auto',display:'flex',alignItems:'center',justifyContent:'center'}}>
-              <div style={{position:'absolute',inset:0,border:`1px solid ${M.accent}33`,borderRadius:'50%'}} />
-              <div style={{width:'100%',height:'100%',borderRadius:'50%',background:`radial-gradient(circle, ${M.accent}66 0%, ${M.accent}22 70%, ${M.accent}00 100%)`,transform:`scale(${scale})`,transition:'transform 0.1s linear',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                <span style={{fontFamily:fCormorant,fontStyle:'italic',fontSize:24,color:M.ink,letterSpacing:'0.05em'}}>{phaseLabel}</span>
+    <div>
+    <NavShell T={T} kicker="per calmare la mente, anche 1 minuto" title="Respiro">
+      {!loaded && <Loading color={T.gold} />}
+      {loaded && (<div style={{display:'flex',flexDirection:'column',gap:16}}>
+        <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:16,padding:'8px 0 0'}}>
+          <div style={{width:230,height:230,borderRadius:'50%',border:`1px solid ${T.cream}33`,display:'flex',alignItems:'center',justifyContent:'center'}}>
+            <div style={{width:230,height:230,borderRadius:'50%',background:'#142A4C',border:`2px solid ${T.gold}`,boxSizing:'border-box',transform:`scale(${circle})`,transition:'transform 0.12s linear',display:'flex',alignItems:'center',justifyContent:'center'}}>
+              <div style={{transform:`scale(${1/circle})`,display:'flex',flexDirection:'column',alignItems:'center',gap:2}}>
+                <span style={{fontFamily:fTitle,fontSize:34,fontWeight:500,lineHeight:1}}>{breathingOpen ? phaseLabel : 'inspira'}</span>
+                <span style={{fontSize:13,opacity:0.75}}>{breathingOpen ? `mancano ${mmss(leftS)}` : '4 secondi'}</span>
               </div>
             </div>
-            <div style={{fontFamily:fDmSans,fontSize:9,letterSpacing:'0.3em',color:M.dim,marginTop:30,textTransform:'uppercase'}}>4 · 4 · 4 · 4 secondi</div>
-            <button onClick={()=>setBreathingOpen(false)} style={{marginTop:24,background:'transparent',color:M.dim,border:`1px solid ${M.dim}66`,fontFamily:fDmSans,fontSize:10,letterSpacing:'0.4em',padding:'10px 22px',cursor:'pointer',textTransform:'uppercase'}}>chiudi</button>
+          </div>
+          <span style={{fontSize:13,opacity:0.75,textAlign:'center'}}>respirazione quadrata · inspira, trattieni, espira, riposa</span>
+        </div>
+        {!breathingOpen && (
+          <div style={{display:'grid',gridTemplateColumns:'repeat(4, minmax(0, 1fr))',gap:6}}>
+            {[1,3,5,10].map(m=>(<button key={m} onClick={()=>setDurMin(m)} style={navChip(T, durMin===m)}>{m} min</button>))}
+          </div>
+        )}
+        {breathingOpen
+          ? <button onClick={stopBreath} style={navBtn(T,false)}>interrompi</button>
+          : <button onClick={startBreath} style={navBtn(T)}>inizia a respirare</button>}
+        <NavStats T={T} items={[[streak,'giorni di fila'],[fmt0(weekMin),'minuti · 7 giorni'],[todayCount,'sessioni oggi']]} />
+        <div>
+          <div style={navKicker}>registra un'altra pratica</div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(2, minmax(0, 1fr))',gap:6}}>
+            {MINDFUL_TYPES.map(t=>(<button key={t.id} onClick={()=>{ setLogging(t.id); setDraftMin(''); setDraftNote(''); }} style={navChip(T,false)}>{t.label}</button>))}
           </div>
         </div>
+        {recent.length>0 && (
+          <div>
+            <div style={navKicker}>sessioni recenti · tocca due volte per eliminare</div>
+            {recent.map(s=>{ const type = MINDFUL_TYPES.find(t=>t.id===s.type) || { label:s.type }; const d=new Date(s.ts); return (
+              <button key={s.id} onClick={()=>{ if(confirmDelSess===s.id){ deleteSession(s.id); } else { setConfirmDelSess(s.id); } }} style={{display:'flex',alignItems:'baseline',gap:12,padding:'11px 2px',minHeight:44,width:'100%',background:'transparent',border:'none',borderBottom:`1px solid ${T.cream}22`,color:T.cream,fontFamily:fDmSans,cursor:'pointer',textAlign:'left'}}>
+                <span style={{fontSize:13,fontWeight:700,width:64,flexShrink:0}}>{sameDay(d,new Date()) ? 'oggi' : d.toLocaleDateString('it-IT',{day:'numeric',month:'short'})}</span>
+                <span style={{flex:1,minWidth:0,fontSize:15}}>{type.label} · {fmt(s.duration_min)} min{s.note ? ` · ${s.note}` : ''}</span>
+                <span style={{fontSize:13,color:confirmDelSess===s.id?'#F0B9A0':T.cream,opacity:confirmDelSess===s.id?1:0.7,whiteSpace:'nowrap'}}>{confirmDelSess===s.id ? 'elimina?' : d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})}</span>
+              </button>
+            ); })}
+          </div>
+        )}
+      </div>)}
+    </NavShell>
+      {logging && (
+        <ModalQ Q={T} onClose={()=>setLogging(null)} title={MINDFUL_TYPES.find(t=>t.id===logging)?.label || 'sessione'} subtitle="nuova sessione">
+          <InputBig value={draftMin} onChange={setDraftMin} onEnter={saveSession} placeholder="15" unit="minuti" Q={T} />
+          <textarea value={draftNote} onChange={e=>setDraftNote(e.target.value)} placeholder="nota (opzionale)" aria-label="nota" rows={3} style={{width:'100%',marginTop:16,background:'transparent',border:`1px solid ${T.cream}44`,borderRadius:14,color:T.cream,fontFamily:fDmSans,fontSize:15,padding:12,outline:'none',resize:'none',boxSizing:'border-box'}} />
+          <EditButtons Q={T} onCancel={()=>setLogging(null)} onSave={saveSession} />
+        </ModalQ>
       )}
-
-      {/* Modal allenamenti (ex pagina Allena) */}
-      {detailType && <TypeDetailModal type={detailType} workouts={workouts||[]} onClose={()=>setDetailTypeId(null)} updWorkouts={updWorkouts} onEditType={()=>{setDetailTypeId(null); setEditingType(detailType.id);}} />}
-      {editingType && <TypeModal existing={editingT} onClose={()=>setEditingType(null)} onSave={saveType} onDelete={editingType!=='new'?delType:null} />}
     </div>
   );
 }
@@ -4925,13 +4816,13 @@ function Row({ label, value, unit, details, theme, dot }){
     </div>
   );
 }
-function FieldLabel({ children, light }){ return <div style={{fontFamily:fDmSans,fontSize:9,letterSpacing:'0.4em',color:light?S.dim:'#888',textTransform:'uppercase',marginBottom:4}}>{children}</div>; }
+function FieldLabel({ children, light }){ return <div style={{fontFamily:fDmSans,fontSize:9,letterSpacing:'0.4em',color:'#B4BFCC',textTransform:'uppercase',marginBottom:4}}>{children}</div>; }
 function fieldInput(theme){ return { width:'100%',background:'transparent',border:'none',borderBottom:`1px solid ${(theme.ink||theme.dark)}66`,fontFamily:fGaramond,fontStyle:'italic',fontSize:18,color:theme.ink||theme.dark,padding:'6px 0 4px',outline:'none' }; }
 function fieldInputDark(theme){ return { width:'100%',background:'transparent',border:'none',borderBottom:`1px solid ${theme.gold}66`,fontFamily:fFraunces,fontStyle:'italic',fontSize:18,color:theme.pale,padding:'6px 0 4px',outline:'none' }; }
 function btnSolid(bg, fg){ return { marginTop:22,background:bg,color:fg,border:`1px solid ${bg}`,fontFamily:fCinzel,fontSize:10,letterSpacing:'0.4em',padding:'14px 32px',cursor:'pointer',borderRadius:0 }; }
 function btnOutline(c, font){ return { background:'transparent',color:c,border:`1px solid ${c}`,fontFamily:font||fMarcellus,fontSize:11,letterSpacing:'0.4em',padding:'12px 28px',cursor:'pointer',borderRadius:0 }; }
 function btnOutlineThin(c){ return { background:'transparent',color:c,border:`1px solid ${c}66`,fontFamily:fCormorant,fontStyle:'italic',fontSize:14,padding:'8px 18px',cursor:'pointer',borderRadius:0 }; }
-function btnOutlineMini(c, font){ return { background:'transparent',color:c,border:`1px solid ${c}66`,fontFamily:font||fDmSans,fontSize:10,letterSpacing:'0.3em',padding:'10px 16px',cursor:'pointer',borderRadius:0,textTransform:'uppercase' }; }
+function btnOutlineMini(c, font){ return { background:'transparent',color:c,border:`1px solid ${c}66`,fontFamily:font||fDmSans,fontSize:13,padding:'10px 16px',cursor:'pointer',borderRadius:22 }; }
 
 function DayStrip({ selectedKey, onSelect, ink, tan, count, fontA, fontB }){
   const days = []; const today = new Date();
@@ -4957,7 +4848,7 @@ function DayStrip({ selectedKey, onSelect, ink, tan, count, fontA, fontB }){
 function SimpleModal({ children, onClose, bg, border, wide }){
   return (
     <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.55)',backdropFilter:'blur(3px)',WebkitBackdropFilter:'blur(3px)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
-      <div onClick={e=>e.stopPropagation()} style={{background:bg,border:`1px solid ${border}33`,maxWidth:wide?400:340,width:'100%',padding:'24px 22px',position:'relative',borderRadius:4,maxHeight:'88vh',overflowY:'auto'}}>{children}</div>
+      <div onClick={e=>e.stopPropagation()} style={{background:'#142A4C',border:'1px solid #34506F',maxWidth:wide?400:340,width:'100%',padding:'24px 22px',position:'relative',borderRadius:24,maxHeight:'88vh',overflowY:'auto',boxSizing:'border-box',boxShadow:'0 12px 32px rgba(0,0,0,0.45)'}}>{children}</div>
     </div>
   );
 }
