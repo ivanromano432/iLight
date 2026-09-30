@@ -215,7 +215,9 @@ export const THEMES = {
     desc: 'blu notte, petrolio e oro',
     isDark: true,
     swatch: ['#0E2240', '#C9A55A', '#F4EFE2'],
-    bg: '#0E2240', bg1: '#0E2240', bg2: '#0E2240',
+    bg: '#0E2240', bg1: '#4A6A62', bg2: '#0E2240',
+    // Sfumatura delle pagine: petrolio in alto che scende nel blu notte (stop in px, non si allunga sulle pagine lunghe)
+    pageBg: 'linear-gradient(180deg, #4A6A62 0px, #24405A 260px, #0E2240 540px)',
     ink: '#F4EFE2', dark: '#F4EFE2',
     cream: '#F4EFE2', pale: '#F4EFE2', body: '#F4EFE2',
     gold: '#C9A55A', sage: '#C9A55A', silver: '#C9A55A', accent: '#C9A55A', amber: '#C9A55A', active: '#C9A55A',

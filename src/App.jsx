@@ -822,59 +822,42 @@ export default function App({ user, onLogout }){
     }[subState.tone] || (Q.gold || '#8C6A4E');
     return (
       <>
-        <div style={{ position: 'fixed', top: 12, right: 12, zIndex: 9000 }}>
+        <div style={{ position: 'fixed', top: 'calc(18px + env(safe-area-inset-top, 0px))', right: 16, zIndex: 9000 }}>
           <button onClick={() => setShowAccountMenu(!showAccountMenu)} aria-label="account"
-            style={{ width: 36, height: 36, borderRadius: '50%', background: avatarSrc ? 'transparent' : `${surface}D9`, border: `1px solid ${accent}40`, color: ink, fontFamily, fontSize: 16, fontStyle: labelStyle, fontWeight: isDashboard ? 700 : 400, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: 0 }}>
+            style={{ width: 44, height: 44, borderRadius: '50%', background: avatarSrc ? 'transparent' : `${surface}D9`, border: `1px solid ${accent}40`, color: ink, fontFamily, fontSize: 16, fontStyle: labelStyle, fontWeight: isDashboard ? 700 : 400, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: 0 }}>
             {avatarSrc ? <img src={avatarSrc} alt="profilo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : accountInitial}
           </button>
           {showAccountMenu && (
-            <div style={{ position: 'absolute', top: 44, right: 0, background: surface, border: `1px solid ${accent}40`, borderRadius: radius, padding: '14px 16px', minWidth: 240, fontFamily, color: ink, boxShadow: '0 4px 16px rgba(0,0,0,0.12)' }}>
-              <div style={{ fontSize: 12, fontStyle: labelStyle, color: accentSoft, marginBottom: 4 }}>connesso come</div>
-              <div style={{ fontSize: 14, marginBottom: 10, wordBreak: 'break-all', fontStyle: labelStyle }}>{displayName || accountEmail}</div>
-
-              {/* Badge stato abbonamento */}
-              <div style={{ padding: '8px 10px', border: `1px solid ${badgeColor}66`, background: `${badgeColor}14`, borderRadius: btnRadius, marginBottom: 12, fontSize: 13, fontStyle: labelStyle, color: badgeColor, textAlign: 'center' }}>
-                {subState.label}
+            <div style={{ position: 'absolute', top: 54, right: 0, width: 'min(300px, calc(100vw - 32px))', maxHeight: 'calc(100vh - 150px)', overflowY: 'auto', boxSizing: 'border-box', background: '#142A4C', border: '1px solid #34506F', borderRadius: 24, padding: '18px 16px 12px', fontFamily: fDmSans, color: ink, boxShadow: '0 12px 32px rgba(0,0,0,0.45)', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ padding: '0 4px' }}>
+                <div style={{ fontFamily: fGaramond, fontSize: 26, fontWeight: 500, lineHeight: 1.1, wordBreak: 'break-word' }}>{displayName || accountEmail}</div>
+                <div style={{ fontSize: 12, color: badgeColor, marginTop: 4 }}>{subState.label}</div>
               </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 6, marginBottom: 10, paddingBottom: 10, borderBottom: `1px solid ${accent}40` }}>
-                {MENU_PAGE_IDS.map(id => (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
+                {MENU_PAGE_IDS.map(id => { const on = !showStats && page === id; return (
                   <button key={id} onClick={() => goPage(id)}
-                    style={{ background: (!showStats && page === id) ? `${accent}26` : 'transparent', color: ink, border: btnBorder, borderRadius: btnRadius, fontFamily, fontStyle: labelStyle, fontSize: 14, fontWeight: btnFontWeight, padding: '10px 12px', minHeight: 44, cursor: 'pointer', textAlign: 'left' }}>
+                    style={{ minHeight: 52, padding: '0 14px', borderRadius: 14, background: '#0E2240', border: `1px solid ${on ? accent : '#34506F'}`, color: on ? accent : ink, fontFamily: fDmSans, fontSize: 15, fontWeight: 600, textAlign: 'left', cursor: 'pointer' }}>
                     {MENU_PAGE_LABELS[id]}
                   </button>
-                ))}
+                ); })}
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <button onClick={() => { setShowAccountMenu(false); setShowProfile(true); }}
-                  style={{ background: 'transparent', color: ink, border: btnBorder, borderRadius: btnRadius, fontFamily, fontStyle: labelStyle, fontSize: 14, fontWeight: btnFontWeight, padding: '8px 12px', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
-                  ☉ profilo
-                </button>
-                <button onClick={() => { setShowAccountMenu(false); setShowGuida(true); }}
-                  style={{ background: 'transparent', color: ink, border: btnBorder, borderRadius: btnRadius, fontFamily, fontStyle: labelStyle, fontSize: 14, fontWeight: btnFontWeight, padding: '8px 12px', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
-                  ✦ guida
-                </button>
-                <button onClick={() => { setShowAccountMenu(false); setShowSub(true); }}
-                  style={{
-                    background: subState.ctaPrimary ? ctaBg : 'transparent',
-                    color: subState.ctaPrimary ? ctaColor : ink,
-                    border: subState.ctaPrimary ? `1px solid ${ctaBg}` : btnBorder,
-                    borderRadius: btnRadius,
-                    fontFamily, fontStyle: labelStyle, fontSize: 14,
-                    padding: '8px 12px', cursor: 'pointer', width: '100%', textAlign: 'left',
-                    fontWeight: subState.ctaPrimary ? 700 : btnFontWeight,
-                  }}>
-                  {subState.ctaLabel}
-                </button>
-                <button onClick={() => { setShowAccountMenu(false); onLogout && onLogout(); }}
-                  style={{ background: exitBg, color: exitColor, border: 'none', borderRadius: btnRadius, fontFamily, fontStyle: labelStyle, fontSize: 14, fontWeight: isDashboard ? 700 : 400, padding: '8px 12px', cursor: 'pointer', width: '100%', marginTop: 4, textAlign: isDashboard ? 'center' : 'left', letterSpacing: isDashboard ? '0.1em' : 'normal', textTransform: isDashboard ? 'uppercase' : 'none' }}>
-                  esci
-                </button>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {[
+                  ['Profilo', () => { setShowAccountMenu(false); setShowProfile(true); }],
+                  ['Guida', () => { setShowAccountMenu(false); setShowGuida(true); }],
+                  [subState.ctaLabel, () => { setShowAccountMenu(false); setShowSub(true); }, subState.ctaPrimary],
+                  ['Esci', () => { setShowAccountMenu(false); onLogout && onLogout(); }],
+                ].map(([label, fn, strong], i, arr) => (
+                  <button key={i} onClick={fn}
+                    style={{ minHeight: 46, padding: '0 6px', background: 'transparent', border: 'none', borderBottom: i < arr.length - 1 ? '1px solid #34506F' : 'none', color: strong ? accent : ink, fontFamily: fDmSans, fontSize: 15, fontWeight: strong ? 700 : 400, textAlign: 'left', cursor: 'pointer' }}>
+                    {label}
+                  </button>
+                ))}
               </div>
             </div>
           )}
         </div>
-        {showAccountMenu && <div onClick={() => setShowAccountMenu(false)} style={{ position: 'fixed', inset: 0, zIndex: 8999, background: 'transparent' }} />}
+        {showAccountMenu && <div onClick={() => setShowAccountMenu(false)} style={{ position: 'fixed', inset: 0, zIndex: 8999, background: 'rgba(4,12,28,0.6)' }} />}
       </>
     );
   };
@@ -922,7 +905,7 @@ export default function App({ user, onLogout }){
         {page==='stats' && <StatsPage theme={__theme} loaded={loaded} weights={weights} goal={goal} meals={meals} profile={profile} openFull={() => { setShowStats(true); try { window.scrollTo(0, 0); } catch (_) {} }} />}
         {page==='coach' && <CoachPage theme={__theme} loaded={loaded} profile={profile} weights={weights} goal={goal} meals={meals} water={waterByDay} waterGoal={waterGoal} workouts={workouts} workoutTypes={workoutTypes} sleeps={sleeps} fasts={fasts} supps={supplements} taken={suppTaken} notes={foodNotes} mindful={mindfulSessions} />}
         {page==='aggiorna' && <AggiornaPage theme={__theme} loaded={loaded} weights={weights} updWeights={updWeights} supps={supplements} taken={suppTaken} updTaken={updTaken} water={waterByDay} waterGoal={waterGoal} updWater={updWater} workouts={workouts} fasts={fasts} sleeps={sleeps} meals={meals} go={goPage} />}
-        {page==='foto' && <FotoPage theme={__theme} loaded={loaded} meals={meals} onPhoto={(b64) => { setPhotoSeed(b64 || 'manual'); goPage('pasti'); }} />}
+        {page==='foto' && <FotoPage theme={__theme} loaded={loaded} meals={meals} />}
         {page==='pasti' && <PastiPage profile={profile} seedPhotoInit={photoSeed} clearSeedPhoto={() => setPhotoSeed(null)} user={user} theme={__theme} loaded={loaded} meals={meals} updMeals={updMeals} notes={foodNotes} weights={weights} goal={goal} />}
         {page==='menu' && <MenuPage theme={__theme} loaded={loaded} meals={meals} updMeals={updMeals} weights={weights} goal={goal} profile={profile} updProfile={updProfile} />}
         {page==='integra' && <IntegraPage theme={__theme} loaded={loaded} supps={supplements} taken={suppTaken} updSupps={updSupps} updTaken={updTaken} />}
@@ -932,20 +915,22 @@ export default function App({ user, onLogout }){
         {page==='sera' && <SeraPage theme={__theme} loaded={loaded} weights={weights} goal={goal} notes={foodNotes} water={waterByDay} waterGoal={waterGoal} meals={meals} workouts={workouts} workoutTypes={workoutTypes} supps={supplements} taken={suppTaken} sleeps={sleeps} mindful={mindfulSessions} updNotes={updFoodNotes} profile={profile} />}
         </>); })()}
       </div>
-      <BottomNav theme={getTheme(profile?.theme)} currentId={page} onGo={goPage} />
+      <BottomNav theme={getTheme(profile?.theme)} currentId={page} onGo={goPage} onShoot={async (file) => { let b64 = null; try { b64 = await resizeImage(file, 480, 0.7); } catch (_) {} setPhotoSeed(b64 || 'manual'); goPage('pasti'); }} />
       {renderAccountMenu()}
     </div>
   );
 }
 
-function BottomNav({ theme, currentId, onGo }){
+function BottomNav({ theme, currentId, onGo, onShoot }){
+  const shootRef = useRef(null);
   // Tema dinamico: bottom nav usa colori del tema attivo
   const NAV = theme ? { bg: theme.bg2, border: theme.border, dim: theme.dim, gold: theme.gold, cream: theme.cream } : { bg: '#1A1108', border: '#3A2818', dim: '#6B5D45', gold: '#C9A876', cream: '#E8D8B8' };
   return (
-    <nav aria-label="navigazione principale" style={{position:'fixed',left:0,right:0,bottom:0,background:NAV.bg,borderTop:`1px solid ${NAV.border}55`,display:'flex',justifyContent:'space-around',alignItems:'flex-start',paddingTop:8,paddingBottom:'calc(10px + env(safe-area-inset-bottom, 0px))',zIndex:50}}>
+    <nav aria-label="navigazione principale" data-nav style={{position:'fixed',left:0,right:0,bottom:0,background:NAV.bg,borderTop:`1px solid ${NAV.border}55`,display:'flex',justifyContent:'space-around',alignItems:'flex-start',paddingTop:8,paddingBottom:'calc(10px + env(safe-area-inset-bottom, 0px))',zIndex:50}}>
+      <input ref={shootRef} type="file" accept="image/*" style={{display:'none'}} onChange={e=>{ const f=e.target.files?.[0]; e.target.value=''; if (f && onShoot) onShoot(f); }} />
       {NAV_ITEMS.map(p=>{const active=p.id===currentId; const Ic=p.Icon;
         if (p.center) return (
-          <button key={p.id} onClick={()=>onGo(p.id)} aria-label="diario fotografico dei pasti" style={{width:62,height:62,marginTop:-30,borderRadius:'50%',background:NAV.gold,border:`4px solid ${NAV.bg}`,boxShadow:active?`0 0 0 2px ${NAV.gold}`:'0 2px 8px rgba(0,0,0,0.25)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',padding:0,flexShrink:0}}>
+          <button key={p.id} onClick={()=>{ if (active && onShoot) shootRef.current?.click(); else onGo(p.id); }} aria-label={active ? 'fotografa il pasto' : 'diario fotografico dei pasti'} style={{width:62,height:62,marginTop:-30,borderRadius:'50%',background:NAV.gold,border:`4px solid ${NAV.bg}`,boxShadow:active?`0 0 0 2px ${NAV.gold}`:'0 2px 8px rgba(0,0,0,0.25)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',padding:0,flexShrink:0}}>
             <Ic size={27} strokeWidth={2} color={NAV.bg} />
           </button>
         );
@@ -967,9 +952,9 @@ function BottomNav({ theme, currentId, onGo }){
 function NavShell({ T, kicker, title, children }){
   const fTitle = T.fontText || fGaramond;
   return (
-    <div style={{minHeight:'100vh',background:`radial-gradient(ellipse at top, ${T.bg1} 0%, ${T.bg2} 100%)`,color:T.cream,fontFamily:fDmSans,position:'relative'}}>
+    <div style={{minHeight:'100vh',background:T.pageBg || `radial-gradient(ellipse at top, ${T.bg1} 0%, ${T.bg2} 100%)`,color:T.cream,fontFamily:fDmSans,position:'relative'}}>
       <div style={{padding:'30px 22px 28px',maxWidth:480,margin:'0 auto'}}>
-        <div style={{paddingRight:48,marginBottom:14}}>
+        <div style={{paddingRight:56,marginBottom:14}}>
           <div style={{fontSize:11,letterSpacing:'0.14em',textTransform:'uppercase',color:T.gold,fontWeight:600}}>{kicker}</div>
           <h1 style={{margin:'4px 0 0',fontFamily:fTitle,fontSize:36,fontWeight:500,lineHeight:1.05,color:T.cream}}>{title}</h1>
         </div>
@@ -1080,21 +1065,12 @@ function AggiornaPage({ theme, loaded, weights, updWeights, supps, taken, updTak
 }
 
 // ---------- FOTO: diario fotografico dei pasti, vista griglia o linea del giorno ----------
-function FotoPage({ theme, loaded, meals, onPhoto }){
+function FotoPage({ theme, loaded, meals }){
   const T = theme;
   const [view, setView] = useState(()=>{ try { return localStorage.getItem('goalfit_foto_view')==='linea' ? 'linea' : 'griglia'; } catch(_) { return 'griglia'; } });
   const [limit, setLimit] = useState(14);
   const [open, setOpen] = useState(null);
-  const [preparing, setPreparing] = useState(false);
-  const fileRef = useRef(null);
   function pickView(v){ setView(v); try { localStorage.setItem('goalfit_foto_view', v); } catch(_) {} }
-  async function onPick(e){
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
-    setPreparing(true);
-    try { const b64 = await resizeImage(file, 480, 0.7); onPhoto(b64); } catch(_) { onPhoto(null); } finally { setPreparing(false); }
-  }
   const days = useMemo(()=>{
     const map = {};
     (meals||[]).forEach(m=>{ if(m.status==='planned' || !(m.photo_url||m.photo)) return; const k=dayKey(new Date(m.ts)); (map[k]=map[k]||[]).push(m); });
@@ -1109,14 +1085,10 @@ function FotoPage({ theme, loaded, meals, onPhoto }){
     <button onClick={()=>pickView(id)} style={{flex:1,minHeight:44,borderRadius:22,border:'none',background:view===id?T.gold:'transparent',color:view===id?T.bg2:T.cream,fontFamily:fDmSans,fontSize:14,fontWeight:600,cursor:'pointer'}}>{label}</button>
   );
   return (
-    <NavShell T={T} kicker="diario fotografico" title="I tuoi piatti">
-      <input ref={fileRef} type="file" accept="image/*" onChange={onPick} style={{display:'none'}} />
-      <button onClick={()=>fileRef.current?.click()} disabled={preparing} style={{width:'100%',minHeight:52,borderRadius:26,background:T.gold,border:`1px solid ${T.gold}`,color:T.bg2,fontFamily:fDmSans,fontSize:16,fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:10}}>
-        <Camera size={20} strokeWidth={2.2} color={T.bg2} /> {preparing ? 'preparo la foto…' : 'fotografa il pasto'}
-      </button>
-      <div style={{...navCard(T),borderRadius:26,padding:4,display:'flex',gap:4,margin:'12px 0 4px'}}>{seg('griglia','griglia')}{seg('linea','linea del giorno')}</div>
+    <NavShell T={T} kicker={view==='griglia' ? 'vista a griglia' : 'vista a linea del giorno'} title="Diario foto">
+      <div style={{background:'#142A4C',border:'1px solid #34506F',borderRadius:26,padding:4,display:'flex',gap:4,margin:'0 0 4px'}}>{seg('griglia','griglia')}{seg('linea','linea del giorno')}</div>
       {!loaded && <Loading color={T.gold} />}
-      {loaded && days.length===0 && <div style={{marginTop:40,textAlign:'center',fontSize:15,opacity:0.8,lineHeight:1.5}}>Ancora nessuna foto.<br/>Fotografa il prossimo pasto per iniziare il diario.</div>}
+      {loaded && days.length===0 && <div style={{marginTop:40,textAlign:'center',fontSize:15,opacity:0.8,lineHeight:1.5}}>Ancora nessuna foto.<br/>Tocca di nuovo l'icona della fotocamera qui sotto per fotografare il pasto.</div>}
       {loaded && shown.map(d=>(
         <div key={d.key} style={{marginTop:18}}>
           <div style={{fontSize:11,letterSpacing:'0.14em',textTransform:'uppercase',opacity:0.75,fontWeight:600,padding:'0 4px 8px'}}>{dayLabel(d.key)} · {d.list.length} {d.list.length===1?'pasto':'pasti'}</div>
@@ -1138,9 +1110,9 @@ function FotoPage({ theme, loaded, meals, onPhoto }){
                     <span style={{width:2,flexGrow:1,background:`${T.gold}55`}} />
                   </div>
                   <button onClick={()=>setOpen(m)} style={{flex:1,minWidth:0,padding:'0 0 16px',border:'none',background:'transparent',cursor:'pointer',textAlign:'left',color:T.cream}}>
-                    <img src={m.photo_url||m.photo} alt="" loading="lazy" style={{width:'100%',height:170,objectFit:'cover',borderRadius:18,display:'block'}} />
+                    <img src={m.photo_url||m.photo} alt="" loading="lazy" style={{width:'100%',height:150,objectFit:'cover',borderRadius:18,display:'block'}} />
                     <span style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:8,marginTop:6}}>
-                      <span style={{fontFamily:T.fontText||fGaramond,fontSize:21,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{m.description || typeName(m)}</span>
+                      <span style={{fontFamily:T.fontText||fGaramond,fontSize:22,fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{typeName(m)}</span>
                       {m.kcal!=null && <span style={{fontFamily:fDmSans,fontSize:13,opacity:0.8,whiteSpace:'nowrap'}}>{fmt0(m.kcal)} kcal</span>}
                     </span>
                   </button>
