@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, lazy } from 'react';
-import { Home, Scale, Salad, ClipboardList, Hourglass, Pill, Activity, Moon, NotebookPen, MessageCircle, ListChecks, Camera, Utensils, ChartColumn, Send, Check } from 'lucide-react';
+import { Home, Scale, Salad, ClipboardList, Hourglass, Pill, Activity, Moon, NotebookPen, MessageCircle, ListChecks, Camera, Utensils, ChartColumn, Send, Check, Image as ImageIcon, FolderOpen } from 'lucide-react';
 import {
   weightsRepo, profileRepo, waterRepo, sleepsRepo, diaryRepo, mealsRepo,
   workoutsRepo, workoutTypesRepo, supplementsRepo, suppTakenRepo, mindfulRepo, fastsRepo,
@@ -845,7 +845,7 @@ export default function App({ user, onLogout }){
                 {[
                   ['Profilo', () => { setShowAccountMenu(false); setShowProfile(true); }],
                   ['Guida', () => { setShowAccountMenu(false); setShowGuida(true); }],
-                  [subState.ctaLabel, () => { setShowAccountMenu(false); setShowSub(true); }, subState.ctaPrimary],
+                  ['Abbonamento', () => { setShowAccountMenu(false); setShowSub(true); }, subState.ctaPrimary],
                   ['Esci', () => { setShowAccountMenu(false); onLogout && onLogout(); }],
                 ].map(([label, fn, strong], i, arr) => (
                   <button key={i} onClick={fn}
@@ -922,26 +922,46 @@ export default function App({ user, onLogout }){
 }
 
 function BottomNav({ theme, currentId, onGo, onShoot }){
-  const shootRef = useRef(null);
   // Tema dinamico: bottom nav usa colori del tema attivo
   const NAV = theme ? { bg: theme.bg2, border: theme.border, dim: theme.dim, gold: theme.gold, cream: theme.cream } : { bg: '#1A1108', border: '#3A2818', dim: '#6B5D45', gold: '#C9A876', cream: '#E8D8B8' };
+  // Secondo tocco sulla fotocamera: si aprono 3 icone (scatta, libreria, file)
+  const [fan, setFan] = useState(false);
+  const camRef = useRef(null), libRef = useRef(null), fileRef = useRef(null);
+  const picked = e => { const f = e.target.files?.[0]; e.target.value = ''; setFan(false); if (f && onShoot) onShoot(f); };
+  const fanBtn = (label, Ic, ref, dx, dy) => (
+    <button onClick={()=>ref.current?.click()} aria-label={label} style={{position:'absolute',left:'50%',bottom:dy,marginLeft:dx-27,width:54,height:54,borderRadius:'50%',background:NAV.bg,border:`1.5px solid ${NAV.gold}`,boxShadow:'0 6px 18px rgba(0,0,0,0.4)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',padding:0}}>
+      <Ic size={24} strokeWidth={1.9} color={NAV.gold} />
+    </button>
+  );
   return (
-    <nav aria-label="navigazione principale" data-nav style={{position:'fixed',left:0,right:0,bottom:0,background:NAV.bg,borderTop:`1px solid ${NAV.border}55`,display:'flex',justifyContent:'space-around',alignItems:'flex-start',paddingTop:8,paddingBottom:'calc(10px + env(safe-area-inset-bottom, 0px))',zIndex:50}}>
-      <input ref={shootRef} type="file" accept="image/*" style={{display:'none'}} onChange={e=>{ const f=e.target.files?.[0]; e.target.value=''; if (f && onShoot) onShoot(f); }} />
+    <>
+    {fan && <div onClick={()=>setFan(false)} style={{position:'fixed',inset:0,zIndex:49,background:'rgba(4,12,28,0.55)'}} />}
+    <nav aria-label="navigazione principale" style={{position:'fixed',left:0,right:0,bottom:0,background:NAV.bg,borderTop:`1px solid ${NAV.border}55`,display:'flex',justifyContent:'space-around',alignItems:'flex-start',paddingTop:8,paddingBottom:'calc(10px + env(safe-area-inset-bottom, 0px))',zIndex:50}}>
+      <input ref={camRef} type="file" accept="image/*" capture="environment" style={{display:'none'}} onChange={picked} />
+      <input ref={libRef} type="file" accept="image/*" style={{display:'none'}} onChange={picked} />
+      <input ref={fileRef} type="file" accept="image/*,.heic,.heif" style={{display:'none'}} onChange={picked} />
+      {fan && (
+        <div style={{position:'absolute',left:0,right:0,top:0,height:0}}>
+          {fanBtn('scatta una foto', Camera, camRef, -74, 34)}
+          {fanBtn('scegli dalla libreria foto', ImageIcon, libRef, 0, 72)}
+          {fanBtn('scegli un file', FolderOpen, fileRef, 74, 34)}
+        </div>
+      )}
       {NAV_ITEMS.map(p=>{const active=p.id===currentId; const Ic=p.Icon;
         if (p.center) return (
-          <button key={p.id} onClick={()=>{ if (active && onShoot) shootRef.current?.click(); else onGo(p.id); }} aria-label={active ? 'fotografa il pasto' : 'diario fotografico dei pasti'} style={{width:62,height:62,marginTop:-30,borderRadius:'50%',background:NAV.gold,border:`4px solid ${NAV.bg}`,boxShadow:active?`0 0 0 2px ${NAV.gold}`:'0 2px 8px rgba(0,0,0,0.25)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',padding:0,flexShrink:0}}>
+          <button key={p.id} onClick={()=>{ if (active && onShoot) setFan(v=>!v); else { setFan(false); onGo(p.id); } }} aria-label={active ? 'fotografa il pasto' : 'diario fotografico dei pasti'} aria-expanded={fan} style={{width:62,height:62,marginTop:-30,borderRadius:'50%',background:NAV.gold,border:`4px solid ${NAV.bg}`,boxShadow:active?`0 0 0 2px ${NAV.gold}`:'0 2px 8px rgba(0,0,0,0.25)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',padding:0,flexShrink:0}}>
             <Ic size={27} strokeWidth={2} color={NAV.bg} />
           </button>
         );
         return (
-          <button key={p.id} onClick={()=>onGo(p.id)} style={{background:'transparent',border:'none',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:4,padding:'4px 2px',minWidth:58,minHeight:46,flex:'1 1 0'}}>
+          <button key={p.id} onClick={()=>{ setFan(false); onGo(p.id); }} style={{background:'transparent',border:'none',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:4,padding:'4px 2px',minWidth:58,minHeight:46,flex:'1 1 0'}}>
             <Ic size={23} strokeWidth={active?2.4:1.7} color={active?NAV.gold:NAV.cream} style={{opacity:active?1:0.7}} />
             <span style={{fontFamily:fDmSans,fontSize:10.5,fontWeight:active?700:500,color:active?NAV.gold:NAV.cream,opacity:active?1:0.75}}>{p.label}</span>
           </button>
         );
       })}
     </nav>
+    </>
   );
 }
 
@@ -1088,7 +1108,7 @@ function FotoPage({ theme, loaded, meals }){
     <NavShell T={T} kicker={view==='griglia' ? 'vista a griglia' : 'vista a linea del giorno'} title="Diario foto">
       <div style={{background:'#142A4C',border:'1px solid #34506F',borderRadius:26,padding:4,display:'flex',gap:4,margin:'0 0 4px'}}>{seg('griglia','griglia')}{seg('linea','linea del giorno')}</div>
       {!loaded && <Loading color={T.gold} />}
-      {loaded && days.length===0 && <div style={{marginTop:40,textAlign:'center',fontSize:15,opacity:0.8,lineHeight:1.5}}>Ancora nessuna foto.<br/>Tocca di nuovo l'icona della fotocamera qui sotto per fotografare il pasto.</div>}
+      {loaded && days.length===0 && <div style={{marginTop:40,textAlign:'center',fontSize:15,opacity:0.8,lineHeight:1.5}}>Ancora nessuna foto.<br/>Tocca di nuovo l'icona della fotocamera qui sotto per aggiungere una foto.</div>}
       {loaded && shown.map(d=>(
         <div key={d.key} style={{marginTop:18}}>
           <div style={{fontSize:11,letterSpacing:'0.14em',textTransform:'uppercase',opacity:0.75,fontWeight:600,padding:'0 4px 8px'}}>{dayLabel(d.key)} · {d.list.length} {d.list.length===1?'pasto':'pasti'}</div>
