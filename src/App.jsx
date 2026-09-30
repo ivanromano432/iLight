@@ -391,6 +391,7 @@ const PAGES = [
   { id:'coach', label:'coach', roman:'', Icon:MessageCircle },
   { id:'aggiorna', label:'aggiorna', roman:'', Icon:ListChecks },
   { id:'foto', label:'foto', roman:'', Icon:Camera },
+  { id:'stats', label:'statistiche', roman:'', Icon:ChartColumn },
 ];
 // Barra in basso: solo 5 voci. 'stats' apre la pagina Statistiche; tutte le altre pagine stanno nel menu del profilo.
 const NAV_ITEMS = [
@@ -702,7 +703,6 @@ export default function App({ user, onLogout }){
   // Navigazione per id: chiude le pagine a tutto schermo e apre la pagina richiesta ('stats' = Statistiche)
   const goPage = (id) => {
     setShowAccountMenu(false); setShowSub(false); setShowGuida(false); setShowProfile(false); setShowLayout(false);
-    if (id === 'stats') { setShowStats(true); try { window.scrollTo(0, 0); } catch (_) {} return; }
     setShowStats(false);
     const idx = PAGES.findIndex(p => p.id === id);
     if (idx >= 0) setPageIdx(idx);
@@ -923,6 +923,7 @@ export default function App({ user, onLogout }){
         <ThemeStyles theme={__theme} />
         {page==='oggi' && <OggiPage theme={__theme} loaded={loaded} profile={profile} weights={weights} goal={goal} meals={meals} notes={foodNotes} water={waterByDay} waterGoal={waterGoal} workouts={workouts} sleeps={sleeps} fasts={fasts} supps={supplements} taken={suppTaken} updWater={updWater} setPage={setPageIdx} />}
         {page==='peso' && <PesoPage theme={__theme} loaded={loaded} weights={weights} goal={goal} updWeights={updWeights} updGoal={updGoal} meals={meals} updMeals={updMeals} openStats={() => setShowStats(true)} profile={profile} openSub={() => setShowSub(true)} />}
+        {page==='stats' && <StatsPage theme={__theme} loaded={loaded} weights={weights} goal={goal} meals={meals} profile={profile} openFull={() => { setShowStats(true); try { window.scrollTo(0, 0); } catch (_) {} }} />}
         {page==='coach' && <CoachPage theme={__theme} loaded={loaded} profile={profile} weights={weights} goal={goal} meals={meals} water={waterByDay} waterGoal={waterGoal} workouts={workouts} workoutTypes={workoutTypes} sleeps={sleeps} fasts={fasts} supps={supplements} taken={suppTaken} notes={foodNotes} mindful={mindfulSessions} />}
         {page==='aggiorna' && <AggiornaPage theme={__theme} loaded={loaded} weights={weights} updWeights={updWeights} supps={supplements} taken={suppTaken} updTaken={updTaken} water={waterByDay} waterGoal={waterGoal} updWater={updWater} workouts={workouts} fasts={fasts} sleeps={sleeps} meals={meals} go={goPage} />}
         {page==='foto' && <FotoPage theme={__theme} loaded={loaded} meals={meals} onPhoto={(b64) => { setPhotoSeed(b64 || 'manual'); goPage('pasti'); }} />}
@@ -1163,6 +1164,87 @@ function FotoPage({ theme, loaded, meals, onPhoto }){
           </div>
         </div>
       )}
+    </NavShell>
+  );
+}
+
+// ---------- STATISTICHE semplici: peso, andamento, obiettivo, calorie della settimana ----------
+function StatsPage({ theme, loaded, weights, goal, meals, profile, openFull }){
+  const T = theme;
+  const fTitle = T.fontText || fGaramond;
+  const now = new Date();
+  const ws = [...(weights||[])].sort((a,b)=>new Date(a.ts)-new Date(b.ts));
+  const latest = ws[ws.length-1] || null;
+  const weekAgo = new Date(now.getTime() - 7*86400000);
+  const before = [...ws].reverse().find(w=>new Date(w.ts) <= weekAgo) || ws.find(w=>new Date(w.ts) > weekAgo) || null;
+  const diff = (latest && before && before.id !== latest.id) ? latest.weight - before.weight : null;
+  const monthAgo = new Date(now.getTime() - 30*86400000);
+  const perDay = {}; ws.filter(w=>new Date(w.ts) >= monthAgo).forEach(w=>{ perDay[dayKey(new Date(w.ts))] = w.weight; });
+  const series = Object.keys(perDay).sort().map(k=>perDay[k]);
+  let path = '', lastPt = null;
+  if (series.length > 1) {
+    const mn = Math.min(...series), mx = Math.max(...series), span = Math.max(mx-mn, 0.5);
+    const pts = series.map((v,i)=>({ x: 6 + i*(288/(series.length-1)), y: 10 + 70*(1-(v-mn)/span) }));
+    path = pts.map((p,i)=>`${i?'L':'M'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
+    lastPt = pts[pts.length-1];
+  }
+  const sentence = diff == null ? 'Registra il peso per qualche giorno e qui vedrai come sta andando.'
+    : diff <= -0.2 ? 'Stai scendendo. Continua così.'
+    : diff >= 0.2 ? 'Nell\'ultima settimana il peso è salito. Guarda i pasti dei giorni scorsi.'
+    : 'Il peso è fermo rispetto a una settimana fa.';
+  const toGoal = (latest && goal != null) ? latest.weight - Number(goal) : null;
+  const tg = computeNutritionTarget(profile, weights, goal);
+  const days = Array.from({length:7},(_,k)=>{ const d=new Date(); d.setHours(12,0,0,0); d.setDate(d.getDate()-(6-k)); return d; });
+  const kcalBy = days.map(d=>(meals||[]).filter(m=>m.status!=='planned' && sameDay(new Date(m.ts), d)).reduce((a,m)=>a+(m.kcal||0),0));
+  const maxK = Math.max(tg.kcal||0, ...kcalBy, 1);
+  const fullDays = days.filter((d,i)=>kcalBy[i] > 0 && ws.some(w=>sameDay(new Date(w.ts), d))).length;
+  const tile = (label, value, sub) => (
+    <div style={{...navCard(T),borderRadius:18,padding:14,display:'flex',flexDirection:'column',gap:2}}>
+      <span style={{fontSize:12,opacity:0.75}}>{label}</span>
+      <span style={{fontFamily:fTitle,fontSize:30,lineHeight:1.1}}>{value}</span>
+      <span style={{fontSize:12,opacity:0.75}}>{sub}</span>
+    </div>
+  );
+  return (
+    <NavShell T={T} kicker="statistiche · ultimi 7 giorni" title="Come stai andando">
+      {!loaded && <Loading color={T.gold} />}
+      {loaded && (<div style={{display:'flex',flexDirection:'column',gap:12}}>
+        <div style={{...navCard(T),borderRadius:22,padding:18,display:'flex',flexDirection:'column',gap:10}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-end',gap:10,flexWrap:'wrap'}}>
+            <div style={{display:'flex',flexDirection:'column'}}>
+              <span style={{fontSize:12,opacity:0.75}}>{latest && sameDay(new Date(latest.ts), now) ? 'peso di oggi' : 'ultimo peso'}</span>
+              <span style={{fontFamily:fTitle,fontSize:52,lineHeight:1}}>{latest ? fmt(latest.weight) : '—'} <span style={{fontSize:24}}>kg</span></span>
+            </div>
+            {diff != null && <span style={{background:T.gold,color:T.bg2,fontSize:13,fontWeight:700,padding:'6px 12px',borderRadius:14,whiteSpace:'nowrap'}}>{diff>0?'+':diff<0?'−':''}{fmt(Math.abs(diff))} kg in 7 giorni</span>}
+          </div>
+          {path && (
+            <svg viewBox="0 0 300 90" role="img" aria-label="Andamento del peso negli ultimi 30 giorni" style={{width:'100%',height:'auto',display:'block'}}>
+              <path d={path} fill="none" stroke={T.gold} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+              <circle cx={lastPt.x} cy={lastPt.y} r="5.5" fill={T.cream} />
+            </svg>
+          )}
+          <span style={{fontSize:14,lineHeight:1.4}}>{sentence}</span>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(2, minmax(0, 1fr))',gap:12}}>
+          {tile(toGoal != null && toGoal <= 0 ? 'obiettivo' : 'all\'obiettivo mancano', toGoal == null ? '—' : toGoal <= 0 ? 'raggiunto' : `${fmt(toGoal)} kg`, goal != null ? `obiettivo ${fmt(Number(goal))} kg` : 'imposta un obiettivo in Peso')}
+          {tile('giorni completi', `${fullDays} su 7`, 'peso e pasti registrati')}
+        </div>
+        <div style={{...navCard(T),borderRadius:22,padding:'16px 18px',display:'flex',flexDirection:'column',gap:10}}>
+          <div style={{display:'flex',justifyContent:'space-between',fontSize:12}}><span style={{opacity:0.75}}>calorie per giorno</span><span style={{opacity:0.75}}>obiettivo {fmt0(tg.kcal)}</span></div>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-end',gap:6}}>
+            {days.map((d,i)=>{ const today = i===6; return (
+              <div key={i} style={{flex:'1 1 0',display:'flex',flexDirection:'column',alignItems:'center',gap:5}}>
+                <span style={{fontSize:10,opacity:0.75,minHeight:12}}>{kcalBy[i] ? fmt0(kcalBy[i]) : ''}</span>
+                <div style={{width:'100%',maxWidth:28,height:90,display:'flex',alignItems:'flex-end'}}>
+                  <div style={{width:'100%',height:`${Math.max(3, Math.round(kcalBy[i]/maxK*100))}%`,borderRadius:8,background:today?T.gold:`${T.cream}2E`,border:`1px solid ${T.gold}`,boxSizing:'border-box'}} />
+                </div>
+                <span style={{fontSize:11,fontWeight:today?700:400,opacity:today?1:0.75}}>{d.toLocaleDateString('it-IT',{weekday:'narrow'})}</span>
+              </div>
+            ); })}
+          </div>
+        </div>
+        <button onClick={openFull} style={{minHeight:48,borderRadius:24,background:'transparent',border:`1px solid ${T.gold}`,color:T.cream,fontFamily:fDmSans,fontSize:15,cursor:'pointer'}}>tutte le statistiche</button>
+      </div>)}
     </NavShell>
   );
 }
@@ -2747,126 +2829,96 @@ function PastiPage({ user, theme, loaded, meals, updMeals, notes, weights, goal,
   const dateLabel = parseDayKey(selectedDay).toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long'});
   const editingMeal = editing && editing!=='new' ? meals.find(m=>m.id===editing) : null;
 
-  return (
-    <div style={{minHeight:'100vh',background:`radial-gradient(ellipse at top, ${J.bg1} 0%, ${J.bg2} 100%)`,color:J.cream,fontFamily:fMarcellus,position:'relative',overflow:'hidden'}}>
-      <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${J.gold}40`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
-      <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${J.gold}1A`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
-      <div style={{position:'relative',zIndex:2,padding:'32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
-        {(J?.structuralVariant === 'dashboard') ? <DashHeader label="Pasti" /> : <Header q="PASTI" sub="II" color={J.gold} dim={J.goldDim} mark="✦" />}
-        {!loaded && <Loading color={J.sage} />}
-        {loaded && (<>
-          <DayStrip selectedKey={selectedDay} onSelect={setSelectedDay} ink={J.dark} tan={J.sage} count={14} fontA={fMarcellus} fontB={fGaramond} />
-          <div style={{marginTop:12,fontFamily:fGaramond,fontStyle:'italic',fontSize:13,color:J.sage,textAlign:'center'}}>{dateLabel}</div>
-          {/* Copertina: foto dell'ultimo pasto del giorno */}
-          {(() => { const withPhoto = [...eatenMeals].filter(m => m.photo_url || m.photo).sort((a,b) => new Date(b.ts) - new Date(a.ts)); const h = withPhoto[0]; if (!h) return null; return (
-            <button onClick={() => setEditing(h.id)} style={{position:'relative',display:'block',width:'100%',marginTop:14,padding:0,border:'none',background:'transparent',cursor:'pointer',borderRadius:22,overflow:'hidden'}}>
-              <img src={h.photo_url || h.photo} alt="" style={{width:'100%',height:210,objectFit:'cover',display:'block'}} />
-              <span style={{position:'absolute',left:12,bottom:12,background:'rgba(8,18,36,0.78)',color:'#F4EFE2',padding:'7px 13px',borderRadius:14,textAlign:'left',fontFamily:fDmSans,fontSize:12,maxWidth:'80%'}}>
-                <span style={{display:'block',fontFamily:fGaramond,fontSize:20,lineHeight:1.15}}>{h.description || MEAL_TYPES.find(t => t.id === h.type)?.name || 'Pasto'}</span>
-                {new Date(h.ts).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})}{h.kcal != null ? ` · ${fmt0(h.kcal)} kcal` : ''}
-              </span>
-            </button>
-          ); })()}
-          <div style={(J?.structuralVariant === 'dashboard') ? {marginTop:14,padding:'16px 14px',background:'#FFFFFF',border:'1px solid #E5EAEE',borderRadius:16,boxShadow:'0 1px 3px rgba(42,57,66,0.04)',display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8} : {marginTop:18,padding:'14px 0',borderTop:`1px solid ${J.sage}66`,borderBottom:`1px solid ${J.sage}66`,display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8}}>
-            <Totale label="kcal" value={fmt0(totals.kcal)} dark={J.dark} sage={J.sage} font={fMarcellus} big={fGaramond} />
-            <Totale label="prot." value={fmt0(totals.p)} unit="g" dark={J.dark} sage={J.sage} font={fMarcellus} big={fGaramond} />
-            <Totale label="carb." value={fmt0(totals.c)} unit="g" dark={J.dark} sage={J.sage} font={fMarcellus} big={fGaramond} />
-            <Totale label="gras." value={fmt0(totals.g)} unit="g" dark={J.dark} sage={J.sage} font={fMarcellus} big={fGaramond} />
-          </div>
-          {/* Obiettivi del giorno: calorie e nutrienti rispetto al target */}
-          {(() => { const tg = computeNutritionTarget(profile, weights, goal); const rows = [['calorie', totals.kcal, tg.kcal, 'kcal'], ['proteine', totals.p, tg.protein, 'g'], ['carboidrati', totals.c, tg.carbs, 'g'], ['grassi', totals.g, tg.fat, 'g']]; return (
-            <div style={{marginTop:12,display:'flex',flexDirection:'column',gap:8}}>
-              {rows.map(([lab,val,tot,u]) => (
-                <div key={lab}>
-                  <div style={{display:'flex',justifyContent:'space-between',fontFamily:fDmSans,fontSize:12,color:J.cream}}><span style={{opacity:0.8}}>{lab}</span><span><b>{fmt0(val)}</b> su {fmt0(tot)} {u}</span></div>
-                  <div style={{height:7,borderRadius:4,background:`${J.sage}33`,marginTop:3}}><div style={{width:`${Math.min(100, tot ? Math.round(val/tot*100) : 0)}%`,height:7,borderRadius:4,background:val>tot?(J.danger||'#C99A7A'):J.sage}} /></div>
-                </div>
-              ))}
-            </div>
-          ); })()}
-
-          {/* PastiPage ora mostra solo i pasti EFFETTIVAMENTE FATTI di oggi (i pianificati stanno nella pagina Menù) */}
-          {true && (
-            <div style={{marginTop:14}}>
-              {MEAL_TYPES.map(type => {
-                const mealsOfType = eatenMeals.filter(m => m.type === type.id);
-                const typeTotals = mealsOfType.reduce((acc,m)=>({kcal:acc.kcal+(m.kcal||0)}),{kcal:0});
-                return (
-                  <div key={type.id} style={{marginTop:14}}>
-                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',padding:'6px 0',borderBottom:`1px solid ${J.dark}`}}>
-                      <span style={{fontFamily:fMarcellus,fontSize:11,letterSpacing:'0.35em',color:J.dark,textTransform:'uppercase'}}>{type.name}</span>
-                      {mealsOfType.length>0 && <span style={{fontFamily:fMarcellus,fontSize:9,letterSpacing:'0.25em',color:J.sage,textTransform:'uppercase'}}>{fmt0(typeTotals.kcal)} kcal</span>}
-                    </div>
-                    {mealsOfType.length === 0 ? (
-                      <div style={{padding:'10px 4px',fontFamily:fGaramond,fontStyle:'italic',fontSize:13,color:J.sage,opacity:0.55}}>—</div>
-                    ) : mealsOfType.sort((a,b)=>new Date(a.ts)-new Date(b.ts)).map(m=>{const t=new Date(m.ts); return (
-                      <button key={m.id} onClick={()=>setEditing(m.id)} style={{display:'flex',gap:12,alignItems:'flex-start',padding:'10px 0',borderBottom:`1px solid ${J.sage}22`,background:'transparent',border:'none',borderRadius:0,width:'100%',cursor:'pointer',textAlign:'left'}}>
-                        {(m.photo_url||m.photo) ? <img src={m.photo_url||m.photo} alt="" loading="lazy" style={{width:52,height:52,objectFit:'cover',borderRadius:'50%',flexShrink:0,border:`2px solid ${J.sage}`}} /> : <div style={{width:52,height:52,borderRadius:'50%',background:`linear-gradient(135deg, ${J.light}, ${J.sage})`,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',color:J.bg,fontFamily:fMarcellus,fontSize:9,letterSpacing:'0.25em'}}>{type.abbr}</div>}
-                        <div style={{flex:1,minWidth:0}}>
-                          <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:15,color:J.dark,lineHeight:1.25}}>{m.description||'(senza descrizione)'}</div>
-                          <div style={{fontFamily:fMarcellus,fontSize:9,letterSpacing:'0.2em',color:J.sage,marginTop:4,textTransform:'uppercase'}}>{t.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})}{m.qty_g?` · ${fmt0(m.qty_g)}g`:''} · {fmt0(m.kcal)} kcal · P {fmt0(m.p)} · C {fmt0(m.c)} · G {fmt0(m.g)}</div>
-                        </div>
-                      </button>
-                    );})}
-                  </div>
-                );
-              })}
-
-              <div style={{marginTop:28,paddingTop:18,borderTop:`1px solid ${J.sage}33`,textAlign:'center'}}>
-                <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:13,color:J.sage,marginBottom:14,lineHeight:1.5,maxWidth:340,margin:'0 auto 14px'}}>Scatta o carica una foto del piatto: l'IA identifica cosa è, stima la porzione e calcola i macronutrienti.</div>
-                <input ref={photoIaRef} type="file" accept="image/*" onChange={onPhotoIaPick} style={{display:'none'}} />
-                <div style={{display:'flex',flexDirection:'column',gap:10,alignItems:'center'}}>
-                  <button onClick={()=>photoIaRef.current?.click()} disabled={preparingPhoto} style={{background:J.sage,color:J.bg,border:`1px solid ${J.sage}`,fontFamily:fMarcellus,fontSize:11,letterSpacing:'0.4em',padding:'14px 30px',cursor:preparingPhoto?'default':'pointer',opacity:preparingPhoto?0.6:1,textTransform:'uppercase'}}>{preparingPhoto?'⋯ apro foto':'✦ IA · pasto da foto'}</button>
-                  <button onClick={()=>setEditing('new')} style={{background:'transparent',color:J.dark,border:`1px solid ${J.dark}66`,fontFamily:fMarcellus,fontSize:10,letterSpacing:'0.35em',padding:'10px 22px',cursor:'pointer',textTransform:'uppercase'}}>+ nuovo pasto a mano</button>
-                </div>
-                {/* Bulk: analizza con IA i pasti del giorno che hanno foto ma campi incompleti (nome / peso / nutrienti) */}
-                {(() => {
-                  const missing = eatenMeals.filter(m => {
-                    const hasPhoto = !!(m.photo || m.photo_url);
-                    const hasDesc = (m.description||'').trim().length > 0;
-                    if (hasPhoto && (!hasDesc || m.qty_g == null || m.kcal == null)) return true;
-                    if (!hasPhoto && hasDesc && m.kcal == null) return true;
-                    return false;
-                  });
-                  const nothingToAnalyze = missing.length === 0 && !bulkEstimating;
-                  return (
-                    <div style={{marginTop:22,paddingTop:14,borderTop:`1px dashed ${J.sage}33`}}>
-                      <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:13,color:J.sage,marginBottom:10,lineHeight:1.4}}>
-                        {bulkEstimating
-                          ? `Analizzando... ${bulkProgress.done}/${bulkProgress.total}`
-                          : nothingToAnalyze
-                            ? `${eatenMeals.length === 0 ? 'Nessun pasto registrato' : 'Tutti i pasti di ' + (isToday?'oggi':'questo giorno') + ' hanno nome, peso e calorie'} · Il bottone si attiva quando ci sono foto da analizzare.`
-                            : `${missing.length} ${missing.length===1?'pasto':'pasti'} di ${isToday?'oggi':'questo giorno'} ${missing.length===1?'ha':'hanno'} la foto ma ${missing.length===1?'manca':'mancano'} nome, peso o nutrienti.`}
-                      </div>
-                      <button
-                        onClick={bulkEstimateNutrients}
-                        disabled={bulkEstimating || nothingToAnalyze}
-                        style={{
-                          background:bulkEstimating||nothingToAnalyze?'transparent':J.sage,
-                          color:bulkEstimating||nothingToAnalyze?J.sage:J.bg,
-                          border:`1px solid ${J.sage}${nothingToAnalyze?'55':''}`,
-                          fontFamily:fMarcellus,
-                          fontSize:11,
-                          letterSpacing:'0.3em',
-                          padding:'10px 22px',
-                          cursor:bulkEstimating||nothingToAnalyze?'default':'pointer',
-                          opacity:nothingToAnalyze?0.5:1,
-                          textTransform:'uppercase',
-                        }}>
-                        {bulkEstimating ? `⋯ ${bulkProgress.done}/${bulkProgress.total}` : '✦ analizza foto con ia'}
-                      </button>
-                      {bulkError && <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:13,color:'#A04848',marginTop:10}}>{bulkError}</div>}
-                    </div>
-                  );
-                })()}
-              </div>
-            </div>
-          )}
-
-        </>)}
-      </div>
-      {editing && <MealModal J={J} existing={editingMeal} seedPhoto={editing==='new'?photoIaSeed:null} onClose={()=>{setEditing(null); setPhotoIaSeed(null);}} onSave={saveMeal} onDelete={editing!=='new'?delMeal:null} />}
+  // --- Render "Il tuo piatto": giorni, copertina, miniature, calorie e nutrienti ---
+  const fTitle = J.fontText || fGaramond;
+  const last7 = Array.from({length:7},(_,k)=>{ const d=new Date(); d.setHours(12,0,0,0); d.setDate(d.getDate()-(6-k)); return d; });
+  const byTime = [...eatenMeals].sort((x,y)=>new Date(x.ts)-new Date(y.ts));
+  const hero = [...byTime].reverse().find(m=>m.photo_url||m.photo) || null;
+  const tg = computeNutritionTarget(profile, weights, goal);
+  const hhmm = ts => new Date(ts).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
+  const typeName = m => MEAL_TYPES.find(t=>t.id===m.type)?.name || 'Pasto';
+  const missing = eatenMeals.filter(m => { const hasPhoto=!!(m.photo||m.photo_url); const hasDesc=(m.description||'').trim().length>0; if (hasPhoto && (!hasDesc || m.qty_g==null || m.kcal==null)) return true; if (!hasPhoto && hasDesc && m.kcal==null) return true; return false; });
+  const macro = (lab,val,tot) => (
+    <div key={lab} style={{display:'flex',flexDirection:'column',gap:4}}>
+      <div style={{display:'flex',justifyContent:'space-between',fontSize:12}}><span style={{opacity:0.75}}>{lab}</span><span style={{fontWeight:700}}>{fmt0(val)} g</span></div>
+      <div style={{height:8,borderRadius:4,background:`${J.cream}22`}}><div style={{width:`${Math.min(100, tot ? Math.round(val/tot*100) : 0)}%`,height:8,borderRadius:4,background:J.gold}} /></div>
+      <div style={{fontSize:11,opacity:0.6}}>su {fmt0(tot)} g</div>
     </div>
+  );
+  return (
+    <NavShell T={J} kicker={isToday ? 'pasti di oggi' : dateLabel} title="Il tuo piatto">
+      <input ref={photoIaRef} type="file" accept="image/*" onChange={onPhotoIaPick} style={{display:'none'}} />
+      {!loaded && <Loading color={J.gold} />}
+      {loaded && (<div style={{display:'flex',flexDirection:'column',gap:14}}>
+        <div style={{display:'flex',justifyContent:'space-between',gap:4}}>
+          {last7.map(d=>{ const k=dayKey(d); const on=k===selectedDay; return (
+            <button key={k} onClick={()=>setSelectedDay(k)} style={{flex:'1 1 0',maxWidth:48,height:56,borderRadius:14,border:`1px solid ${on?J.gold:`${J.cream}33`}`,background:on?J.gold:'transparent',color:on?J.bg2:J.cream,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:2,cursor:'pointer',padding:0,fontFamily:fDmSans}}>
+              <span style={{fontSize:11}}>{d.toLocaleDateString('it-IT',{weekday:'short'}).replace('.','')}</span>
+              <span style={{fontSize:16,fontWeight:700}}>{d.getDate()}</span>
+            </button>
+          ); })}
+        </div>
+        {hero ? (
+          <button onClick={()=>setEditing(hero.id)} style={{position:'relative',display:'block',width:'100%',padding:0,border:'none',background:'transparent',cursor:'pointer',borderRadius:24,overflow:'hidden'}}>
+            <img src={hero.photo_url||hero.photo} alt="" style={{width:'100%',height:270,objectFit:'cover',display:'block'}} />
+            <span style={{position:'absolute',left:14,bottom:14,background:'rgba(8,18,36,0.8)',color:'#F4EFE2',padding:'8px 14px',borderRadius:14,textAlign:'left',maxWidth:'80%',display:'flex',flexDirection:'column'}}>
+              <span style={{fontFamily:fTitle,fontSize:22,lineHeight:1.15}}>{hero.description || typeName(hero)}</span>
+              <span style={{fontFamily:fDmSans,fontSize:12}}>{hhmm(hero.ts)}{hero.kcal!=null?` · ${fmt0(hero.kcal)} kcal`:''}</span>
+            </span>
+          </button>
+        ) : (
+          <button onClick={()=>photoIaRef.current?.click()} disabled={preparingPhoto} style={{width:'100%',height:200,borderRadius:24,border:`1px dashed ${J.gold}`,background:`${J.cream}0D`,color:J.cream,fontFamily:fDmSans,fontSize:15,cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:10}}>
+            <Camera size={30} strokeWidth={1.8} color={J.gold} />
+            {preparingPhoto ? 'preparo la foto…' : 'Fotografa il primo pasto del giorno'}
+          </button>
+        )}
+        <div style={{display:'grid',gridTemplateColumns:'repeat(4, minmax(0, 1fr))',gap:8}}>
+          {byTime.map(m=>(
+            <button key={m.id} onClick={()=>setEditing(m.id)} aria-label={`${typeName(m)} delle ${hhmm(m.ts)}`} style={{padding:0,border:'none',background:'transparent',cursor:'pointer',display:'flex',flexDirection:'column',gap:4,color:J.cream,fontFamily:fDmSans}}>
+              {(m.photo_url||m.photo)
+                ? <img src={m.photo_url||m.photo} alt="" loading="lazy" style={{width:'100%',aspectRatio:'1 / 1',objectFit:'cover',borderRadius:12,display:'block',border:hero&&hero.id===m.id?`2px solid ${J.gold}`:'2px solid transparent',boxSizing:'border-box'}} />
+                : <span style={{width:'100%',aspectRatio:'1 / 1',borderRadius:12,border:`1px solid ${J.gold}66`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:700,boxSizing:'border-box'}}>{MEAL_TYPES.find(t=>t.id===m.type)?.abbr || '·'}</span>}
+              <span style={{fontSize:11,opacity:0.75,textAlign:'center'}}>{hhmm(m.ts)}</span>
+            </button>
+          ))}
+          <button onClick={()=>photoIaRef.current?.click()} disabled={preparingPhoto} aria-label="aggiungi un pasto con foto" style={{padding:0,border:'none',background:'transparent',cursor:'pointer',display:'flex',flexDirection:'column',gap:4,color:J.cream,fontFamily:fDmSans}}>
+            <span style={{width:'100%',aspectRatio:'1 / 1',borderRadius:12,border:`1px dashed ${J.gold}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:26,color:J.gold,boxSizing:'border-box'}}>+</span>
+            <span style={{fontSize:11,opacity:0.75,textAlign:'center'}}>{preparingPhoto?'…':'aggiungi'}</span>
+          </button>
+        </div>
+        <div style={{...navCard(J),borderRadius:20,padding:'14px 16px',display:'flex',flexDirection:'column',gap:10}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:8}}>
+            <span style={{fontFamily:fTitle,fontSize:32,lineHeight:1}}>{fmt0(totals.kcal)} kcal</span>
+            <span style={{fontSize:12,opacity:0.75}}>su {fmt0(tg.kcal)} {isToday?'di oggi':'del giorno'}</span>
+          </div>
+          <div style={{height:10,borderRadius:5,background:`${J.cream}22`}}><div style={{width:`${Math.min(100, tg.kcal ? Math.round(totals.kcal/tg.kcal*100) : 0)}%`,height:10,borderRadius:5,background:totals.kcal>tg.kcal?(J.danger||'#C99A7A'):J.cream}} /></div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(3, minmax(0, 1fr))',gap:12}}>
+            {macro('proteine',totals.p,tg.protein)}{macro('carboidrati',totals.c,tg.carbs)}{macro('grassi',totals.g,tg.fat)}
+          </div>
+        </div>
+        {byTime.length>0 && (
+          <div style={{display:'flex',flexDirection:'column'}}>
+            {byTime.map(m=>(
+              <button key={m.id} onClick={()=>setEditing(m.id)} style={{display:'flex',alignItems:'baseline',gap:12,padding:'11px 2px',minHeight:44,background:'transparent',border:'none',borderBottom:`1px solid ${J.cream}22`,color:J.cream,fontFamily:fDmSans,cursor:'pointer',textAlign:'left',width:'100%'}}>
+                <span style={{fontSize:13,fontWeight:700,width:42,flexShrink:0}}>{hhmm(m.ts)}</span>
+                <span style={{flex:1,minWidth:0,fontSize:15,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{m.description || typeName(m)}</span>
+                <span style={{fontSize:13,opacity:0.75,whiteSpace:'nowrap'}}>{m.kcal!=null?`${fmt0(m.kcal)} kcal`:'—'}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        <div style={{display:'flex',flexDirection:'column',gap:8}}>
+          {(missing.length>0 || bulkEstimating) && (
+            <button onClick={bulkEstimateNutrients} disabled={bulkEstimating} style={{minHeight:46,borderRadius:23,background:J.gold,border:`1px solid ${J.gold}`,color:J.bg2,fontFamily:fDmSans,fontSize:14,fontWeight:700,cursor:'pointer'}}>
+              {bulkEstimating ? `analizzo… ${bulkProgress.done}/${bulkProgress.total}` : `calcola calorie di ${missing.length} ${missing.length===1?'pasto':'pasti'} con l'IA`}
+            </button>
+          )}
+          {bulkError && <div style={{fontSize:13,color:J.danger||'#C99A7A'}}>{bulkError}</div>}
+          <button onClick={()=>setEditing('new')} style={{minHeight:46,borderRadius:23,background:'transparent',border:`1px solid ${J.cream}55`,color:J.cream,fontFamily:fDmSans,fontSize:14,cursor:'pointer'}}>aggiungi un pasto senza foto</button>
+        </div>
+      </div>)}
+      {editing && <MealModal J={J} existing={editingMeal} seedPhoto={editing==='new'?photoIaSeed:null} onClose={()=>{setEditing(null); setPhotoIaSeed(null);}} onSave={saveMeal} onDelete={editing!=='new'?delMeal:null} />}
+    </NavShell>
   );
 }
 
