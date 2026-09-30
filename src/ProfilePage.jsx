@@ -380,51 +380,6 @@ export default function ProfilePage({ user, profile, updProfile, onClose }) {
           )}
         </div>
 
-        {/* Selettore tema */}
-        <div style={{ marginTop: 30 }}>
-          <div style={{ fontFamily: fCinzel, fontSize: 9, letterSpacing: '0.35em', color: Q.goldDim, textTransform: 'uppercase', marginBottom: 8, textAlign: 'center' }}>TEMA VISIVO</div>
-          <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 12, color: Q.goldDim, textAlign: 'center', marginBottom: 14 }}>
-            scegli lo stile cromatico di tutta l'app
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            {THEME_ORDER.map(id => {
-              const t = THEMES[id];
-              const selected = themeId === id;
-              return (
-                <button key={id} onClick={() => setThemeId(id)}
-                  style={{
-                    background: selected ? `${Q.gold}1A` : 'transparent',
-                    border: `1px solid ${selected ? Q.gold : Q.gold + '44'}`,
-                    padding: '10px 10px',
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 6,
-                  }}>
-                  {/* Swatch a 3 colori */}
-                  <div style={{ display: 'flex', gap: 4, height: 18 }}>
-                    {t.swatch.map((c, i) => (
-                      <div key={i} style={{ flex: 1, background: c, borderRadius: 2, border: `1px solid ${Q.gold}22` }} />
-                    ))}
-                  </div>
-                  <div>
-                    <div style={{ fontFamily: fCinzel, fontSize: 9, letterSpacing: '0.25em', color: selected ? Q.gold : Q.cream, textTransform: 'uppercase' }}>
-                      {selected ? '✓ ' : ''}{t.name}
-                    </div>
-                    <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 11, color: Q.goldDim, marginTop: 2 }}>
-                      {t.desc}
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-          <div style={{ marginTop: 10, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 11, color: Q.goldDim, textAlign: 'center' }}>
-            in questo primo aggiornamento il tema cambia solo le pagine I peso, II diario e III pasti. Altre pagine seguono nel prossimo deploy.
-          </div>
-        </div>
-
         {/* Errore */}
         {error && (
           <div style={{ marginTop: 18, padding: '10px 14px', border: `1px solid #C99A7A66`, background: '#C99A7A14', color: '#C99A7A', fontFamily: fGaramond, fontStyle: 'italic', fontSize: 13, textAlign: 'center' }}>

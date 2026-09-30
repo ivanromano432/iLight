@@ -824,7 +824,7 @@ export default function App({ user, onLogout }){
       <>
         <div style={{ position: 'fixed', top: 12, right: 12, zIndex: 9000 }}>
           <button onClick={() => setShowAccountMenu(!showAccountMenu)} aria-label="account"
-            style={{ width: 36, height: 36, borderRadius: '50%', background: avatarSrc ? 'transparent' : `${surface}D9`, border: `1px solid ${accent}40`, color: ink, fontFamily, fontSize: 16, fontStyle: labelStyle, fontWeight: isDashboard ? 700 : 400, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', boxShadow: '0 2px 6px rgba(0,0,0,0.08)', overflow: 'hidden', padding: 0 }}>
+            style={{ width: 36, height: 36, borderRadius: '50%', background: avatarSrc ? 'transparent' : `${surface}D9`, border: `1px solid ${accent}40`, color: ink, fontFamily, fontSize: 16, fontStyle: labelStyle, fontWeight: isDashboard ? 700 : 400, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: 0 }}>
             {avatarSrc ? <img src={avatarSrc} alt="profilo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : accountInitial}
           </button>
           {showAccountMenu && (
@@ -849,10 +849,6 @@ export default function App({ user, onLogout }){
                 <button onClick={() => { setShowAccountMenu(false); setShowProfile(true); }}
                   style={{ background: 'transparent', color: ink, border: btnBorder, borderRadius: btnRadius, fontFamily, fontStyle: labelStyle, fontSize: 14, fontWeight: btnFontWeight, padding: '8px 12px', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
                   ☉ profilo
-                </button>
-                <button onClick={() => { setShowAccountMenu(false); setShowLayout(true); }}
-                  style={{ background: 'transparent', color: ink, border: btnBorder, borderRadius: btnRadius, fontFamily, fontStyle: labelStyle, fontSize: 14, fontWeight: btnFontWeight, padding: '8px 12px', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
-                  ✦ layout
                 </button>
                 <button onClick={() => { setShowAccountMenu(false); setShowGuida(true); }}
                   style={{ background: 'transparent', color: ink, border: btnBorder, borderRadius: btnRadius, fontFamily, fontStyle: labelStyle, fontSize: 14, fontWeight: btnFontWeight, padding: '8px 12px', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
@@ -899,7 +895,7 @@ export default function App({ user, onLogout }){
   if (showStats) {
     return (
       <>
-        <div style={{paddingBottom:90}}>
+        <div style={{paddingBottom:'calc(96px + env(safe-area-inset-bottom, 0px))'}}>
         <StatistichePage
           weights={weights} meals={meals} sleeps={sleeps} water={waterByDay}
           workouts={workouts} workoutTypes={workoutTypes}
@@ -917,8 +913,8 @@ export default function App({ user, onLogout }){
     );
   }
   return (
-    <div style={{minHeight:'100vh', background:'#000', position:'relative'}}>
-      <div style={{paddingBottom:90}}>
+    <div style={{minHeight:'100vh', background:getTheme(profile?.theme).bg2, position:'relative'}}>
+      <div style={{paddingBottom:'calc(96px + env(safe-area-inset-bottom, 0px))'}}>
         {(() => { const __theme = getTheme(profile?.theme); return (<>
         <ThemeStyles theme={__theme} />
         {page==='oggi' && <OggiPage theme={__theme} loaded={loaded} profile={profile} weights={weights} goal={goal} meals={meals} notes={foodNotes} water={waterByDay} waterGoal={waterGoal} workouts={workouts} sleeps={sleeps} fasts={fasts} supps={supplements} taken={suppTaken} updWater={updWater} setPage={setPageIdx} />}
@@ -1316,7 +1312,7 @@ function CoachPage(props){
   const chips = ['Come sta andando il mio peso?', 'Cosa mangio stasera?', 'Dove posso migliorare questa settimana?'];
   return (
     <NavShell T={T} kicker="vede i tuoi dati degli ultimi 30 giorni" title="Coach">
-      <div style={{display:'flex',flexDirection:'column',gap:10,paddingBottom:150}}>
+      <div style={{display:'flex',flexDirection:'column',gap:10,paddingBottom:120}}>
         {msgs.length===0 && (
           <div style={{...navCard(T),padding:'14px 16px',fontSize:15,lineHeight:1.5}}>Chiedimi del tuo peso, dei pasti o di cosa migliorare. Rispondo guardando quello che hai registrato nell'app. Sono consigli generali: non sostituiscono medico o nutrizionista.</div>
         )}
@@ -1332,7 +1328,7 @@ function CoachPage(props){
         )}
         <div ref={endRef} />
       </div>
-      <div style={{position:'fixed',left:0,right:0,bottom:82,zIndex:40,padding:'0 16px'}}>
+      <div style={{position:'fixed',left:0,right:0,bottom:'calc(98px + env(safe-area-inset-bottom, 0px))',zIndex:40,padding:'0 16px'}}>
         <div style={{maxWidth:448,margin:'0 auto',display:'flex',alignItems:'center',gap:8,background:T.bg2,border:`1px solid ${T.gold}80`,borderRadius:26,padding:'4px 4px 4px 18px',boxShadow:'0 4px 16px rgba(0,0,0,0.25)'}}>
           <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{ if(e.key==='Enter') send(); }} placeholder="Scrivi al coach…" aria-label="Scrivi al coach"
             style={{flex:1,minWidth:0,border:'none',background:'transparent',fontFamily:fDmSans,fontSize:16,color:T.cream,outline:'none',height:44}} />

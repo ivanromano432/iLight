@@ -215,7 +215,7 @@ export const THEMES = {
     desc: 'blu notte, petrolio e oro',
     isDark: true,
     swatch: ['#0E2240', '#C9A55A', '#F4EFE2'],
-    bg: '#0E2240', bg1: '#3E5F5C', bg2: '#0E2240',
+    bg: '#0E2240', bg1: '#0E2240', bg2: '#0E2240',
     ink: '#F4EFE2', dark: '#F4EFE2',
     cream: '#F4EFE2', pale: '#F4EFE2', body: '#F4EFE2',
     gold: '#C9A55A', sage: '#C9A55A', silver: '#C9A55A', accent: '#C9A55A', amber: '#C9A55A', active: '#C9A55A',
@@ -258,6 +258,7 @@ export const THEME_ORDER = [
 
 export const DEFAULT_THEME = 'planetario';
 
-export function getTheme(themeId) {
-  return THEMES[themeId] || THEMES[DEFAULT_THEME];
+// Tema unico: l'app usa sempre Planetario. Il tema salvato nel profilo viene ignorato.
+export function getTheme(_themeId) {
+  return THEMES[DEFAULT_THEME];
 }
