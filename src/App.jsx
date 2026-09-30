@@ -25,7 +25,7 @@ const W = { bg: '#E8E0D2', ink: '#3C3329', tan: '#8C6A4E' };
 const J = { bg: '#E5E3D5', dark: '#2D3A2E', sage: '#5C6B4E', light: '#8FA288' };
 const A = { bg1: '#142A4C', bg2: '#0E2240', ink: '#F4EFE2', sage: '#C9A55A' };
 const T = { bg: '#F2EBDC', ink: '#1F1A12', dim: '#6B5D45' };
-const S = { bg1: '#1E1A2E', bg2: '#0F0D1A', silver: '#B8B0C9', pale: '#F2E8D0', gold: '#C9A876', dim: '#6B6478' };
+const S = { bg1: '#142A4C', bg2: '#0E2240', silver: '#B4BFCC', pale: '#F4EFE2', gold: '#C9A55A', dim: '#B4BFCC' };
 const N = { bg1: '#2C3340', bg2: '#14171F', cream: '#F2E8D0', dim: '#8A8270', gold: '#C9A876', body: '#DDD3C2' };
 const NAV = { bg: '#1A1108', border: '#3A2818', dim: '#6B5D45', gold: '#C9A876', cream: '#E8D8B8' };
 const M = { bg1: '#EAE6D2', bg2: '#D8D4C0', ink: '#3A4339', accent: '#7A8E78', dim: '#9CA194', cream: '#F4F1E5' };
@@ -3619,66 +3619,64 @@ function SonnoPage({ theme, loaded, sleeps, updSleeps }){
   async function delSleep(){ await updSleeps(sleeps.filter(s=>s.id!==editing)); setEditing(null); }
   const editingSleep = editing && editing!=='new' ? sleeps.find(s=>s.id===editing) : null;
 
+  // --- Render nuovo stile: arco letto → sveglia, qualità, medie, ultime 7 notti, notti recenti ---
+  const T = S;
+  const fTitle = T.fontText || fGaramond;
+  const ARC = Math.PI*130;
+  const arcP = lastNightDur != null ? Math.max(0.04, Math.min(1, lastNightDur/8)) : 0;
+  const week = chartData.slice(-7);
+  const maxW = Math.max(8, ...week.map(d=>d.val||0));
+  const isLastToday = lastNight && lastNight.wakeDate === todayK;
   return (
-    <div style={{minHeight:'100vh',background:`radial-gradient(ellipse at top, ${S.bg1} 0%, ${S.bg2} 100%)`,color:S.cream,fontFamily:fFraunces,position:'relative',overflow:'hidden'}}>
-      <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${S.gold}40`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
-      <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${S.gold}1A`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
-      <div style={{position:'relative',zIndex:2,padding:'32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
-        {(S?.structuralVariant === 'dashboard') ? <DashHeader label="Sonno" /> : <Header q="SONNO" sub="VII" color={S.gold} dim={S.goldDim} mark="✦" font={fFraunces} />}
-
-        {!loaded && <Loading color={S.dim} />}
-
-        {loaded && (<>
-          <div style={(S?.structuralVariant === 'dashboard') ? {textAlign:'center',background:'#FFFFFF',border:'1px solid #E5EAEE',borderRadius:16,padding:'18px 16px',boxShadow:'0 1px 3px rgba(42,57,66,0.04)'} : {textAlign:'center',marginTop:28}}>
-            <div style={{fontFamily:fFraunces,fontSize:9,letterSpacing:'0.45em',color:S.dim,textTransform:'uppercase'}}>{lastNight?`NOTTE DEL ${parseDayKey(lastNight.wakeDate).toLocaleDateString('it-IT',{day:'numeric',month:'short'})}`:'NESSUNA NOTTE REGISTRATA'}</div>
-            <div style={{fontFamily:fFraunces,fontStyle:(S?.structuralVariant === 'dashboard')?'normal':'italic',fontWeight:(S?.structuralVariant === 'dashboard')?800:300,fontSize:62,lineHeight:1,color:(S?.structuralVariant === 'dashboard')?'#9CC756':S.pale,marginTop:8}}>{lastNightDur!=null?fmtDur(lastNightDur):'—'}</div>
-            {lastNight && (<>
-              <div style={{fontFamily:fFraunces,fontStyle:'italic',fontSize:13,color:S.silver,marginTop:6}}>dalle {lastNight.bedtime} alle {lastNight.waketime}</div>
-              <div style={{fontSize:18,letterSpacing:'0.1em',color:S.gold,marginTop:8}}>{'★'.repeat(lastNight.quality)}<span style={{color:S.dim}}>{'★'.repeat(5-lastNight.quality)}</span></div>
-            </>)}
-          </div>
-          <div style={{marginTop:22,padding:'14px 0 8px',borderTop:`1px solid ${S.gold}33`,borderBottom:`1px solid ${S.gold}33`}}>
-            <div style={{display:'flex',justifyContent:'space-between',fontFamily:fFraunces,fontSize:9,letterSpacing:'0.4em',color:S.dim,textTransform:'uppercase',marginBottom:8}}>
-              <span>30 NOTTI</span>
-              <span style={{color:S.pale,fontStyle:'italic',textTransform:'none',letterSpacing:0,fontSize:13}}>{avg30!=null?`media ${fmtDur(avg30)}`:'—'}</span>
-            </div>
-            <svg viewBox="0 0 280 80" width="100%" height={80} style={{display:'block'}}>
-              <defs><linearGradient id="sa" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor={S.gold} stopOpacity="0.2"/><stop offset="100%" stopColor={S.gold} stopOpacity="0"/></linearGradient></defs>
-              {points.length>1 && <path d={area} fill="url(#sa)" />}
-              {points.length>1 && <path d={path} stroke={S.gold} strokeWidth="1.2" fill="none" />}
-              {points.map((p,i)=><circle key={i} cx={p.x} cy={p.y} r={i===points.length-1?3:1.6} fill={i===points.length-1?S.pale:S.gold} />)}
+    <div>
+    <NavShell T={T} kicker={!lastNight ? 'nessuna notte registrata' : isLastToday ? 'stanotte' : `notte del ${parseDayKey(lastNight.wakeDate).toLocaleDateString('it-IT',{day:'numeric',month:'long'})}`} title="Sonno">
+      {!loaded && <Loading color={T.gold} />}
+      {loaded && (<div style={{display:'flex',flexDirection:'column',gap:16}}>
+        <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:8}}>
+          <div style={{position:'relative',width:300,maxWidth:'100%',height:170}}>
+            <svg viewBox="0 0 300 170" fill="none" aria-hidden="true" style={{width:'100%',height:'100%',display:'block'}}>
+              <path d="M 20 155 A 130 130 0 0 1 280 155" stroke={`${T.cream}22`} strokeWidth="14" strokeLinecap="round" />
+              {lastNight && <path d="M 20 155 A 130 130 0 0 1 280 155" stroke={T.gold} strokeWidth="14" strokeLinecap="round" strokeDasharray={`${ARC*arcP} ${ARC}`} />}
             </svg>
-            <div style={{display:'flex',justifyContent:'space-between',marginTop:4,fontFamily:fFraunces,fontSize:9,letterSpacing:'0.15em',color:S.dim}}><span>30 g. fa</span><span>oggi</span></div>
+            <div style={{position:'absolute',left:0,right:0,top:62,display:'flex',flexDirection:'column',alignItems:'center',gap:2}}>
+              <span style={{fontFamily:fTitle,fontSize:46,fontWeight:500,lineHeight:1}}>{lastNight ? fmtDur(lastNightDur) : '—'}</span>
+              <span style={{fontSize:13,opacity:0.75}}>{lastNight ? 'hai dormito' : 'registra la tua notte'}</span>
+            </div>
           </div>
-          <div style={{display:'flex',justifyContent:'space-around',marginTop:18}}>
-            <Stat label="media 7g" value={avg7!=null?fmtDur(avg7):'—'} color={S.gold} dim={S.dim} />
-            <Stat label="notti" value={last30.length} color={S.gold} dim={S.dim} />
-            <Stat label="media 30g" value={avg30!=null?fmtDur(avg30):'—'} color={S.gold} dim={S.dim} />
+          {lastNight && <div style={{width:300,maxWidth:'100%',display:'flex',justifyContent:'space-between',fontSize:13}}><span><b>{lastNight.bedtime}</b> a letto</span><span>sveglia <b>{lastNight.waketime}</b></span></div>}
+        </div>
+        {lastNight && (
+          <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10}}>
+            <span style={{fontSize:13,opacity:0.75}}>qualità</span>
+            <span style={{display:'flex',gap:6}} role="img" aria-label={`qualità ${lastNight.quality} su 5`}>{[1,2,3,4,5].map(n=>(<span key={n} style={{width:14,height:14,borderRadius:'50%',background:n<=lastNight.quality?T.gold:'transparent',border:`1.5px solid ${T.gold}`,boxSizing:'border-box'}} />))}</span>
           </div>
-          <div style={{marginTop:22}}>
-            <div style={{fontFamily:fFraunces,fontSize:9,letterSpacing:'0.4em',color:S.dim,textAlign:'center',textTransform:'uppercase',marginBottom:10}}>NOTTI RECENTI</div>
-            {sorted.length===0 ? (
-              <div style={{textAlign:'center',fontFamily:fFraunces,fontStyle:'italic',fontSize:14,color:S.dim,padding:'12px 0'}}>Nessuna notte registrata.</div>
-            ) : sorted.slice().reverse().slice(0,10).map(s=>{const dur=durHours(s.bedtime,s.waketime); return (
-              <button key={s.id} onClick={()=>setEditing(s.id)} style={{width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',padding:'11px 4px',background:'transparent',border:'none',borderBottom:`1px solid ${S.gold}1F`,cursor:'pointer',textAlign:'left'}}>
-                <div>
-                  <div style={{fontFamily:fFraunces,fontStyle:'italic',fontSize:17,color:S.pale}}>{fmtDur(dur)}</div>
-                  <div style={{fontFamily:fFraunces,fontSize:11,color:S.dim,marginTop:2}}>{parseDayKey(s.wakeDate).toLocaleDateString('it-IT',{weekday:'short',day:'numeric',month:'short'})} · {s.bedtime} → {s.waketime}</div>
+        )}
+        <button onClick={()=>setEditing('new')} style={navBtn(T)}>registra la notte</button>
+        <NavStats T={T} items={[[avg7!=null?fmtDur(avg7):'—','media 7 giorni'],[avg30!=null?fmtDur(avg30):'—','media 30 giorni'],[last30.length,'notti · 30 giorni']]} />
+        <div>
+          <div style={navKicker}>ultime 7 notti</div>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-end',padding:'0 6px'}}>
+            {week.map((d,i)=>(
+              <div key={i} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:5}}>
+                <span style={{fontSize:10,opacity:0.75,minHeight:12}}>{d.val!=null ? fmt(d.val) : ''}</span>
+                <div style={{width:26,height:90,display:'flex',alignItems:'flex-end'}}>
+                  <div style={{width:'100%',height:`${d.val!=null ? Math.max(6, Math.round(d.val/maxW*100)) : 3}%`,borderRadius:8,background:i===6?T.gold:(d.val!=null?`${T.cream}2E`:'transparent'),border:`1px solid ${d.val!=null?T.gold:`${T.cream}33`}`,boxSizing:'border-box'}} />
                 </div>
-                <span style={{fontSize:13,letterSpacing:'0.05em',color:S.gold}}>{'★'.repeat(s.quality)}<span style={{color:S.dim}}>{'★'.repeat(5-s.quality)}</span></span>
-              </button>
-            );})}
+                <span style={{fontSize:11,fontWeight:i===6?700:400,opacity:i===6?1:0.75}}>{d.date.toLocaleDateString('it-IT',{weekday:'narrow'})}</span>
+              </div>
+            ))}
           </div>
-          <div style={{textAlign:'center',marginTop:22}}>
-            <button onClick={()=>setEditing('new')} style={{background:S.gold,color:S.bg2,border:`1px solid ${S.gold}`,fontFamily:fFraunces,fontSize:11,letterSpacing:'0.35em',padding:'13px 28px',cursor:'pointer',borderRadius:0,textTransform:'uppercase'}}>+ Registra notte</button>
+        </div>
+        {sorted.length>0 && (
+          <div>
+            <div style={navKicker}>notti recenti · tocca per correggere</div>
+            {sorted.slice().reverse().slice(0,10).map((s,i,arr)=>(
+              <NavStep key={s.id} T={T} time={fmtDur(durHours(s.bedtime,s.waketime))} title={s.wakeDate===todayK ? 'Stanotte' : parseDayKey(s.wakeDate).toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'short'})} desc={`${s.bedtime} – ${s.waketime} · qualità ${s.quality} su 5${s.notes ? ` · ${s.notes}` : ''}`} state="done" last={i===arr.length-1} onTap={()=>setEditing(s.id)} />
+            ))}
           </div>
-          <div style={{marginTop:18,padding:12,fontFamily:fFraunces,fontStyle:'italic',fontSize:12,color:S.silver,lineHeight:1.5,background:`${S.gold}0F`,border:`1px solid ${S.gold}33`}}>
-            <div style={{fontFamily:fFraunces,fontStyle:'normal',fontSize:9,letterSpacing:'0.4em',color:S.gold,textTransform:'uppercase',marginBottom:4}}>⟡ Correlazione IA</div>
-            In arrivo: analisi della correlazione tra <em>ore di sonno</em>, qualità e peso. Il sonno breve è uno dei fattori più correlati alla difficoltà di dimagrire. Servono 20-30 notti.
-          </div>
-        </>)}
-      </div>
-
+        )}
+      </div>)}
+    </NavShell>
       {editing && <SleepModal existing={editingSleep} todayK={todayK} onClose={()=>setEditing(null)} onSave={saveSleep} onDelete={editing!=='new'?delSleep:null} />}
     </div>
   );
@@ -3697,7 +3695,7 @@ function SleepModal({ existing, todayK, onClose, onSave, onDelete }){
 
   return (
     <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',backdropFilter:'blur(4px)',WebkitBackdropFilter:'blur(4px)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
-      <div onClick={e=>e.stopPropagation()} style={{background:`linear-gradient(180deg, ${S.bg1} 0%, ${S.bg2} 100%)`,border:`1px solid ${S.gold}55`,maxWidth:360,width:'100%',padding:'28px 24px',borderRadius:4,maxHeight:'88vh',overflowY:'auto'}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:'#142A4C',border:`1px solid ${S.gold}55`,maxWidth:360,width:'100%',padding:'28px 24px',borderRadius:24,maxHeight:'88vh',overflowY:'auto'}}>
         <h2 style={{fontFamily:fFraunces,fontStyle:'italic',fontWeight:300,fontSize:24,color:S.pale,textAlign:'center',margin:0}}>{existing?'Modifica notte':'Nuova notte'}</h2>
         <div style={{marginTop:18}}>
           <FieldLabel light>data del risveglio</FieldLabel>
@@ -3850,213 +3848,66 @@ function SeraPage({ theme, loaded, weights, goal, notes, water, waterGoal, meals
   // integratori: solo se ne ha definiti; tutti → verde, parziali → ambra, 0 → rosso
   const suppDot = supps.length === 0 ? null : suppsTakenToday === supps.length ? OK : suppsTakenToday > 0 ? WARN : BAD;
 
+  // --- Render nuovo stile: lettura dell'IA, cronologia della giornata a linea del tempo, note ---
+  const T = N;
+  const fTitle = T.fontText || fGaramond;
+  const events = [];
+  todayWeights.forEach(w => events.push({ ts:new Date(w.ts), key:'w'+w.id, title:'Pesata', text:`${fmt(w.weight)} kg` }));
+  todayMeals.forEach(m => events.push({ ts:new Date(m.ts), key:'m'+m.id, title: MEAL_TYPES.find(t => t.id === m.type)?.name || 'Pasto', text:[m.description || '(senza descrizione)', m.kcal ? `${fmt0(m.kcal)} kcal` : ''].filter(Boolean).join(' · ') }));
+  todayWorkouts.forEach(w => { const t=(workoutTypes||[]).find(x => x.id === w.typeId); events.push({ ts:new Date(w.ts), key:'a'+w.id, title:'Movimento', text:`${t ? t.name : 'Allenamento'}${w.qty ? ` · ${fmt0(w.qty)} ${t ? t.unit : ''}` : ''}` }); });
+  todayMindful.forEach(s => events.push({ ts:new Date(s.ts), key:'r'+s.id, title:'Respiro', text:`${fmt0(s.duration_min||0)} minuti${s.note ? ` · ${s.note}` : ''}` }));
+  todayNotesSorted.forEach(n => events.push({ ts:new Date(n.ts), key:'n'+n.id, title:'Nota', text:n.text, noteId:n.id }));
+  events.sort((a,b) => a.ts - b.ts);
+  const reflection = todayMeals.length===0 && todayWeights.length===0 && !lastNight
+    ? 'La giornata è ancora vuota. Registra qualcosa per ricevere una riflessione.'
+    : lastNightDur!=null && lastNightDur<6 ? `Hai dormito ${fmtDur(lastNightDur)} la scorsa notte: poco. Il sonno breve aumenta la fame e rallenta il dimagrimento.`
+    : evening && morning && evening!==morning ? `Tra mattina e sera il peso è cambiato di ${fmt(Math.abs(evening.weight-morning.weight),1)} kg. È fisiologico: guarda la media settimanale.`
+    : todayWater < Math.ceil(waterGoal*0.75) ? `Hai bevuto ${todayWater} bicchieri su ${waterGoal}. Domani prova a completarli.`
+    : '';
+  const cardSt = { background:'#142A4C', border:'1px solid #34506F', borderRadius:22, padding:'16px 18px', display:'flex', flexDirection:'column', gap:10 };
+  const tag = { fontSize:12, color:T.gold, fontWeight:600, letterSpacing:'0.1em', textTransform:'uppercase' };
+  const ta = { width:'100%', background:'transparent', border:`1px solid ${T.cream}44`, borderRadius:14, color:T.cream, fontFamily:fDmSans, fontSize:15, lineHeight:1.45, padding:12, outline:'none', resize:'none', boxSizing:'border-box' };
   return (
-    <div style={{minHeight:'100vh',background:`radial-gradient(ellipse at top, ${N.bg1} 0%, ${N.bg2} 100%)`,color:N.cream,fontFamily:fFraunces,position:'relative',overflow:'hidden'}}>
-      <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${N.gold}40`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
-      <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${N.gold}1A`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
-      <div style={{position:'relative',zIndex:2,padding:'32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
-        {(N?.structuralVariant === 'dashboard') ? <DashHeader label="Diario" /> : <Header q="DIARIO" sub="VIII" color={N.gold} dim={N.goldDim} mark="✦" font={fFraunces} />}
-
-        {!loaded && <Loading color={N.dim} />}
-
-        {loaded && (<>
-          {/* === SEZIONE DIARIO: timeline cronologica auto-popolata dai dati del giorno + note manuali === */}
-          {(() => {
-            // Costruisco la timeline degli eventi di oggi da tutte le aree dell'app
-            const events = [];
-            // Pesate
-            todayWeights.forEach(w => {
-              events.push({ ts: new Date(w.ts), kind: 'weight', icon: '⚖', label: 'pesata', text: `${fmt(w.weight)} kg` });
-            });
-            // Pasti registrati
-            todayMeals.forEach(m => {
-              const typeName = MEAL_TYPES.find(t => t.id === m.type)?.name || m.type;
-              const parts = [];
-              if (m.description) parts.push(m.description);
-              const meta = [];
-              if (m.qty_g) meta.push(`${fmt0(m.qty_g)}g`);
-              if (m.kcal) meta.push(`${fmt0(m.kcal)} kcal`);
-              events.push({ ts: new Date(m.ts), kind: 'meal', icon: '✿', label: typeName.toLowerCase(), text: parts.join(' · ') || '(senza descrizione)', meta: meta.join(' · ') });
-            });
-            // Allenamenti
-            todayWorkouts.forEach(w => {
-              const t = (workoutTypes||[]).find(x => x.id === w.typeId);
-              const name = t ? t.name : 'Allenamento';
-              const unit = t ? t.unit : '';
-              events.push({ ts: new Date(w.ts), kind: 'workout', icon: '✦', label: 'movimento', text: `${name}${w.qty?` · ${fmt0(w.qty)}${unit}`:''}` });
-            });
-            // Sessioni mindful/respiro
-            todayMindful.forEach(s => {
-              const noteTxt = s.note ? ` · ${s.note}` : '';
-              events.push({ ts: new Date(s.ts), kind: 'mindful', icon: '∞', label: 'respiro', text: `${fmt0(s.duration_min||0)} min${noteTxt}` });
-            });
-            // Note manuali (gestione modifica/elimina speciale)
-            todayNotesSorted.forEach(n => {
-              events.push({ ts: new Date(n.ts), kind: 'note', icon: '⟡', label: 'nota', text: n.text, id: n.id });
-            });
-            // Ordino cronologicamente
-            events.sort((a, b) => a.ts - b.ts);
-
-            return (
-              <div style={{marginTop:30}}>
-                <div style={{display:'flex',alignItems:'center',gap:14,marginBottom:14}}>
-                  <div style={{flex:1,height:1,background:`linear-gradient(90deg, transparent, ${N.gold}55)`}} />
-                  <span style={{fontFamily:fFraunces,fontSize:10,letterSpacing:'0.45em',color:N.gold,textTransform:'uppercase'}}>diario</span>
-                  <div style={{flex:1,height:1,background:`linear-gradient(90deg, ${N.gold}55, transparent)`}} />
-                </div>
-                <div style={{textAlign:'center',fontFamily:fFraunces,fontStyle:'italic',fontSize:12,color:N.dim||N.goldDim,marginBottom:14,opacity:0.85}}>
-                  cronologia automatica della giornata
-                </div>
-
-                {events.length === 0 ? (
-                  <div style={{textAlign:'center',fontFamily:fFraunces,fontStyle:'italic',fontSize:13,color:N.dim||N.goldDim,padding:'14px 0 18px'}}>
-                    Niente registrato oggi. Aggiungi pesate, pasti, allenamenti o una nota qui sotto.
-                  </div>
-                ) : (
-                  <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:14}}>
-                    {events.map((ev, i) => {
-                      const time = ev.ts.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
-                      // Le note manuali sono cliccabili per modifica/elimina
-                      if (ev.kind === 'note') {
-                        const isEditing = editingNote === ev.id;
-                        if (isEditing) {
-                          return (
-                            <div key={`note-${ev.id}`} style={{padding:'10px 12px',background:`${N.gold}0A`,border:`1px solid ${N.gold}44`}}>
-                              <textarea value={editNoteText} onChange={e=>setEditNoteText(e.target.value)} rows={3} style={{width:'100%',background:'transparent',border:'none',color:N.cream||N.body,fontFamily:fFraunces,fontStyle:'italic',fontSize:14,resize:'vertical',outline:'none'}} />
-                              <div style={{display:'flex',gap:8,justifyContent:'flex-end',marginTop:8}}>
-                                <button onClick={()=>{setEditingNote(null);setEditNoteText('');}} style={{background:'transparent',color:N.dim||N.goldDim,border:`1px solid ${N.dim||N.goldDim}66`,fontFamily:fFraunces,fontSize:10,letterSpacing:'0.2em',padding:'6px 12px',cursor:'pointer',textTransform:'uppercase'}}>annulla</button>
-                                <button onClick={()=>deleteNote(ev.id)} style={{background:'transparent',color:'#C99A7A',border:`1px solid #C99A7A66`,fontFamily:fFraunces,fontSize:10,letterSpacing:'0.2em',padding:'6px 12px',cursor:'pointer',textTransform:'uppercase'}}>elimina</button>
-                                <button onClick={saveEditNote} style={{background:N.gold,color:N.bg2||'#14171F',border:'none',fontFamily:fFraunces,fontSize:10,letterSpacing:'0.2em',padding:'6px 12px',cursor:'pointer',textTransform:'uppercase'}}>salva</button>
-                              </div>
-                            </div>
-                          );
-                        }
-                        return (
-                          <div key={`note-${ev.id}`} onClick={()=>{setEditingNote(ev.id);setEditNoteText(ev.text);}} style={{display:'flex',gap:12,padding:'10px 12px',background:`${N.gold}08`,border:`1px solid ${N.gold}33`,cursor:'pointer'}}>
-                            <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:3,minWidth:46,flexShrink:0}}>
-                              <span style={{fontSize:14,color:N.gold,lineHeight:1}}>{ev.icon}</span>
-                              <span style={{fontFamily:fFraunces,fontSize:9,letterSpacing:'0.2em',color:N.dim||N.goldDim}}>{time}</span>
-                            </div>
-                            <div style={{flex:1,minWidth:0}}>
-                              <div style={{fontFamily:fFraunces,fontSize:9,letterSpacing:'0.3em',color:N.gold,textTransform:'uppercase',marginBottom:3,opacity:0.8}}>{ev.label} · tocca per modificare</div>
-                              <div style={{fontFamily:fFraunces,fontStyle:'italic',fontSize:14,color:N.cream||N.body,lineHeight:1.5,whiteSpace:'pre-wrap'}}>{ev.text}</div>
-                            </div>
-                          </div>
-                        );
-                      }
-                      // Eventi automatici (read-only): pesate, pasti, allenamenti, mindful
-                      return (
-                        <div key={`${ev.kind}-${i}`} style={{display:'flex',gap:12,padding:'8px 12px',borderBottom:`1px solid ${N.gold}1A`}}>
-                          <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:3,minWidth:46,flexShrink:0}}>
-                            <span style={{fontSize:14,color:N.gold,opacity:0.75,lineHeight:1}}>{ev.icon}</span>
-                            <span style={{fontFamily:fFraunces,fontSize:9,letterSpacing:'0.2em',color:N.dim||N.goldDim}}>{time}</span>
-                          </div>
-                          <div style={{flex:1,minWidth:0}}>
-                            <div style={{fontFamily:fFraunces,fontSize:9,letterSpacing:'0.3em',color:N.dim||N.goldDim,textTransform:'uppercase',marginBottom:2,opacity:0.85}}>{ev.label}</div>
-                            <div style={{fontFamily:fFraunces,fontStyle:'italic',fontSize:14,color:N.cream||N.body,lineHeight:1.4,whiteSpace:'pre-wrap'}}>{ev.text}</div>
-                            {ev.meta && <div style={{fontFamily:fFraunces,fontSize:11,color:N.dim||N.goldDim,marginTop:2,opacity:0.75}}>{ev.meta}</div>}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* Input nuova nota */}
-                <div style={{marginTop:14}}>
-                  <textarea value={noteInput} onChange={e=>setNoteInput(e.target.value)} rows={2} placeholder="Aggiungi una nota a mano (un pensiero, un dettaglio)…" style={{width:'100%',background:`${N.gold}06`,border:`1px solid ${N.gold}33`,color:N.cream||N.body,fontFamily:fFraunces,fontStyle:'italic',fontSize:14,padding:'10px 12px',outline:'none',resize:'vertical',boxSizing:'border-box'}} />
-                  <div style={{textAlign:'right',marginTop:8}}>
-                    <button onClick={addNote} disabled={!noteInput.trim()} style={{background:noteInput.trim()?N.gold:'transparent',color:noteInput.trim()?(N.bg2||'#14171F'):N.dim,border:`1px solid ${noteInput.trim()?N.gold:N.dim+'66'}`,fontFamily:fFraunces,fontSize:10,letterSpacing:'0.3em',padding:'8px 18px',cursor:noteInput.trim()?'pointer':'not-allowed',textTransform:'uppercase'}}>aggiungi nota</button>
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
-          {/* === FINE SEZIONE DIARIO === */}
-          <div style={{marginTop:22,padding:14,background:`${N.gold}0F`,border:`1px solid ${N.gold}33`,borderRadius:2,textAlign:'left'}}>
-            <div style={{fontFamily:fFraunces,fontSize:9,letterSpacing:'0.4em',color:N.gold,textTransform:'uppercase'}}>⟡ riflessione</div>
-            <div style={{fontFamily:fFraunces,fontStyle:'italic',fontSize:14,color:N.body,marginTop:6,lineHeight:1.5}}>
-              {todayMeals.length===0 && todayWeights.length===0 && !lastNight
-                ? "La giornata è ancora silenziosa. Registra qualcosa per ricevere una riflessione."
-                : lastNightDur!=null && lastNightDur<6
-                ? `Hai dormito ${fmtDur(lastNightDur)} la scorsa notte — poco. Il sonno breve aumenta la fame e rallenta il dimagrimento.`
-                : evening && morning && evening!==morning
-                ? `Tra mattina e sera il peso è cambiato di ${fmt(Math.abs(evening.weight-morning.weight),1)} kg. È fisiologico — guarda la media settimanale.`
-                : todayWater < Math.ceil(waterGoal*0.75)
-                ? `Hai bevuto ${todayWater} bicchieri su ${waterGoal}. Domani prova a chiudere il cerchio.`
-                : "Le riflessioni dell'IA si arricchiranno man mano che il diario cresce. Servono 20-30 giorni."}
-            </div>
-          </div>
-
-          {/* Analisi IA per dimagrimento */}
-          <div style={{marginTop:22,padding:16,background:`${N.gold}08`,border:`1px solid ${N.gold}55`,borderRadius:2,textAlign:'left'}}>
-            <div style={{fontFamily:fFraunces,fontSize:9,letterSpacing:'0.4em',color:N.gold,textTransform:'uppercase',marginBottom:8}}>✦ analisi IA · dimagrimento</div>
-
-            {!aiResult && !aiAnalyzing && !aiError && (
-              <>
-                <div style={{fontFamily:fFraunces,fontStyle:'italic',fontSize:13,color:N.body,lineHeight:1.5,marginBottom:14}}>
-                  Lascia che l'IA analizzi peso, sonno, alimentazione, allenamenti e integratori per dirti cosa fare per dimagrire.
-                </div>
-                <div style={{textAlign:'center'}}>
-                  <button onClick={runAiAnalysis} style={{background:N.gold,color:N.bg2,border:'none',fontFamily:fFraunces,fontSize:11,letterSpacing:'0.3em',padding:'12px 26px',cursor:'pointer',textTransform:'uppercase'}}>analizza tutto</button>
-                </div>
-              </>
+    <NavShell T={T} kicker="cronologia automatica della giornata" title="Diario">
+      {!loaded && <Loading color={T.gold} />}
+      {loaded && (<div style={{display:'flex',flexDirection:'column',gap:14}}>
+        <div style={cardSt}>
+          <span style={tag}>lettura dell'ia</span>
+          {!aiResult && !aiAnalyzing && <span style={{fontSize:15,lineHeight:1.45}}>{reflection || 'Fai analizzare all\'IA peso, sonno, alimentazione, allenamenti e integratori per sapere cosa fare per dimagrire.'}</span>}
+          {aiAnalyzing && <span style={{fontSize:15,opacity:0.8}}>sto leggendo i tuoi dati…</span>}
+          {aiError && !aiAnalyzing && <span style={{fontSize:13,color:'#F0B9A0'}}>{aiError}</span>}
+          {aiResult && !aiAnalyzing && (<>
+            {aiResult.stato && <span style={{fontSize:15,lineHeight:1.5}}>{aiResult.stato}</span>}
+            {aiResult.focus && <span style={{fontSize:15,lineHeight:1.5}}><b style={{color:T.gold}}>Focus.</b> {aiResult.focus}</span>}
+            {aiResult.azioni && aiResult.azioni.length>0 && (
+              <ol style={{margin:0,paddingLeft:20,display:'flex',flexDirection:'column',gap:6,fontSize:14,lineHeight:1.5}}>{aiResult.azioni.map((a,i)=>(<li key={i}>{a}</li>))}</ol>
             )}
-
-            {aiAnalyzing && (
-              <div style={{textAlign:'center',padding:'18px 0',fontFamily:fFraunces,fontStyle:'italic',fontSize:14,color:N.dim}}>⋯ sto leggendo i tuoi dati</div>
-            )}
-
-            {aiError && !aiAnalyzing && (
-              <>
-                <div style={{fontFamily:fFraunces,fontStyle:'italic',fontSize:13,color:'#C99A7A',marginBottom:10}}>{aiError}</div>
-                <div style={{textAlign:'center'}}>
-                  <button onClick={runAiAnalysis} style={{background:'transparent',color:N.gold,border:`1px solid ${N.gold}66`,fontFamily:fFraunces,fontSize:11,letterSpacing:'0.3em',padding:'10px 22px',cursor:'pointer',textTransform:'uppercase'}}>riprova</button>
-                </div>
-              </>
-            )}
-
-            {aiResult && (
-              <>
-                {aiResult.stato && (
-                  <div style={{fontFamily:fFraunces,fontStyle:'italic',fontSize:14,color:N.body,lineHeight:1.55,marginBottom:14}}>{aiResult.stato}</div>
-                )}
-
-                {aiResult.focus && (
-                  <div style={{padding:'10px 12px',background:`${N.gold}15`,borderLeft:`2px solid ${N.gold}`,marginBottom:14}}>
-                    <div style={{fontFamily:fFraunces,fontSize:9,letterSpacing:'0.35em',color:N.gold,textTransform:'uppercase',marginBottom:4}}>focus</div>
-                    <div style={{fontFamily:fFraunces,fontStyle:'italic',fontSize:14,color:N.cream}}>{aiResult.focus}</div>
+            {aiResult.attenzione && <div style={{padding:'10px 12px',background:'#F0B9A01F',border:'1px solid #F0B9A088',borderRadius:14,fontSize:13,lineHeight:1.5}}><b>Attenzione.</b> {aiResult.attenzione}</div>}
+          </>)}
+          <button onClick={runAiAnalysis} disabled={aiAnalyzing} style={{...navBtn(T,false),minHeight:46,opacity:aiAnalyzing?0.6:1}}>{aiResult ? 'rianalizza' : aiError ? 'riprova' : 'analizza tutto'}</button>
+        </div>
+        {events.length===0
+          ? <div style={{fontSize:14,opacity:0.75,lineHeight:1.5,textAlign:'center',padding:'10px'}}>Niente registrato oggi. Pesate, pasti, allenamenti e note compariranno qui.</div>
+          : <div style={{paddingTop:4}}>
+              {events.map((ev,i)=>{
+                const time = ev.ts.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
+                if (ev.noteId && editingNote===ev.noteId) return (
+                  <div key={ev.key} style={{...cardSt,marginBottom:16}}>
+                    <textarea value={editNoteText} onChange={e=>setEditNoteText(e.target.value)} rows={3} aria-label="modifica nota" style={ta} />
+                    <div style={{display:'flex',gap:8,flexWrap:'wrap',justifyContent:'flex-end'}}>
+                      <button onClick={()=>deleteNote(ev.noteId)} style={{...navBtn(T,false),width:'auto',minHeight:44,padding:'0 16px',borderColor:'#F0B9A088',color:'#F0B9A0'}}>elimina</button>
+                      <button onClick={()=>{setEditingNote(null);setEditNoteText('');}} style={{...navBtn(T,false),width:'auto',minHeight:44,padding:'0 16px'}}>annulla</button>
+                      <button onClick={saveEditNote} style={{...navBtn(T),width:'auto',minHeight:44,padding:'0 20px'}}>salva</button>
+                    </div>
                   </div>
-                )}
-
-                {aiResult.azioni && aiResult.azioni.length>0 && (
-                  <div style={{marginBottom:14}}>
-                    <div style={{fontFamily:fFraunces,fontSize:9,letterSpacing:'0.35em',color:N.gold,textTransform:'uppercase',marginBottom:8}}>azioni</div>
-                    {aiResult.azioni.map((a,i)=>(
-                      <div key={i} style={{display:'flex',gap:10,padding:'8px 0',borderBottom:i<aiResult.azioni.length-1?`1px solid ${N.gold}1A`:'none'}}>
-                        <span style={{fontFamily:fFraunces,fontStyle:'italic',fontSize:14,color:N.gold,flexShrink:0,minWidth:18}}>{i+1}.</span>
-                        <span style={{fontFamily:fFraunces,fontStyle:'italic',fontSize:13,color:N.body,lineHeight:1.5}}>{a}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {aiResult.attenzione && (
-                  <div style={{padding:'10px 12px',background:'#5C2828',border:'1px solid #C99A7A66',marginBottom:14}}>
-                    <div style={{fontFamily:fFraunces,fontSize:9,letterSpacing:'0.35em',color:'#E8B8A0',textTransform:'uppercase',marginBottom:4}}>⚠ attenzione</div>
-                    <div style={{fontFamily:fFraunces,fontStyle:'italic',fontSize:13,color:'#F2D8C8'}}>{aiResult.attenzione}</div>
-                  </div>
-                )}
-
-                <div style={{textAlign:'center'}}>
-                  <button onClick={runAiAnalysis} style={{background:'transparent',color:N.dim,border:`1px solid ${N.dim}66`,fontFamily:fFraunces,fontSize:10,letterSpacing:'0.25em',padding:'8px 18px',cursor:'pointer',textTransform:'uppercase'}}>rianalizza</button>
-                </div>
-              </>
-            )}
-          </div>
-        </>)}
-      </div>
-    </div>
+                );
+                return <NavStep key={ev.key} T={T} time={time} title={ev.title} desc={ev.noteId ? `${ev.text} · tocca per modificare` : ev.text} state="done" last={i===events.length-1} onTap={ev.noteId ? ()=>{setEditingNote(ev.noteId);setEditNoteText(ev.text);} : undefined} />;
+              })}
+            </div>}
+        <textarea value={noteInput} onChange={e=>setNoteInput(e.target.value)} rows={2} placeholder="Scrivi una nota (un pensiero, un dettaglio)…" aria-label="nuova nota" style={ta} />
+        <button onClick={addNote} disabled={!noteInput.trim()} style={{...navBtn(T),opacity:noteInput.trim()?1:0.5}}>aggiungi nota</button>
+      </div>)}
+    </NavShell>
   );
 }
 
@@ -4208,200 +4059,91 @@ function DigiunoPage({ theme, loaded, fasts, updFasts }){
   const totalHours = past.reduce((a,f)=>{ const dur=(new Date(f.ended_ts)-new Date(f.started_ts))/3600000; return a+dur; }, 0);
   const longest = past.reduce((a,f)=>{ const dur=(new Date(f.ended_ts)-new Date(f.started_ts))/3600000; return Math.max(a,dur); }, 0);
 
+  // --- Render nuovo stile: anello-timer, percorso delle fasi, scelta del protocollo, storico ---
+  const T = D;
+  const fTitle = T.fontText || fGaramond;
+  const cardSt = { background:'#142A4C', border:'1px solid #34506F', borderRadius:18, padding:'14px 16px', color:T.cream, fontFamily:fDmSans, textAlign:'left', width:'100%', boxSizing:'border-box' };
+  const riskBox = (info) => info && (
+    <div style={{padding:'12px 14px',background:`${info.color}1F`,border:`1px solid ${info.color}88`,borderRadius:16}}>
+      <div style={{fontSize:12,letterSpacing:'0.1em',color:info.color,textTransform:'uppercase',fontWeight:700,marginBottom:4}}>{info.label}</div>
+      <div style={{fontSize:13,lineHeight:1.5}}>{info.text}</div>
+    </div>
+  );
+  const presetBtn = (p, info) => (
+    <button key={p.id} onClick={()=>requestStartFast(p)} style={{...cardSt,display:'flex',justifyContent:'space-between',alignItems:'center',gap:10,cursor:'pointer',minHeight:64}}>
+      <span style={{display:'flex',flexDirection:'column',gap:2,minWidth:0}}>
+        <span style={{fontFamily:fTitle,fontSize:24,fontWeight:500,lineHeight:1.1}}>{p.label}</span>
+        <span style={{fontSize:12,opacity:0.75}}>{p.desc}</span>
+        {info && <span style={{fontSize:11,letterSpacing:'0.1em',color:info.color,textTransform:'uppercase',fontWeight:700,marginTop:2}}>{info.label}</span>}
+      </span>
+      <span style={{fontSize:13,fontWeight:700,color:T.gold,whiteSpace:'nowrap'}}>inizia ›</span>
+    </button>
+  );
+  const remainMs = (plannedH - elapsedH) * 3600000;
   return (
-    <div style={{minHeight:'100vh',background:`radial-gradient(ellipse at top, ${D.bg1} 0%, ${D.bg2} 100%)`,color:D.cream,fontFamily:fBodoni,position:'relative',overflow:'hidden'}}>
-      <div aria-hidden style={{position:'absolute',inset:14,border:`1px solid ${D.gold}40`,borderRadius:20,pointerEvents:'none',zIndex:1}} />
-      <div aria-hidden style={{position:'absolute',inset:20,border:`1px solid ${D.gold}1A`,borderRadius:16,pointerEvents:'none',zIndex:1}} />
-      <div style={{position:'relative',zIndex:2,padding:'32px 28px 28px',maxWidth:480,margin:'0 auto'}}>
-        {(D?.structuralVariant === 'dashboard') ? <DashHeader label="Digiuno" /> : <Header q="DIGIUNO" sub="IV" color={D.gold} dim={D.goldDim} mark="✦" font={fBodoni} />}
-
-        {!loaded && <Loading color={D.dim} />}
-
-        {loaded && !active && (
-          <>
-            <div style={{textAlign:'center',marginTop:24,fontFamily:fBodoni,fontStyle:'italic',fontSize:15,color:D.cream,lineHeight:1.5}}>
-              Nessun digiuno attivo.<br/>
-              <span style={{fontSize:13,color:D.dim}}>Scegli un protocollo e inizia.</span>
+    <div>
+    <NavShell T={T} kicker={active ? `in corso · ${active.label}` : 'nessun digiuno attivo'} title="Digiuno">
+      {!loaded && <Loading color={T.gold} />}
+      {loaded && active && (<div style={{display:'flex',flexDirection:'column',gap:16}}>
+        <NavRing T={T} p={progress/100} size={260}>
+          <span style={{fontSize:13,opacity:0.75}}>trascorse</span>
+          <span style={{fontFamily:fTitle,fontSize:elapsedH>=24?40:54,fontWeight:500,lineHeight:1}}>{fmtElapsed(elapsedMs)}</span>
+          <span style={{fontSize:13,opacity:0.75}}>{progress>=100 ? `obiettivo di ${plannedH}h raggiunto` : `mancano ${fmtElapsed(remainMs)}`}</span>
+          <button onClick={()=>setEditing(active)} style={{background:'transparent',border:'none',color:T.cream,fontFamily:fDmSans,fontSize:12,opacity:0.8,cursor:'pointer',padding:'6px 10px',textDecoration:'underline',textUnderlineOffset:3}}>iniziato alle {new Date(active.started_ts).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})} · modifica</button>
+        </NavRing>
+        {!confirmEnd ? (
+          <button onClick={()=>setConfirmEnd(true)} style={navBtn(T)}>termina digiuno</button>
+        ) : (
+          <div style={{...cardSt,display:'flex',flexDirection:'column',gap:12}}>
+            <span style={{fontFamily:fTitle,fontSize:22}}>Terminare il digiuno ora?</span>
+            <div style={{display:'flex',gap:8}}>
+              <button onClick={()=>setConfirmEnd(false)} style={{...navBtn(T,false),minHeight:46}}>annulla</button>
+              <button onClick={()=>{ endFast(); setConfirmEnd(false); }} style={{...navBtn(T),minHeight:46}}>sì, termina</button>
             </div>
-
-            {/* Selettore categoria */}
-            <div style={{display:'flex',gap:0,marginTop:24,borderBottom:`1px solid ${D.accent}33`}}>
-              {[{id:'intermittent',label:'intermittente'},{id:'extended',label:'prolungato'},{id:'custom',label:'personalizzato'}].map(c=>{
-                const act = category===c.id;
-                return (
-                  <button key={c.id} onClick={()=>setCategory(c.id)} style={{flex:1,padding:'12px 4px',background:'transparent',border:'none',borderBottom:`2px solid ${act?D.amber:'transparent'}`,marginBottom:-1,fontFamily:fDmSans,fontSize:10,letterSpacing:'0.25em',textTransform:'uppercase',color:act?D.amber:D.dim,cursor:'pointer'}}>{c.label}</button>
-                );
-              })}
-            </div>
-
-            <div style={{marginTop:18}}>
-              {category==='intermittent' && FAST_PRESETS_INTERMITTENT.map(p=>(
-                <button key={p.id} onClick={()=>requestStartFast(p)} style={{width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',padding:'14px 16px',marginBottom:8,background:`${D.accent}0F`,border:`1px solid ${D.accent}33`,borderLeft:`3px solid ${D.amber}`,cursor:'pointer',textAlign:'left',color:D.cream}}>
-                  <div>
-                    <div style={{fontFamily:fBodoni,fontStyle:'italic',fontSize:20,lineHeight:1}}>{p.label}</div>
-                    <div style={{fontFamily:fBodoni,fontStyle:'italic',fontSize:12,color:D.dim,marginTop:4}}>{p.desc}</div>
-                  </div>
-                  <span style={{fontFamily:fDmSans,fontSize:10,letterSpacing:'0.3em',color:D.amber,textTransform:'uppercase'}}>inizia ›</span>
-                </button>
-              ))}
-              {category==='extended' && FAST_PRESETS_EXTENDED.map(p=>{
-                const lvl = fastRiskLevel(p.hours);
-                const info = fastRiskInfo(lvl);
-                return (
-                  <button key={p.id} onClick={()=>requestStartFast(p)} style={{width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',padding:'14px 16px',marginBottom:8,background:`${D.accent}0F`,border:`1px solid ${D.accent}33`,borderLeft:`3px solid ${info?info.color:D.amber}`,cursor:'pointer',textAlign:'left',color:D.cream}}>
-                    <div>
-                      <div style={{fontFamily:fBodoni,fontStyle:'italic',fontSize:20,lineHeight:1}}>{p.label}</div>
-                      <div style={{fontFamily:fBodoni,fontStyle:'italic',fontSize:12,color:D.dim,marginTop:4}}>{p.desc}</div>
-                      {info && (
-                        <div style={{fontFamily:fDmSans,fontSize:9,letterSpacing:'0.18em',color:info.color,marginTop:6,textTransform:'uppercase'}}>{info.label}</div>
-                      )}
-                    </div>
-                    <span style={{fontFamily:fDmSans,fontSize:10,letterSpacing:'0.3em',color:info?info.color:D.amber,textTransform:'uppercase'}}>inizia ›</span>
-                  </button>
-                );
-              })}
-              {category==='custom' && (() => {
-                const hPreview = parseInt(customHours, 10);
-                const lvlPreview = !isNaN(hPreview) ? fastRiskLevel(hPreview) : 'none';
-                const infoPreview = fastRiskInfo(lvlPreview);
-                return (
-                  <div style={{padding:'18px 16px',background:`${D.accent}0F`,border:`1px solid ${D.accent}33`,borderLeft:`3px solid ${infoPreview?infoPreview.color:D.amber}`}}>
-                    <div style={{fontFamily:fBodoni,fontStyle:'italic',fontSize:14,color:D.cream,marginBottom:10}}>Durata in ore (1 – 240)</div>
-                    <div style={{display:'flex',gap:8,alignItems:'center'}}>
-                      <input type="text" inputMode="numeric" value={customHours} onChange={e=>setCustomHours(e.target.value)} placeholder="es. 36" style={{flex:1,background:'transparent',border:`1px solid ${D.accent}66`,fontFamily:fBodoni,fontStyle:'italic',fontSize:24,color:D.cream,padding:'8px 12px',outline:'none',textAlign:'center'}} />
-                      <button onClick={startCustom} disabled={!customHours} style={{background:infoPreview?infoPreview.color:D.amber,color:D.bg2,border:'none',fontFamily:fDmSans,fontSize:10,letterSpacing:'0.35em',padding:'14px 22px',cursor:customHours?'pointer':'default',opacity:customHours?1:0.4,textTransform:'uppercase'}}>inizia</button>
-                    </div>
-                    {infoPreview && (
-                      <div style={{marginTop:14,padding:'12px 14px',background:`${infoPreview.color}14`,border:`1px solid ${infoPreview.color}55`,borderRadius:2}}>
-                        <div style={{fontFamily:fDmSans,fontSize:9,letterSpacing:'0.3em',color:infoPreview.color,textTransform:'uppercase',marginBottom:6}}>{infoPreview.label}</div>
-                        <div style={{fontFamily:fBodoni,fontStyle:'italic',fontSize:13,color:D.cream,lineHeight:1.5}}>{infoPreview.text}</div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-            </div>
-
-            {past.length>0 && (
-              <div style={{marginTop:28,paddingTop:18,borderTop:`1px solid ${D.accent}33`}}>
-                <div style={{fontFamily:fDmSans,fontSize:9,letterSpacing:'0.4em',color:D.dim,textAlign:'center',textTransform:'uppercase',marginBottom:10}}>STATISTICHE</div>
-                <div style={{display:'flex',justifyContent:'space-around',marginBottom:18}}>
-                  <Stat label="digiuni" value={past.length} color={D.amber} dim={D.dim} />
-                  <Stat label="tot. ore" value={fmt0(totalHours)} color={D.amber} dim={D.dim} />
-                  <Stat label="più lungo" value={`${fmt0(longest)}h`} color={D.amber} dim={D.dim} />
-                </div>
-                <div style={{fontFamily:fDmSans,fontSize:9,letterSpacing:'0.4em',color:D.dim,textAlign:'center',textTransform:'uppercase',marginBottom:10}}>STORICO</div>
-                {past.slice(0,10).map(f=>{
-                  const dur = (new Date(f.ended_ts)-new Date(f.started_ts))/3600000;
-                  const reached = (dur/f.planned_hours)*100;
-                  return (
-                    <button key={f.id} onClick={()=>setEditing(f)} style={{width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',padding:'11px 4px',background:'transparent',border:'none',borderBottom:`1px solid ${D.accent}1F`,cursor:'pointer',textAlign:'left',color:D.cream}}>
-                      <div>
-                        <div style={{fontFamily:fBodoni,fontStyle:'italic',fontSize:16}}>{fmtElapsed((new Date(f.ended_ts)-new Date(f.started_ts)))}{' '}<span style={{fontSize:11,color:D.dim}}>· {f.label}</span></div>
-                        <div style={{fontFamily:fDmSans,fontSize:9,letterSpacing:'0.15em',color:D.dim,marginTop:2,textTransform:'uppercase'}}>{new Date(f.started_ts).toLocaleDateString('it-IT',{day:'numeric',month:'short'})} — {Math.round(reached)}%</div>
-                      </div>
-                      <span style={{fontFamily:fBodoni,fontStyle:'italic',fontSize:18,color:D.dim,paddingRight:6}}>›</span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </>
-        )}
-
-        {loaded && active && (
-          <>
-            <div style={{textAlign:'center',marginTop:20}}>
-              <div style={{fontFamily:fDmSans,fontSize:9,letterSpacing:'0.45em',color:D.amber,textTransform:'uppercase',marginBottom:6}}>{active.label} · iniziato {new Date(active.started_ts).toLocaleString('it-IT',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</div>
-              <button onClick={()=>setEditing(active)} style={{background:'transparent',border:'none',color:D.dim,fontFamily:fDmSans,fontSize:9,letterSpacing:'0.3em',textTransform:'uppercase',cursor:'pointer',padding:'2px 6px',marginBottom:8,textDecoration:'underline',textUnderlineOffset:3}}>modifica inizio</button>
-              <div style={{fontFamily:fBodoni,fontStyle:'italic',fontWeight:400,fontSize:64,lineHeight:1,color:D.cream,letterSpacing:'-0.02em'}}>{fmtElapsed(elapsedMs)}</div>
-              <div style={{fontFamily:fDmSans,fontSize:10,letterSpacing:'0.4em',color:D.dim,marginTop:6,textTransform:'uppercase'}}>su {plannedH}h obiettivo</div>
-            </div>
-
-            {/* Progress bar */}
-            <div style={{marginTop:24,height:8,background:`${D.accent}1F`,position:'relative',borderRadius:0}}>
-              <div style={{position:'absolute',top:0,left:0,bottom:0,width:`${progress}%`,background:`linear-gradient(90deg, ${D.active} 0%, ${D.amber} 100%)`,transition:'width 0.5s ease'}} />
-            </div>
-            <div style={{display:'flex',justifyContent:'space-between',marginTop:4,fontFamily:fDmSans,fontSize:9,letterSpacing:'0.2em',color:D.dim,textTransform:'uppercase'}}>
-              <span>{Math.round(progress)}%</span>
-              <span>{progress>=100?'obiettivo raggiunto':`-${fmtElapsed((plannedH-elapsedH)*3600000)}`}</span>
-            </div>
-
-            {/* Phase corrente */}
-            {currentPhase && (
-              <div style={{marginTop:22,padding:14,background:`${D.amber}1F`,borderLeft:`3px solid ${D.amber}`}}>
-                <div style={{fontFamily:fDmSans,fontSize:9,letterSpacing:'0.4em',color:D.amber,textTransform:'uppercase',marginBottom:4}}>fase · {phaseShort(currentPhase.h)}+</div>
-                <div style={{fontFamily:fBodoni,fontStyle:'italic',fontSize:20,color:D.cream}}>{currentPhase.label}</div>
-                <div style={{fontFamily:fBodoni,fontStyle:'italic',fontSize:13,color:D.dim,marginTop:4,lineHeight:1.4}}>{currentPhase.note}</div>
-                {currentPhase.body && (
-                  <div style={{marginTop:10,paddingTop:10,borderTop:`1px solid ${D.amber}33`,fontFamily:fBodoni,fontStyle:'italic',fontSize:13,color:D.cream,lineHeight:1.6}}>
-                    {currentPhase.body}
-                  </div>
-                )}
-              </div>
-            )}
-            {nextPhase && (
-              <div style={{marginTop:10,padding:'10px 14px',fontFamily:fBodoni,fontStyle:'italic',fontSize:12,color:D.dim,background:`${D.accent}0A`}}>
-                → prossima fase: <span style={{color:D.accent}}>{nextPhase.label}</span> tra {fmtElapsed((nextPhase.h-elapsedH)*3600000)}
-              </div>
-            )}
-
-            {/* Avviso sicurezza progressivo basato sul tempo trascorso (non sul piano) */}
-            {(() => {
-              const lvl = fastRiskLevel(elapsedH);
-              const info = fastRiskInfo(lvl);
-              if (!info) return null;
-              return (
-                <div style={{marginTop:12,padding:'12px 14px',background:`${info.color}14`,border:`1px solid ${info.color}55`,borderRadius:2}}>
-                  <div style={{fontFamily:fDmSans,fontSize:9,letterSpacing:'0.3em',color:info.color,textTransform:'uppercase',marginBottom:6}}>{info.label}</div>
-                  <div style={{fontFamily:fBodoni,fontStyle:'italic',fontSize:13,color:D.cream,lineHeight:1.5}}>{info.text}</div>
-                </div>
-              );
-            })()}
-
-            {/* Phases timeline */}
-            <div style={{marginTop:22}}>
-              <div style={{fontFamily:fDmSans,fontSize:9,letterSpacing:'0.4em',color:D.dim,textAlign:'center',textTransform:'uppercase',marginBottom:10}}>fasi del digiuno</div>
-              {FAST_PHASES.map(p=>{
-                const reached = elapsedH >= p.h;
-                const isCurrent = currentPhase && currentPhase.h === p.h;
-                // Colore della fase basato sul livello di rischio della soglia stessa
-                const phaseRisk = fastRiskInfo(fastRiskLevel(p.h));
-                const phaseColor = phaseRisk ? phaseRisk.color : D.amber;
-                return (
-                  <div key={p.h} style={{display:'flex',alignItems:'baseline',gap:10,padding:'8px 0',borderBottom:`1px solid ${D.accent}11`,opacity:reached?1:0.45}}>
-                    <span style={{fontFamily:fDmSans,fontSize:10,letterSpacing:'0.15em',color:reached?phaseColor:D.dim,minWidth:40}}>{phaseShort(p.h)}</span>
-                    <span style={{fontFamily:fBodoni,fontStyle:'italic',fontSize:14,color:reached?D.cream:D.dim,flex:1,fontWeight:isCurrent?600:400}}>{p.label}</span>
-                    {reached && <span style={{color:phaseColor,fontSize:12}}>{isCurrent?'●':'✓'}</span>}
-                  </div>
-                );
-              })}
-            </div>
-
-            <div style={{textAlign:'center',marginTop:28}}>
-              {!confirmEnd ? (
-                <button onClick={()=>setConfirmEnd(true)} style={{background:'transparent',color:D.danger,border:`1px solid ${D.danger}`,fontFamily:fDmSans,fontSize:11,letterSpacing:'0.4em',padding:'14px 30px',cursor:'pointer',textTransform:'uppercase'}}>termina digiuno</button>
-              ) : (
-                <div style={{padding:'14px',background:`${D.danger}1A`,border:`1px solid ${D.danger}66`}}>
-                  <div style={{fontFamily:fBodoni,fontStyle:'italic',fontSize:15,color:D.cream,marginBottom:12}}>Terminare il digiuno ora?</div>
-                  <div style={{display:'flex',gap:8,justifyContent:'center'}}>
-                    <button onClick={()=>setConfirmEnd(false)} style={{flex:1,background:'transparent',color:D.dim,border:`1px solid ${D.dim}66`,fontFamily:fDmSans,fontSize:10,letterSpacing:'0.35em',padding:'10px 14px',cursor:'pointer',textTransform:'uppercase'}}>annulla</button>
-                    <button onClick={()=>{ endFast(); setConfirmEnd(false); }} style={{flex:1,background:D.danger,color:D.bg2,border:'none',fontFamily:fDmSans,fontSize:10,letterSpacing:'0.35em',padding:'10px 14px',cursor:'pointer',textTransform:'uppercase'}}>sì, termina</button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </>
-        )}
-
-        {/* Disclaimer permanente — sempre visibile nella DigiunoPage */}
-        <div style={{marginTop:36,paddingTop:18,borderTop:`1px solid ${D.accent}22`}}>
-          <div style={{fontFamily:fDmSans,fontSize:9,letterSpacing:'0.4em',color:D.dim,textAlign:'center',textTransform:'uppercase',marginBottom:10}}>nota di sicurezza</div>
-          <div style={{fontFamily:fBodoni,fontStyle:'italic',fontSize:12,color:D.dim,lineHeight:1.6,textAlign:'center',padding:'0 6px'}}>
-            GoalFit non è un dispositivo medico e non sostituisce il parere di un professionista. Il digiuno non è adatto in gravidanza, allattamento, diabete (tipo 1 e 2), disturbi del comportamento alimentare, sottopeso, o se assumi farmaci. Per digiuni superiori alle 24 ore consigliamo di parlare con il proprio medico; oltre le 72 ore <span style={{color:D.cream}}>sconsigliamo di procedere senza supervisione medica attiva</span>.
           </div>
+        )}
+        {riskBox(fastRiskInfo(fastRiskLevel(elapsedH)))}
+        <div style={{paddingTop:6}}>
+          {FAST_PHASES.map((p,i)=>{ const isCur = currentPhase && currentPhase.h===p.h; const reachedP = elapsedH >= p.h; return (
+            <NavStep key={p.h} T={T} time={isCur ? 'adesso' : `${phaseShort(p.h)}`} title={p.label.charAt(0).toUpperCase()+p.label.slice(1)} desc={isCur ? `${p.note}${p.body ? ` — ${p.body}` : ''}` : (nextPhase && nextPhase.h===p.h ? `tra ${fmtElapsed((p.h-elapsedH)*3600000)}` : '')} state={isCur ? 'now' : reachedP ? 'done' : 'todo'} last={i===FAST_PHASES.length-1} />
+          ); })}
         </div>
+      </div>)}
+      {loaded && !active && (<div style={{display:'flex',flexDirection:'column',gap:14}}>
+        <div style={{fontSize:14,opacity:0.8,lineHeight:1.5}}>Scegli un protocollo e inizia.</div>
+        <div style={{background:'#142A4C',border:'1px solid #34506F',borderRadius:26,padding:4,display:'flex',gap:4}}>
+          {[{id:'intermittent',label:'intermittente'},{id:'extended',label:'prolungato'},{id:'custom',label:'su misura'}].map(c=>(
+            <button key={c.id} onClick={()=>setCategory(c.id)} style={{flex:1,minHeight:44,borderRadius:22,border:'none',background:category===c.id?T.gold:'transparent',color:category===c.id?T.bg2:T.cream,fontFamily:fDmSans,fontSize:13,fontWeight:600,cursor:'pointer'}}>{c.label}</button>
+          ))}
+        </div>
+        <div style={{display:'flex',flexDirection:'column',gap:8}}>
+          {category==='intermittent' && FAST_PRESETS_INTERMITTENT.map(p=>presetBtn(p,null))}
+          {category==='extended' && FAST_PRESETS_EXTENDED.map(p=>presetBtn(p, fastRiskInfo(fastRiskLevel(p.hours))))}
+          {category==='custom' && (() => { const hPreview = parseInt(customHours, 10); const infoPreview = fastRiskInfo(!isNaN(hPreview) ? fastRiskLevel(hPreview) : 'none'); return (<>
+            <div style={{...cardSt,display:'flex',flexDirection:'column',gap:10}}>
+              <label htmlFor="fast-custom" style={{fontSize:14}}>Durata in ore (1 – 240)</label>
+              <div style={{display:'flex',gap:10,alignItems:'center'}}>
+                <input id="fast-custom" type="text" inputMode="numeric" value={customHours} onChange={e=>setCustomHours(e.target.value)} placeholder="es. 36" style={{flex:1,minWidth:0,background:'transparent',border:'none',borderBottom:`2px solid ${T.gold}`,color:T.cream,fontFamily:fTitle,fontSize:30,outline:'none',padding:'4px 0'}} />
+                <button onClick={startCustom} disabled={!customHours} style={{...navBtn(T),width:'auto',padding:'0 22px',minHeight:46,opacity:customHours?1:0.5}}>inizia</button>
+              </div>
+            </div>
+            {riskBox(infoPreview)}
+          </>); })()}
+        </div>
+        {past.length>0 && (<>
+          <NavStats T={T} items={[[past.length,'digiuni'],[`${fmt0(longest)}h`,'il più lungo'],[`${fmt0(totalHours)}h`,'in totale']]} />
+          <div>
+            <div style={navKicker}>storico · tocca per correggere</div>
+            {past.slice(0,10).map((f,i,arr)=>{ const dur=(new Date(f.ended_ts)-new Date(f.started_ts))/3600000; const pct=Math.round((dur/(f.planned_hours||dur||1))*100); return (
+              <NavStep key={f.id} T={T} time={new Date(f.started_ts).toLocaleDateString('it-IT',{day:'numeric',month:'short'})} title={fmtElapsed(new Date(f.ended_ts)-new Date(f.started_ts))} desc={`${f.label || ''} · ${pct}% dell'obiettivo`} state={pct>=100?'done':'todo'} last={i===arr.length-1} onTap={()=>setEditing(f)} />
+            ); })}
+          </div>
+        </>)}
+      </div>)}
+      <div style={{marginTop:28,paddingTop:16,borderTop:`1px solid ${T.cream}22`,fontSize:12,opacity:0.75,lineHeight:1.6}}>
+        <b>Nota di sicurezza.</b> GoalFit non è un dispositivo medico e non sostituisce il parere di un professionista. Il digiuno non è adatto in gravidanza, allattamento, diabete (tipo 1 e 2), disturbi del comportamento alimentare, sottopeso, o se assumi farmaci. Per digiuni superiori alle 24 ore consigliamo di parlare con il proprio medico; oltre le 72 ore <b>sconsigliamo di procedere senza supervisione medica attiva</b>.
       </div>
+    </NavShell>
 
       {/* Modale di conferma per digiuni oltre le 72h (rischio "danger") */}
       {pendingFast && (() => {
@@ -4409,7 +4151,7 @@ function DigiunoPage({ theme, loaded, fasts, updFasts }){
         const info = fastRiskInfo('danger');
         return (
           <div onClick={()=>setPendingFast(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.75)',backdropFilter:'blur(4px)',WebkitBackdropFilter:'blur(4px)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
-            <div onClick={e=>e.stopPropagation()} style={{background:`linear-gradient(180deg, ${D.bg1} 0%, ${D.bg2} 100%)`,border:`1px solid ${info.color}88`,maxWidth:380,width:'100%',padding:'24px 22px',color:D.cream}}>
+            <div onClick={e=>e.stopPropagation()} style={{background:'#142A4C',borderRadius:24,border:`1px solid ${info.color}88`,maxWidth:380,width:'100%',padding:'24px 22px',color:D.cream}}>
               <div style={{fontFamily:fDmSans,fontSize:10,letterSpacing:'0.4em',color:info.color,textAlign:'center',textTransform:'uppercase',marginBottom:8}}>{info.label}</div>
               <h2 style={{fontFamily:fBodoni,fontStyle:'italic',fontWeight:400,fontSize:22,color:D.cream,textAlign:'center',margin:'0 0 14px'}}>Digiuno di {h} ore</h2>
               <div style={{fontFamily:fBodoni,fontStyle:'italic',fontSize:13,color:D.cream,lineHeight:1.6,marginBottom:16}}>
@@ -4498,7 +4240,7 @@ function FastEditModal({ fast, isActive, D, onClose, onSave, onDelete }){
 
   // Stili
   const overlayStyle = { position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', backdropFilter:'blur(4px)', WebkitBackdropFilter:'blur(4px)', zIndex:200, display:'flex', alignItems:'center', justifyContent:'center', padding:20 };
-  const cardStyle = { background:`linear-gradient(180deg, ${D.bg1} 0%, ${D.bg2} 100%)`, border:`1px solid ${D.accent||D.gold}55`, maxWidth:380, width:'100%', padding:'24px 22px', borderRadius:4, maxHeight:'88vh', overflowY:'auto', color:D.cream };
+  const cardStyle = { background:'#142A4C', border:`1px solid ${D.accent||D.gold}55`, maxWidth:380, width:'100%', padding:'24px 22px', borderRadius:24, maxHeight:'88vh', overflowY:'auto', color:D.cream };
   const labelStyle = { fontFamily:fDmSans, fontSize:9, letterSpacing:'0.4em', color:D.dim, textTransform:'uppercase', marginBottom:6 };
   const inputStyle = { width:'100%', background:'transparent', border:`1px solid ${(D.accent||D.gold)}55`, fontFamily:fBodoni, fontStyle:'italic', fontSize:16, color:D.cream, padding:'10px 12px', outline:'none', borderRadius:0, colorScheme:'dark' };
 
