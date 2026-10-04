@@ -17,23 +17,26 @@ export const COACH_TOOLS = [
   tool('imposta_obiettivi_giornalieri', 'Imposta calorie e nutrienti giornalieri. Se indichi solo le calorie, i nutrienti seguono la zona 40/30/30.', { kcal: num, proteine_g: num, carboidrati_g: num, grassi_g: num }, ['kcal']),
   tool('imposta_acqua', 'Imposta il numero di bicchieri d\'acqua bevuti in un giorno.', { giorno: day, bicchieri: { type: 'integer', minimum: 0, maximum: 100 } }, ['giorno', 'bicchieri']),
   tool('registra_allenamento', 'Registra una sessione di allenamento. attivita è il nome (es. Corsa); se non esiste viene creata con l\'unità indicata.', { giorno: day, attivita: str, quantita: num, unita: { type: 'string', enum: ['km', 'min', 'kg', 'reps', 'm'] }, note: str }, ['giorno', 'attivita', 'quantita']),
-  tool('digiuno', 'Avvia un digiuno adesso (con le ore previste) oppure termina adesso quello in corso.', { azione: { type: 'string', enum: ['avvia', 'termina'] }, ore: num }, ['azione']),
+  tool('digiuno', 'Avvia un digiuno adesso (con le ore previste), termina adesso quello in corso, oppure corregge l\'orario di inizio di quello in corso (azione correggi_inizio, con giorno e ora).', { azione: { type: 'string', enum: ['avvia', 'termina', 'correggi_inizio'] }, ore: num, giorno: day, ora: { type: 'string', description: 'HH:MM' } }, ['azione']),
+  tool('pianifica_pasto', 'Mette un pasto in piano nel Menù, per oggi o per uno dei prossimi 7 giorni. Per pianificare una giornata usa lo strumento una volta per ogni pasto.', { giorno: day, tipo: mealType, descrizione: str, quantita_g: num, kcal: num, proteine_g: num, carboidrati_g: num, grassi_g: num }, ['giorno', 'tipo', 'descrizione', 'kcal']),
+  tool('segna_integratore', 'Segna un integratore come preso (o non preso) in un giorno. nome è il nome dell\'integratore; se non esiste nell\'elenco e preso è vero, viene aggiunto.', { giorno: day, nome: str, preso: { type: 'boolean' } }, ['giorno', 'nome', 'preso']),
+  tool('aggiungi_nota_diario', 'Aggiunge una nota al diario di oggi, con le parole dell\'utente.', { testo: str }, ['testo']),
 ];
 
 const MEAL_NAMES = { colazione: 'Colazione', spuntino_m: 'Spuntino', pranzo: 'Pranzo', merenda: 'Merenda', cena: 'Cena', spuntino_s: 'Spuntino serale' };
 const pad = n => String(n).padStart(2, '0');
 const keyOf = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-function parseDay(s) {
+function parseDay(s, futureDays = 0) {
   const m = String(s || '').match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
   if (!m) return null;
   const d = new Date(+m[1], +m[2] - 1, +m[3]);
   if (isNaN(d)) return null;
   const now = new Date();
   // niente date future né più vecchie di un anno
-  if (d > new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59) || now - d > 366 * 86400000) return null;
+  if (d > new Date(now.getFullYear(), now.getMonth(), now.getDate() + futureDays, 23, 59) || now - d > 366 * 86400000) return null;
   return d;
 }
-const dayLabel = d => { const k = keyOf(d), n = new Date(); if (k === keyOf(n)) return 'oggi'; if (k === keyOf(new Date(n.getTime() - 86400000))) return 'ieri'; return d.toLocaleDateString('it-IT', { day: 'numeric', month: 'long' }); };
+const dayLabel = d => { const k = keyOf(d), n = new Date(); if (k === keyOf(n)) return 'oggi'; if (k === keyOf(new Date(n.getTime() + 86400000))) return 'domani'; if (k === keyOf(new Date(n.getTime() - 86400000))) return 'ieri'; return d.toLocaleDateString('it-IT', { day: 'numeric', month: 'long' }); };
 const okNum = (v, min, max) => { const n = Number(v); return v != null && v !== '' && !isNaN(n) && n >= min && n <= max ? Math.round(n * 100) / 100 : null; };
 const okTime = t => { const m = String(t || '').match(/^(\d{1,2})[:.](\d{2})$/); if (!m || +m[1] > 23 || +m[2] > 59) return null; return `${pad(+m[1])}:${m[2]}`; };
 function dur(b, w) { if (!b || !w) return null; const [bh, bm] = b.split(':').map(Number), [wh, wm] = w.split(':').map(Number); let x = wh * 60 + wm - (bh * 60 + bm); if (x <= 0) x += 1440; return `${Math.floor(x / 60)} h ${pad(x % 60)}`; }
@@ -142,7 +145,38 @@ export function planActions(uses, data, refs, newId) {
           const hh = Math.round((Date.now() - new Date(active.started_ts).getTime()) / 360000) / 10;
           cards.push({ title: 'Chiudo il digiuno', sub: 'digiuno · adesso', rows: [row('durata', null, hh + ' ore')] });
           labels.push('digiuno terminato');
+        } else if (i.azione === 'correggi_inizio' && active) {
+          const d = parseDay(i.giorno) || new Date(); const t = okTime(i.ora); if (!t) continue;
+          const st = new Date(d.getFullYear(), d.getMonth(), d.getDate(), +t.slice(0, 2), +t.slice(3));
+          if (st > new Date() || Date.now() - st.getTime() > 7 * 86400000) continue;
+          const fmt = x => x.toLocaleString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+          next.fasts = cur('fasts').map(f => f.id === active.id ? { ...f, started_ts: st.toISOString(), planned_end_ts: f.planned_hours ? new Date(st.getTime() + f.planned_hours * 3600000).toISOString() : f.planned_end_ts } : f);
+          cards.push({ title: 'Correggo il digiuno', sub: 'digiuno in corso', rows: [row('inizio', fmt(new Date(active.started_ts)), fmt(st))] });
+          labels.push('inizio del digiuno corretto');
         }
+      } else if (u.name === 'pianifica_pasto') {
+        const d = parseDay(i.giorno, 7); const kcal = okNum(i.kcal, 0, 10000); const desc = String(i.descrizione || '').trim().slice(0, 200);
+        if (!d || !desc || kcal == null || !MEAL_NAMES[i.tipo] || keyOf(d) < keyOf(new Date())) continue;
+        const ts = new Date(d.getFullYear(), d.getMonth(), d.getDate(), hourFor[i.tipo], 0);
+        const meal = { id: newId(), ts: ts.toISOString(), status: 'planned', type: i.tipo, description: desc, qty_g: okNum(i.quantita_g, 1, 5000), kcal, p: okNum(i.proteine_g, 0, 1000), c: okNum(i.carboidrati_g, 0, 1000), g: okNum(i.grassi_g, 0, 1000), photo: null, photo_url: null };
+        next.meals = [...cur('meals'), meal];
+        cards.push({ title: 'Metto in piano', sub: `menù · ${dayLabel(d)}, ${MEAL_NAMES[i.tipo].toLowerCase()}`, rows: [row('piatto', null, desc), row('calorie', null, kcal + ' kcal'), (meal.p != null || meal.c != null || meal.g != null) && row('proteine · carboidrati · grassi', null, `${meal.p ?? '—'} · ${meal.c ?? '—'} · ${meal.g ?? '—'} g`)].filter(Boolean) });
+        labels.push(`in piano per ${dayLabel(d)}: ${desc}`);
+      } else if (u.name === 'segna_integratore') {
+        const d = parseDay(i.giorno); const name = String(i.nome || '').trim().slice(0, 40); if (!d || !name) continue;
+        const k = keyOf(d); const on = i.preso !== false;
+        let sp = cur('supps').find(x => x.name.toLowerCase() === name.toLowerCase()) || cur('supps').find(x => x.name.toLowerCase().includes(name.toLowerCase()));
+        if (!sp) { if (!on) continue; sp = { id: newId(), name: name.charAt(0).toUpperCase() + name.slice(1), color: '#C9A55A' }; next.supps = [...cur('supps'), sp]; }
+        const list = (cur('taken') || {})[k] || []; const had = list.includes(sp.id);
+        if (had === on) continue;
+        next.taken = { ...(cur('taken') || {}), [k]: on ? [...list, sp.id] : list.filter(x => x !== sp.id) };
+        cards.push({ title: on ? 'Segno l\'integratore' : 'Tolgo l\'integratore', sub: `integrazione · ${dayLabel(d)}`, rows: [row(sp.name, had ? 'preso' : 'non preso', on ? 'preso' : 'non preso')] });
+        labels.push(`${sp.name} ${on ? 'segnato' : 'tolto'} (${dayLabel(d)})`);
+      } else if (u.name === 'aggiungi_nota_diario') {
+        const text = String(i.testo || '').trim().slice(0, 1000); if (!text) continue;
+        next.notes = [...cur('notes'), { id: newId(), text, ts: new Date().toISOString() }];
+        cards.push({ title: 'Aggiungo al diario', sub: 'diario · oggi', rows: [row('nota', null, text.length > 90 ? text.slice(0, 90) + '…' : text)] });
+        labels.push('nota aggiunta al diario');
       }
     } catch (e) { console.error('[coach] azione non valida', u?.name, e); }
   }

@@ -921,7 +921,7 @@ export default function App({ user, onLogout }){
         {page==='oggi' && <OggiPage theme={__theme} loaded={loaded} profile={profile} weights={weights} goal={goal} meals={meals} notes={foodNotes} water={waterByDay} waterGoal={waterGoal} workouts={workouts} sleeps={sleeps} fasts={fasts} supps={supplements} taken={suppTaken} updWater={updWater} setPage={setPageIdx} />}
         {page==='peso' && <PesoPage theme={__theme} loaded={loaded} weights={weights} goal={goal} updWeights={updWeights} updGoal={updGoal} meals={meals} updMeals={updMeals} openStats={() => setShowStats(true)} profile={profile} openSub={() => setShowSub(true)} />}
         {page==='stats' && <StatsPage theme={__theme} loaded={loaded} weights={weights} goal={goal} meals={meals} profile={profile} openFull={() => { setShowStats(true); try { window.scrollTo(0, 0); } catch (_) {} }} />}
-        {page==='coach' && <CoachPage user={user} theme={__theme} loaded={loaded} profile={profile} weights={weights} goal={goal} meals={meals} water={waterByDay} waterGoal={waterGoal} workouts={workouts} workoutTypes={workoutTypes} sleeps={sleeps} fasts={fasts} supps={supplements} taken={suppTaken} notes={foodNotes} mindful={mindfulSessions} updMeals={updMeals} updSleeps={updSleeps} updWeights={updWeights} updGoal={updGoal} updWater={updWater} updWorkouts={updWorkouts} updWorkoutTypes={updWorkoutTypes} updFasts={updFasts} updProfile={updProfile} />}
+        {page==='coach' && <CoachPage user={user} theme={__theme} loaded={loaded} profile={profile} weights={weights} goal={goal} meals={meals} water={waterByDay} waterGoal={waterGoal} workouts={workouts} workoutTypes={workoutTypes} sleeps={sleeps} fasts={fasts} supps={supplements} taken={suppTaken} notes={foodNotes} mindful={mindfulSessions} updMeals={updMeals} updSleeps={updSleeps} updWeights={updWeights} updGoal={updGoal} updWater={updWater} updWorkouts={updWorkouts} updWorkoutTypes={updWorkoutTypes} updFasts={updFasts} updProfile={updProfile} updSupps={updSupps} updTaken={updTaken} updNotes={updFoodNotes} />}
         {page==='aggiorna' && <AggiornaPage theme={__theme} loaded={loaded} weights={weights} updWeights={updWeights} supps={supplements} taken={suppTaken} updTaken={updTaken} water={waterByDay} waterGoal={waterGoal} updWater={updWater} workouts={workouts} fasts={fasts} sleeps={sleeps} meals={meals} go={goPage} />}
         {page==='foto' && <FotoPage theme={__theme} loaded={loaded} meals={meals} />}
         {page==='pasti' && <PastiPage profile={profile} seedPhotoInit={photoSeed} clearSeedPhoto={() => setPhotoSeed(null)} user={user} theme={__theme} loaded={loaded} meals={meals} updMeals={updMeals} notes={foodNotes} weights={weights} goal={goal} />}
@@ -1371,6 +1371,8 @@ function buildCoachContext({ profile, weights, goal, meals, water, waterGoal, wo
   L.push('Pasti per giorno (kcal / proteine / carboidrati / grassi):');
   Object.keys(byDay).sort().forEach(k=>{ const o=byDay[k]; L.push(`  ${k}: ${Math.round(o.kcal)} kcal / ${Math.round(o.p)} / ${Math.round(o.c)} / ${Math.round(o.g)}${k>=weekAgo && o.d.length ? ' — ' + o.d.join(', ').slice(0,300) : ''}`); });
   if (Object.keys(byDay).length===0) L.push('  nessun dato');
+  const pl = (meals||[]).filter(m=>m.status==='planned' && dk(m.ts)>=dayKey(now)).sort((a,b)=>new Date(a.ts)-new Date(b.ts)).slice(0,30);
+  if (pl.length) L.push('Pasti in piano nel Menù: ' + pl.map(m=>`${dk(m.ts)} ${m.type||''} "${String(m.description||'').slice(0,50)}" ${m.kcal??'?'} kcal`).join('; '));
   const wk = Object.keys(water||{}).filter(k=>k>=dayKey(cutoff)).sort();
   L.push(`Acqua (bicchieri, obiettivo ${waterGoal}): ${wk.map(k=>`${k} ${water[k]}`).join('; ') || 'nessun dato'}`);
   const wo = (workouts||[]).filter(w=>recent(w.ts));
@@ -1414,6 +1416,9 @@ function CoachPage(props){
     if (d.workoutTypes !== undefined) await P.updWorkoutTypes(d.workoutTypes);
     if (d.workouts !== undefined) await P.updWorkouts(d.workouts);
     if (d.fasts !== undefined) await P.updFasts(d.fasts);
+    if (d.supps !== undefined) await P.updSupps(d.supps);
+    if (d.taken !== undefined) await P.updTaken(d.taken);
+    if (d.notes !== undefined) await P.updNotes(d.notes);
     if (d.targets !== undefined) await P.updProfile(d.targets);
   }
   function addReply(content){
@@ -1485,7 +1490,7 @@ function CoachPage(props){
         + 'Non fai diagnosi e non sostituisci medico o nutrizionista: per problemi di salute, farmaci, gravidanza o obiettivi di peso estremi invita a rivolgersi a un professionista.\n\n'
         + 'DATI DELL\'UTENTE (ultimi 30 giorni):\n' + buildCoachContext(props)
         + '\n\nPASTI RECENTI CON CODICE (per modificarli o eliminarli):\n' + mr.text
-        + '\n\nMODIFICARE I DATI DELL\'APP: hai strumenti per registrare o correggere pasti, sonno, peso, acqua, allenamenti, digiuno e obiettivi. Usali quando l\'utente ti racconta un dato da registrare ("a pranzo ho mangiato...", "stanotte ho dormito dalle... alle...", "stamattina pesavo...") o ti chiede una modifica. '
+        + '\n\nMODIFICARE I DATI DELL\'APP: hai strumenti per registrare o correggere pasti, sonno, peso, acqua, allenamenti, digiuno, integratori, note di diario e obiettivi, e per mettere in piano i pasti nel Menù (oggi e prossimi 7 giorni, rispettando memoria, allergie e obiettivi giornalieri). Usali quando l\'utente ti racconta un dato da registrare ("a pranzo ho mangiato...", "stanotte ho dormito dalle... alle...", "stamattina pesavo...") o ti chiede una modifica. '
         + 'Ogni modifica viene mostrata all\'utente in una finestra di conferma e si applica solo se approva: quindi scrivi SEMPRE anche una frase breve che dice cosa proponi, senza dire che è già fatto. Non usare gli strumenti per semplici domande o ipotesi, e non inventare dati che l\'utente non ha detto (per i pasti puoi stimare quantità e nutrienti). Se manca un\'informazione indispensabile, chiedila invece di usare lo strumento.'
         + '\n\nMEMORIA (cose stabili che l\'utente ti ha detto di sé; rispettale sempre, quelle a PRIORITÀ ALTA sono vincolanti):\n' + (memText || '(ancora vuota)')
         + (learn ? '\n\nAGGIORNARE LA MEMORIA: se nell\'ultimo messaggio l\'utente ti dice un fatto stabile su di sé che non è già in memoria e che serve per i consigli futuri (cibi esclusi o non graditi, intolleranze, orari, vincoli, infortuni, obiettivi, decisioni prese, come vuole che gli parli), aggiungi IN FONDO alla risposta, su una riga a parte, esattamente: [[MEMORIA: categoria | priorità | testo]]. '
@@ -1498,7 +1503,7 @@ function CoachPage(props){
       if (!res.ok) { let d=''; try { const j=await res.json(); d=j?.error?.message||j?.error||''; } catch(_) {} if ([401,402,429].includes(res.status) && typeof d==='string' && d) { setErr(d); return; } throw new Error('HTTP '+res.status+(d?' '+(typeof d==='string'?d:JSON.stringify(d)):'')); }
       const data = await res.json();
       const uses = (data.content||[]).filter(c=>c.type==='tool_use');
-      const plan = uses.length ? planActions(uses, { meals:props.meals||[], sleeps:props.sleeps||[], weights:props.weights||[], goal:props.goal, water:props.water||{}, workouts:props.workouts||[], workoutTypes:props.workoutTypes||[], fasts:props.fasts||[], profile:props.profile, target:computeNutritionTarget(props.profile, props.weights, props.goal) }, mealRefs.current, newId) : null;
+      const plan = uses.length ? planActions(uses, { meals:props.meals||[], sleeps:props.sleeps||[], weights:props.weights||[], goal:props.goal, water:props.water||{}, workouts:props.workouts||[], workoutTypes:props.workoutTypes||[], fasts:props.fasts||[], supps:props.supps||[], taken:props.taken||{}, notes:props.notes||[], profile:props.profile, target:computeNutritionTarget(props.profile, props.weights, props.goal) }, mealRefs.current, newId) : null;
       const raw = (data.content||[]).filter(c=>c.type==='text').map(c=>c.text).join('\n').trim() || (plan?.cards.length ? 'Ecco la modifica che ti propongo.' : (uses.length ? 'Non sono riuscito a preparare la modifica: mi ridici il dato con giorno e valori?' : ''));
       if (!raw) throw new Error('risposta vuota');
       // Il coach può chiudere la risposta con voci da salvare in memoria: le tolgo dal testo e le salvo
@@ -3941,7 +3946,8 @@ function SeraPage({ theme, loaded, weights, goal, notes, water, waterGoal, meals
     try {
       // Costruisci il riepilogo dei dati
       const summary = buildWeightLossSummary({ weights, goal, meals, workouts, workoutTypes, supps, taken, sleeps, water });
-      const r = await analyzeWeightLoss(summary);
+      const memSera = memoryToText(await loadMemory());
+      const r = await analyzeWeightLoss(summary + (memSera ? `\n\nCOSE DA RICORDARE SULL'UTENTE (rispettale sempre; quelle a PRIORITÀ ALTA sono vincolanti):\n${memSera}` : ''));
       if (r.error) setAiError('IA: '+(r.error||'errore sconosciuto'));
       else {
         setAiResult(r);

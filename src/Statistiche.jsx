@@ -2,6 +2,7 @@
 // Accessibile dalla pagina Peso tramite bottone "STATISTICHE COMPLETE".
 
 import { aiFetch } from './ai.js';
+import { loadMemory, memoryToText } from './coachMemory.js';
 import { useState, useMemo, useEffect } from 'react';
 import { getTheme } from './themes.js';
 
@@ -31,6 +32,10 @@ async function callAI({ cacheKey, systemPrompt, userPrompt, maxTokens = 1200 }) 
     }
   } catch (_) { /* ignore */ }
 
+  // La memoria del coach vale anche qui, così le analisi non consigliano cose escluse
+  let mem = '';
+  try { mem = memoryToText(await loadMemory()); } catch (_) {}
+  if (mem) userPrompt += `\n\nCOSE DA RICORDARE SULL'UTENTE (rispettale sempre; quelle a PRIORITÀ ALTA sono vincolanti):\n${mem}`;
   const res = await aiFetch({
       model: 'claude-sonnet-4-6',
       max_tokens: maxTokens,

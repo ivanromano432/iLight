@@ -11,7 +11,7 @@ const SECTIONS = [
   { id: 'coach', title: 'Coach', body: [
     'È una chat con l’intelligenza artificiale. Riceve un riepilogo dei tuoi ultimi 30 giorni: peso, pasti, acqua, sonno, allenamenti, digiuni, integratori e note.',
     'Chiedigli come sta andando il peso, cosa mangiare stasera o dove puoi migliorare. La conversazione resta salvata: la ritrovi quando torni, anche da un altro dispositivo. Con "nuova conversazione" riparti da zero.',
-    'Può anche modificare i dati dell’app al posto tuo: scrivigli "a pranzo ho mangiato una pizza", "stanotte ho dormito dalle 23:30 alle 6:45" o "stamattina pesavo 80" e ti propone la modifica in una finestra. Si applica solo se tocchi "applica", e subito dopo puoi ancora annullarla.',
+    'Può anche modificare i dati dell’app al posto tuo: scrivigli "a pranzo ho mangiato una pizza", "stanotte ho dormito dalle 23:30 alle 6:45" o "stamattina pesavo 80" e ti propone la modifica in una finestra. Può anche mettere in piano i pasti nel Menù (\"preparami i pasti di domani\"), segnare gli integratori, aggiungere una nota al diario e correggere l’inizio del digiuno. Si applica solo se tocchi "applica", e subito dopo puoi ancora annullarla.',
     'Il coach ha una memoria: quando gli dici qualcosa di stabile su di te (un cibo che non mangi, un giorno in cui non puoi allenarti, un obiettivo) lo salva e te lo segnala sotto la risposta. Ne tiene conto anche nei consigli del Menù. Le voci, al massimo 30, le vedi, correggi e cancelli dal menu del profilo, in "Memoria del coach".',
     'Dà consigli generali: non fa diagnosi e non sostituisce medico o nutrizionista.',
   ] },
