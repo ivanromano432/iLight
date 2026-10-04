@@ -57,10 +57,10 @@ export default function AuthGate() {
     return (
       <div style={{
         minHeight: '100vh',
-        background: W_bg,
+        background: 'linear-gradient(180deg, #4A6A62 0px, #24405A 260px, #0E2240 540px)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontFamily: fCardo, fontStyle: 'italic', fontSize: 20, color: W_tan,
-      }}>...</div>
+        fontFamily: "'EB Garamond',serif", fontSize: 44, color: '#F4EFE2',
+      }}>GoalFit</div>
     );
   }
 
