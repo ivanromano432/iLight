@@ -1478,6 +1478,17 @@ function StatsPage({ theme, loaded, weights, goal, meals, profile, openFull }){
 }
 
 // ---------- COACH: chat con l'IA che riceve un riepilogo degli ultimi 30 giorni ----------
+// Testo del coach: **grassetto** e righe di elenco ("- ") mostrati come tali, senza simboli a vista
+function CoachText({ text }){
+  const bold = (line, k) => String(line).split(/(\*\*[^*\n]+\*\*)/g).map((part, i) =>
+    /^\*\*[^*\n]+\*\*$/.test(part) ? <strong key={k+'-'+i} style={{fontWeight:700}}>{part.slice(2,-2)}</strong> : part.replace(/\*\*/g,''));
+  return String(text||'').split('\n').map((raw, i) => {
+    const line = raw.replace(/^#{1,4}\s+/, '');
+    const m = line.match(/^\s*[-–•]\s+(.*)$/);
+    if (m) return <div key={i} style={{display:'flex',gap:8,paddingLeft:2}}><span aria-hidden="true">•</span><span style={{flex:1,minWidth:0}}>{bold(m[1], i)}</span></div>;
+    return <div key={i} style={{minHeight: line.trim() ? undefined : 10}}>{bold(line, i)}</div>;
+  });
+}
 function buildCoachContext({ profile, weights, goal, meals, water, waterGoal, workouts, workoutTypes, sleeps, fasts, supps, taken, notes, mindful, whoopDaily }){
   const now = new Date();
   const cutoff = new Date(now.getTime() - 30*86400000);
@@ -1646,7 +1657,8 @@ function CoachPage(props){
         + 'Non fai diagnosi e non sostituisci medico o nutrizionista: per problemi di salute, farmaci, gravidanza o obiettivi di peso estremi invita a rivolgersi a un professionista.\n\n'
         + 'DATI DELL\'UTENTE (ultimi 30 giorni):\n' + buildCoachContext(props)
         + '\n\nFOTO: i messaggi che iniziano con 📷 avevano una foto allegata. Se nell\'ultimo messaggio c\'è una foto (un piatto, il menu di un ristorante, un\'etichetta, la bilancia) guardala e rispondi su quella; se è un pasto che l\'utente dice di aver mangiato, proponi di registrarlo. Delle foto dei messaggi precedenti vedi solo il testo.'
-        + '\n\nPASTI RECENTI CON CODICE (per modificarli o eliminarli):\n' + mr.text
+        + '\n\nPASTI RECENTI CON CODICE (per modificarli o eliminarli):\n' + mr.text + '\nI codici (P1, P2…) servono solo a te per gli strumenti: non scriverli MAI nelle risposte, i pasti chiamali con il loro nome e l\'orario.'
+        + '\n\nFORMATO: testo semplice. Puoi usare **grassetto** per due o tre parole chiave e righe che iniziano con "- " per un elenco breve; niente titoli, tabelle o altri simboli.'
         + '\n\nMODIFICARE I DATI DELL\'APP: hai strumenti per registrare o correggere pasti, sonno, peso, acqua, allenamenti, digiuno, integratori, note di diario e obiettivi, e per mettere in piano i pasti nel Menù (oggi e prossimi 7 giorni, rispettando memoria, allergie e obiettivi giornalieri). Usali quando l\'utente ti racconta un dato da registrare ("a pranzo ho mangiato...", "stanotte ho dormito dalle... alle...", "stamattina pesavo...") o ti chiede una modifica. '
         + 'Ogni modifica viene mostrata all\'utente in una finestra di conferma e si applica solo se approva: quindi scrivi SEMPRE anche una frase breve che dice cosa proponi, senza dire che è già fatto. Non usare gli strumenti per semplici domande o ipotesi, e non inventare dati che l\'utente non ha detto (per i pasti puoi stimare quantità e nutrienti). Se manca un\'informazione indispensabile, chiedila invece di usare lo strumento.'
         + '\n\nMEMORIA (cose stabili che l\'utente ti ha detto di sé; rispettale sempre, quelle a PRIORITÀ ALTA sono vincolanti):\n' + (memText || '(ancora vuota)')
@@ -1703,7 +1715,7 @@ function CoachPage(props){
         {msgs.map((m,i)=>{ const k = dayKey(new Date(m.ts||Date.now())); const sep = k!==lastDay; lastDay = k; return (
           <div key={m.id||i} style={{display:'flex',flexDirection:'column',gap:10}}>
             {sep && <div style={{alignSelf:'center',fontSize:11,letterSpacing:'0.14em',textTransform:'uppercase',opacity:0.7,fontWeight:600,padding:'6px 0 0'}}>{dayLabel(k)}</div>}
-            <div style={{alignSelf:m.role==='user'?'flex-end':'flex-start',maxWidth:'86%',padding:'11px 14px',borderRadius:18,background:m.role==='user'?T.gold:`${T.cream}14`,border:m.role==='user'?'none':`1px solid ${T.gold}33`,color:m.role==='user'?T.bg2:T.cream,fontSize:15,lineHeight:1.45,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{imgs[m.id] && <img src={imgs[m.id]} alt="foto allegata" style={{display:'block',width:'100%',maxWidth:220,borderRadius:12,marginBottom:8}} />}{m.content}</div>
+            <div style={{alignSelf:m.role==='user'?'flex-end':'flex-start',maxWidth:'86%',padding:'11px 14px',borderRadius:18,background:m.role==='user'?T.gold:`${T.cream}14`,border:m.role==='user'?'none':`1px solid ${T.gold}33`,color:m.role==='user'?T.bg2:T.cream,fontSize:15,lineHeight:1.45,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{imgs[m.id] && <img src={imgs[m.id]} alt="foto allegata" style={{display:'block',width:'100%',maxWidth:220,borderRadius:12,marginBottom:8}} />}{m.role==='user' ? m.content : <CoachText text={m.content} />}</div>
             {undo && undo.msgId===m.id && <button onClick={undoLast} disabled={applying} style={{alignSelf:'flex-start',minHeight:44,padding:'0 4px',background:'transparent',border:'none',color:T.gold,fontFamily:fDmSans,fontSize:13,textDecoration:'underline',textUnderlineOffset:3,cursor:'pointer'}}>{applying ? 'annullo…' : 'annulla la modifica'}</button>}
           </div>
         ); })}
@@ -1739,7 +1751,8 @@ function CoachPage(props){
           </div>
         </NavModal>
       )}
-      <div style={{position:'fixed',left:0,right:0,bottom:'calc(98px + env(safe-area-inset-bottom, 0px))',zIndex:40,padding:'0 16px'}}>
+      <div style={{position:'fixed',left:0,right:0,bottom:0,zIndex:40,padding:'22px 16px calc(98px + env(safe-area-inset-bottom, 0px))',background:`linear-gradient(180deg, ${T.bg2}00 0px, ${T.bg2} 22px)`,pointerEvents:'none'}}>
+        <div style={{pointerEvents:'auto'}}>
         <input ref={photoRef} type="file" accept="image/*" onChange={pickAttach} style={{display:'none'}} />
         {attach && (
           <div style={{maxWidth:448,margin:'0 auto 8px',display:'flex',alignItems:'center',gap:10,background:T.bg2,border:`1px solid ${T.gold}80`,borderRadius:18,padding:6}}>
@@ -1760,6 +1773,7 @@ function CoachPage(props){
           <button onClick={()=>send()} disabled={busy||(!input.trim()&&!attach)||!props.loaded} aria-label="Invia" style={{width:44,height:44,borderRadius:'50%',background:T.gold,border:'none',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',flexShrink:0,opacity:(busy||(!input.trim()&&!attach))?0.5:1}}>
             <Send size={19} strokeWidth={2.2} color={T.bg2} />
           </button>
+        </div>
         </div>
       </div>
     </NavShell>
