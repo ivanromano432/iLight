@@ -1280,7 +1280,7 @@ function FotoPage({ theme, loaded, meals }){
   const days = useMemo(()=>{
     const map = {};
     (meals||[]).forEach(m=>{ if(m.status==='planned' || !(m.photo_url||m.photo)) return; const k=dayKey(new Date(m.ts)); (map[k]=map[k]||[]).push(m); });
-    return Object.keys(map).sort().reverse().map(k=>({ key:k, list: map[k].sort((a,b)=>new Date(a.ts)-new Date(b.ts)) }));
+    return Object.keys(map).sort().reverse().map(k=>({ key:k, list: map[k].sort((a,b)=>new Date(b.ts)-new Date(a.ts)) }));
   },[meals]);
   const shown = days.slice(0, limit);
   const tk = dayKey(new Date());
