@@ -16,22 +16,22 @@ const REMINDERS = {
   morning: {
     column: 'notif_morning_enabled',
     hourColumn: 'notif_morning_hour',
-    title: 'Buongiorno ✦',
-    body: 'Ricordati di pesarti per iniziare la giornata.',
+    title: 'Buongiorno',
+    body: 'Registra il peso di stamattina: basta un tocco in Aggiorna.',
     url: '/',
   },
   afternoon: {
     column: 'notif_afternoon_enabled',
     hourColumn: 'notif_afternoon_hour',
-    title: 'Pausa acqua 💧',
-    body: 'Quanti bicchieri hai bevuto finora? Tocca per aggiornare.',
+    title: 'Pausa acqua',
+    body: 'Quanti bicchieri finora? Apri Aggiorna e aggiungili.',
     url: '/',
   },
   evening: {
     column: 'notif_evening_enabled',
     hourColumn: 'notif_evening_hour',
-    title: 'Diario di sera ⟡',
-    body: 'Una nota per chiudere la giornata, l\'IA fa il resto.',
+    title: 'Diario della sera',
+    body: 'Fotografa la cena o scrivi una nota per chiudere la giornata.',
     url: '/',
   },
 };
