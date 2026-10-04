@@ -428,6 +428,9 @@ export default function App({ user, onLogout }){
   useGoogleFonts();
   const [pageIdx, setPageIdx] = useState(() => Math.max(0, PAGES.findIndex(p => p.id === 'aggiorna')));
   const [photoSeed, setPhotoSeed] = useState(null);
+  // Foto del pasto scattata dalla barra: si analizza e si registra restando sulla pagina in cui si è
+  const [shot, setShot] = useState(null); // { state:'busy'|'ok'|'err', text, photo }
+  const mealsLive = useRef([]);
   // Scroll automatico in cima quando si cambia tab della nav
   useEffect(() => {
     try { window.scrollTo({ top: 0, behavior: 'auto' }); } catch (_) { try { window.scrollTo(0, 0); } catch (__) {} }
@@ -704,6 +707,37 @@ export default function App({ user, onLogout }){
     setProfile(prev => ({ ...prev, ...fields }));
   };
 
+  mealsLive.current = meals;
+  const shootMeal = async (file) => {
+    if (shot?.state === 'busy') return;
+    let b64 = null;
+    try { b64 = await resizeImage(file, 480, 0.7); } catch (_) {}
+    if (!b64) { setShot({ state:'err', text:'Non sono riuscito a leggere la foto. Riprova.' }); setTimeout(() => setShot(null), 5000); return; }
+    setShot({ state:'busy', text:'analizzo la foto e registro il pasto…', photo:b64 });
+    let done = { state:'err', text:'Qualcosa non ha funzionato: la foto non è stata salvata. Riprova.', photo:b64 };
+    try {
+      const now = new Date();
+      const type = mealTypeFromHour(now);
+      const r = await estimateMealNutrition({ description:'', qty_g:null, photo:b64 });
+      const ok = r && !r.error;
+      const mealId = newId();
+      const meal = { id:mealId, ts:now.toISOString(), status:'eaten', type,
+        description: ok ? (r.name || '') : '', qty_g: ok ? (r.qty_g ?? null) : null, kcal: ok ? (r.kcal ?? null) : null,
+        p: ok ? (r.p ?? null) : null, c: ok ? (r.c ?? null) : null, g: ok ? (r.g ?? null) : null, photo:b64, photo_url:null };
+      if (user?.id) {
+        try { meal.photo_url = await uploadMealPhotoToStorage(user.id, mealId, b64); meal.photo = null; }
+        catch (err) { console.warn('[shootMeal] upload Storage fallito, fallback base64', err); }
+      }
+      await updMeals([...mealsLive.current, meal]);
+      const tName = MEAL_TYPES.find(t => t.id === type)?.name || 'Pasto';
+      done = ok
+        ? { state:'ok', text:`✓ ${tName} registrato: ${r.name || 'piatto'}${r.kcal != null ? ' · ' + Math.round(r.kcal) + ' kcal' : ''}`, photo:b64 }
+        : { state:'err', text:`Foto salvata come ${tName.toLowerCase()}, ma non sono riuscito ad analizzarla${typeof r?.error === 'string' && r.error.includes('limite di oggi') ? ' perché hai raggiunto il limite di analisi di oggi' : ''}. Completala da Pasti.`, photo:b64 };
+    } catch (e) { console.error('[shootMeal]', e); }
+    setShot(done);
+    setTimeout(() => setShot(cur => cur === done ? null : cur), done.state === 'ok' ? 4500 : 8000);
+  };
+
   const page = PAGES[pageIdx].id;
   // Navigazione per id: chiude le pagine a tutto schermo e apre la pagina richiesta ('stats' = Statistiche)
   const goPage = (id) => {
@@ -926,7 +960,16 @@ export default function App({ user, onLogout }){
         {page==='sera' && <SeraPage theme={__theme} loaded={loaded} weights={weights} goal={goal} notes={foodNotes} water={waterByDay} waterGoal={waterGoal} meals={meals} workouts={workouts} workoutTypes={workoutTypes} supps={supplements} taken={suppTaken} sleeps={sleeps} mindful={mindfulSessions} updNotes={updFoodNotes} profile={profile} />}
         </>); })()}
       </div>
-      <BottomNav theme={getTheme(profile?.theme)} currentId={page} onGo={goPage} onShoot={async (file) => { let b64 = null; try { b64 = await resizeImage(file, 480, 0.7); } catch (_) {} setPhotoSeed(b64 || 'manual'); goPage('pasti'); }} />
+      <BottomNav theme={getTheme(profile?.theme)} currentId={page} onGo={goPage} onShoot={shootMeal} />
+      {shot && (
+        <div role="status" aria-live="polite" onClick={() => { if (shot.state !== 'busy') setShot(null); }}
+          style={{ position:'fixed', top:'calc(14px + env(safe-area-inset-top, 0px))', left:16, right:16, zIndex:300, display:'flex', justifyContent:'center', pointerEvents: shot.state==='busy' ? 'none' : 'auto' }}>
+          <div style={{ maxWidth:420, width:'100%', boxSizing:'border-box', display:'flex', alignItems:'center', gap:12, padding:'10px 14px 10px 10px', borderRadius:20, background:'#142A4C', border:`1px solid ${shot.state==='err' ? '#F0B9A0' : '#C9A55A'}`, color:'#F4EFE2', fontFamily:fDmSans, fontSize:14, lineHeight:1.35, boxShadow:'0 8px 24px rgba(0,0,0,0.45)' }}>
+            {shot.photo && <img src={shot.photo} alt="" style={{ width:44, height:44, borderRadius:12, objectFit:'cover', flexShrink:0 }} />}
+            <span style={{ minWidth:0, wordBreak:'break-word' }}>{shot.text}</span>
+          </div>
+        </div>
+      )}
       {renderAccountMenu()}
     </div>
   );

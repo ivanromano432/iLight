@@ -22,7 +22,7 @@ const SECTIONS = [
   { id: 'foto', title: 'Fotografare un pasto', body: [
     'Il tasto tondo al centro apre il diario fotografico dei tuoi piatti. Puoi vederlo a griglia oppure come linea del giorno.',
     'Toccalo una seconda volta: compaiono tre icone per scattare una foto, sceglierla dalla libreria o prenderla da un file.',
-    'Dopo la foto si apre la scheda del pasto: l’IA riconosce il piatto e stima quantità, calorie e nutrienti. Puoi sempre correggere prima di salvare.',
+    'Dopo la foto resti sulla pagina in cui eri: in alto compare un avviso mentre l’IA riconosce il piatto, stima quantità, calorie e nutrienti e sceglie il pasto in base all’ora. Il pasto si registra da solo; per correggerlo toccalo in Pasti.',
   ] },
   { id: 'pasti', title: 'Pasti', body: [
     'Mostra il piatto del giorno: la foto dell’ultimo pasto, le miniature degli altri, le calorie sul tuo obiettivo e proteine, carboidrati e grassi.',
