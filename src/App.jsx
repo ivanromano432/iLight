@@ -10,6 +10,7 @@ const StatistichePage = lazy(() => import('./Statistiche.jsx'));
 const SubscriptionPage = lazy(() => import('./SubscriptionPage.jsx'));
 const ProfileSetup = lazy(() => import('./ProfileSetup.jsx'));
 const GuidaPage = lazy(() => import('./GuidaPage.jsx'));
+const MemoriaPage = lazy(() => import('./MemoriaPage.jsx'));
 const ProfilePage = lazy(() => import('./ProfilePage.jsx'));
 const LayoutPage = lazy(() => import('./LayoutPage.jsx'));
 // Onboarding componente lazy; le helper sincrone arrivano da un file dedicato (vedi onboardingHelpers.js)
@@ -19,6 +20,7 @@ import { uploadMealPhoto as uploadMealPhotoToStorage, deleteMealPhoto as deleteM
 import { getTheme } from './themes.js';
 import ThemeStyles from './ThemeStyles.jsx';
 import { supabase } from './supabase.js';
+import { loadMemory, addMemory, memoryToText, extractMemoryTags, MEMORY_MAX } from './coachMemory.js';
 
 const Q = { bg1: '#3A2818', bg2: '#1F140C', gold: '#C9A876', goldDim: '#8B7355', cream: '#E8D8B8', ink: '#1F140C' };
 const W = { bg: '#E8E0D2', ink: '#3C3329', tan: '#8C6A4E' };
@@ -441,6 +443,7 @@ export default function App({ user, onLogout }){
   const [showStats, setShowStats] = useState(false);
   const [showSub, setShowSub] = useState(false);
   const [showGuida, setShowGuida] = useState(false);
+  const [showMemoria, setShowMemoria] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [showLayout, setShowLayout] = useState(false);
   const [showAccountMenu, setShowAccountMenu] = useState(false);
@@ -713,7 +716,7 @@ export default function App({ user, onLogout }){
   const page = PAGES[pageIdx].id;
   // Navigazione per id: chiude le pagine a tutto schermo e apre la pagina richiesta ('stats' = Statistiche)
   const goPage = (id) => {
-    setShowAccountMenu(false); setShowSub(false); setShowGuida(false); setShowProfile(false); setShowLayout(false);
+    setShowAccountMenu(false); setShowSub(false); setShowGuida(false); setShowMemoria(false); setShowProfile(false); setShowLayout(false);
     setShowStats(false);
     const idx = PAGES.findIndex(p => p.id === id);
     if (idx >= 0) setPageIdx(idx);
@@ -764,6 +767,10 @@ export default function App({ user, onLogout }){
         onDone={() => setShowProfileSetup(false)}
       />
     );
+  }
+
+  if (showMemoria) {
+    return <MemoriaPage profile={profile} updProfile={updProfile} onClose={() => setShowMemoria(false)} />;
   }
 
   if (showGuida) {
@@ -855,6 +862,7 @@ export default function App({ user, onLogout }){
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 {[
                   ['Profilo', () => { setShowAccountMenu(false); setShowProfile(true); }],
+                  ['Memoria del coach', () => { setShowAccountMenu(false); setShowMemoria(true); }],
                   ['Guida', () => { setShowAccountMenu(false); setShowGuida(true); }],
                   ['Abbonamento', () => { setShowAccountMenu(false); setShowSub(true); }, subState.ctaPrimary],
                   ['__versione__'],
@@ -1427,18 +1435,36 @@ function CoachPage(props){
     setMsgs(next); setInput(''); setErr(''); setBusy(true);
     persist(mine);
     try {
+      const learn = props.profile?.coach_learn !== false;
+      const memText = memoryToText(await loadMemory());
       const system = 'Sei il coach di GoalFit, un\'app italiana per il controllo del peso. Parli in italiano, in modo diretto, caldo e concreto, con risposte brevi (massimo 6-8 frasi, niente elenchi lunghi). '
         + 'Dai consigli generali su alimentazione, peso e abitudini basandoti sui dati reali dell\'utente riportati qui sotto: citali quando servono e non inventare dati che non ci sono. '
         + 'Non fai diagnosi e non sostituisci medico o nutrizionista: per problemi di salute, farmaci, gravidanza o obiettivi di peso estremi invita a rivolgersi a un professionista.\n\n'
-        + 'DATI DELL\'UTENTE (ultimi 30 giorni):\n' + buildCoachContext(props);
-      // All'IA vanno solo gli ultimi 12 messaggi: la cronologia completa resta a schermo
-      let recent = next.slice(-12).map(m=>({ role:m.role, content:m.content }));
+        + 'DATI DELL\'UTENTE (ultimi 30 giorni):\n' + buildCoachContext(props)
+        + '\n\nMEMORIA (cose stabili che l\'utente ti ha detto di sé; rispettale sempre, quelle a PRIORITÀ ALTA sono vincolanti):\n' + (memText || '(ancora vuota)')
+        + (learn ? '\n\nAGGIORNARE LA MEMORIA: se nell\'ultimo messaggio l\'utente ti dice un fatto stabile su di sé che non è già in memoria e che serve per i consigli futuri (cibi esclusi o non graditi, intolleranze, orari, vincoli, infortuni, obiettivi, decisioni prese, come vuole che gli parli), aggiungi IN FONDO alla risposta, su una riga a parte, esattamente: [[MEMORIA: categoria | priorità | testo]]. '
+          + 'categoria è una tra: obiettivi, alimentazione, allenamenti, routine, vincoli, coach, altro. priorità è alta (cibi da escludere, intolleranze, vincoli fisici o di salute, cose che non si possono mai ignorare) oppure normale. testo è una frase breve in terza persona, massimo 12 parole (es. "Non mangia latticini"). '
+          + 'Non salvare cose passeggere (cosa ha mangiato oggi, umore del momento), né dati già presenti nell\'app (peso, pasti, sonno registrati). Al massimo 2 righe per risposta, e solo se servono davvero. Non nominare questo meccanismo.' : '');
+      // All'IA vanno gli ultimi 30 messaggi: la cronologia completa resta a schermo
+      let recent = next.slice(-30).map(m=>({ role:m.role, content:m.content }));
       while (recent.length && recent[0].role !== 'user') recent = recent.slice(1);
       const res = await fetch('/api/anthropic', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ model:'claude-sonnet-4-6', max_tokens:900, system, messages: recent }) });
       if (!res.ok) { let d=''; try { const j=await res.json(); d=j?.error?.message||j?.error||''; } catch(_) {} throw new Error('HTTP '+res.status+(d?' '+(typeof d==='string'?d:JSON.stringify(d)):'')); }
       const data = await res.json();
-      const txt = data.content?.find(c=>c.type==='text')?.text || '';
-      if (!txt) throw new Error('risposta vuota');
+      const raw = data.content?.find(c=>c.type==='text')?.text || '';
+      if (!raw) throw new Error('risposta vuota');
+      // Il coach può chiudere la risposta con voci da salvare in memoria: le tolgo dal testo e le salvo
+      const { clean, found } = extractMemoryTags(raw);
+      let txt = clean || 'Fatto.';
+      if (learn && found.length) {
+        const notes = [];
+        for (const f of found.slice(0, 2)) {
+          const r = await addMemory({ ...f, source:'chat' });
+          if (r && !r.error) notes.push('✓ aggiunto alla memoria: ' + r.content);
+          else if (r?.error === 'memoria piena') notes.push('La memoria è piena (' + MEMORY_MAX + ' voci): non ho salvato "' + f.content + '". Puoi fare spazio dal menu, in Memoria del coach.');
+        }
+        if (notes.length) txt += '\n\n' + notes.join('\n');
+      }
       const reply = { id:newId(), role:'assistant', content:txt, ts:new Date().toISOString() };
       setMsgs(cur=>[...cur, reply]);
       persist(reply);
@@ -1458,7 +1484,7 @@ function CoachPage(props){
           <button onClick={newChat} style={{alignSelf:'flex-start',minHeight:44,padding:'0 16px',borderRadius:22,background:'transparent',border:`1px solid ${confirmNew?'#F0B9A0':`${T.cream}55`}`,color:confirmNew?'#F0B9A0':T.cream,fontFamily:fDmSans,fontSize:13,cursor:'pointer'}}>{confirmNew ? 'tocca ancora per cancellare la conversazione' : 'nuova conversazione'}</button>
         )}
         {ready && msgs.length===0 && (
-          <div style={{...navCard(T),padding:'14px 16px',fontSize:15,lineHeight:1.5}}>Chiedimi del tuo peso, dei pasti o di cosa migliorare. Rispondo guardando quello che hai registrato nell'app, e la conversazione resta salvata. Sono consigli generali: non sostituiscono medico o nutrizionista.</div>
+          <div style={{...navCard(T),padding:'14px 16px',fontSize:15,lineHeight:1.5}}>Chiedimi del tuo peso, dei pasti o di cosa migliorare. Rispondo guardando quello che hai registrato nell'app, e la conversazione resta salvata. Le cose importanti che mi dici di te le tengo in memoria: le trovi nel menu, in Memoria del coach. Sono consigli generali: non sostituiscono medico o nutrizionista.</div>
         )}
         {msgs.map((m,i)=>{ const k = dayKey(new Date(m.ts||Date.now())); const sep = k!==lastDay; lastDay = k; return (
           <div key={m.id||i} style={{display:'flex',flexDirection:'column',gap:10}}>
@@ -2976,7 +3002,8 @@ function MenuPage({ theme, loaded, meals, updMeals, weights, goal, profile, updP
         + `- EVITA: zuccheri raffinati, dolci industriali, bibite zuccherate, alcolici, fritti, salumi grassi, pane bianco, pasta raffinata in eccesso, succhi confezionati.\n`
         + `- Bilancia ogni piatto verso la Zona 40/30/30 quando possibile (in particolare il pranzo e la cena).\n`
         + `- Dai precedenza ai macro residui (se mancano molte proteine, proponi pasti proteici; se mancano carb, proponi cereali integrali; ecc.).\n`;
-      const r = await suggestMeals(summary, previousSuggested);
+      const memMenu = memoryToText(await loadMemory());
+      const r = await suggestMeals(summary + (memMenu ? `\nCOSE DA RICORDARE SULL'UTENTE (rispettale sempre; quelle a PRIORITÀ ALTA sono vincolanti, es. cibi esclusi):\n${memMenu}\n` : ''), previousSuggested);
       if (r.error) setSuggestError('IA: ' + (r.error || 'errore sconosciuto'));
       else if (!r.meals || r.meals.length === 0) setSuggestError('Nessun suggerimento ricevuto.');
       else {
