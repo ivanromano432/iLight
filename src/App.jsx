@@ -847,8 +847,13 @@ export default function App({ user, onLogout }){
                   ['Profilo', () => { setShowAccountMenu(false); setShowProfile(true); }],
                   ['Guida', () => { setShowAccountMenu(false); setShowGuida(true); }],
                   ['Abbonamento', () => { setShowAccountMenu(false); setShowSub(true); }, subState.ctaPrimary],
+                  ['__versione__'],
                   ['Esci', () => { setShowAccountMenu(false); onLogout && onLogout(); }],
-                ].map(([label, fn, strong], i, arr) => (
+                ].map(([label, fn, strong], i, arr) => label === '__versione__' ? (
+                  <div key={i} style={{ minHeight: 40, padding: '0 6px', display: 'flex', alignItems: 'center', borderBottom: '1px solid #34506F', color: ink, opacity: 0.7, fontFamily: fDmSans, fontSize: 13 }}>
+                    {__APP_VERSION__ ? `versione ${__APP_VERSION__} · ${__APP_BUILT__}` : `versione del ${__APP_BUILT__}`}
+                  </div>
+                ) : (
                   <button key={i} onClick={fn}
                     style={{ minHeight: 46, padding: '0 6px', background: 'transparent', border: 'none', borderBottom: i < arr.length - 1 ? '1px solid #34506F' : 'none', color: strong ? accent : ink, fontFamily: fDmSans, fontSize: 15, fontWeight: strong ? 700 : 400, textAlign: 'left', cursor: 'pointer' }}>
                     {label}
