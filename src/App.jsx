@@ -426,7 +426,7 @@ const MEAL_TYPES = [
 
 export default function App({ user, onLogout }){
   useGoogleFonts();
-  const [pageIdx, setPageIdx] = useState(() => Math.max(0, PAGES.findIndex(p => p.id === 'aggiorna')));
+  const [pageIdx, setPageIdx] = useState(() => Math.max(0, PAGES.findIndex(p => p.id === 'coach')));
   const [photoSeed, setPhotoSeed] = useState(null);
   // Foto del pasto scattata dalla barra: si analizza e si registra restando sulla pagina in cui si è
   const [shot, setShot] = useState(null); // { state:'busy'|'ok'|'err', text, photo }
@@ -712,6 +712,8 @@ export default function App({ user, onLogout }){
   const [coachUnread, setCoachUnread] = useState(() => { try { return localStorage.getItem('goalfit_coach_unread') === '1'; } catch (_) { return false; } });
   const markCoach = (v) => { setCoachUnread(v); try { if (v) localStorage.setItem('goalfit_coach_unread', '1'); else localStorage.removeItem('goalfit_coach_unread'); } catch (_) {} };
   const checkinDone = useRef(false);
+  const [coachRefresh, setCoachRefresh] = useState(0);
+  const pageNow = useRef('coach');
   useEffect(() => {
     if (!loaded || !user?.id || !profile || checkinDone.current) return;
     if (profile.coach_checkin === false) return;
@@ -737,7 +739,7 @@ export default function App({ user, onLogout }){
         const txt = (data.content || []).filter(c => c.type === 'text').map(c => c.text).join('\n').trim();
         if (!txt) return;
         const { error } = await supabase.from('coach_messages').insert({ id: newId(), user_id: user.id, role: 'assistant', content: 'Il punto della settimana\n\n' + txt, ts: new Date().toISOString() });
-        if (!error) markCoach(true);
+        if (!error) { if (pageNow.current === 'coach') setCoachRefresh(n => n + 1); else markCoach(true); }
       } catch (e) { console.error('[coach] punto della settimana', e); }
     })();
     // eslint-disable-next-line
@@ -773,6 +775,7 @@ export default function App({ user, onLogout }){
   };
 
   const page = PAGES[pageIdx].id;
+  pageNow.current = page;
   useEffect(() => { if (page === 'coach' && coachUnread) markCoach(false); }, [page, coachUnread]);
   // Navigazione per id: chiude le pagine a tutto schermo e apre la pagina richiesta ('stats' = Statistiche)
   const goPage = (id) => {
@@ -982,7 +985,7 @@ export default function App({ user, onLogout }){
         <ThemeStyles theme={__theme} />
         {page==='peso' && <PesoPage theme={__theme} loaded={loaded} weights={weights} goal={goal} updWeights={updWeights} updGoal={updGoal} meals={meals} updMeals={updMeals} openStats={() => setShowStats(true)} profile={profile} openSub={() => setShowSub(true)} />}
         {page==='stats' && <StatsPage theme={__theme} loaded={loaded} weights={weights} goal={goal} meals={meals} profile={profile} openFull={() => { setShowStats(true); try { window.scrollTo(0, 0); } catch (_) {} }} />}
-        {page==='coach' && <CoachPage user={user} theme={__theme} loaded={loaded} profile={profile} weights={weights} goal={goal} meals={meals} water={waterByDay} waterGoal={waterGoal} workouts={workouts} workoutTypes={workoutTypes} sleeps={sleeps} fasts={fasts} supps={supplements} taken={suppTaken} notes={foodNotes} mindful={mindfulSessions} updMeals={updMeals} updSleeps={updSleeps} updWeights={updWeights} updGoal={updGoal} updWater={updWater} updWorkouts={updWorkouts} updWorkoutTypes={updWorkoutTypes} updFasts={updFasts} updProfile={updProfile} updSupps={updSupps} updTaken={updTaken} updNotes={updFoodNotes} />}
+        {page==='coach' && <CoachPage refreshKey={coachRefresh} user={user} theme={__theme} loaded={loaded} profile={profile} weights={weights} goal={goal} meals={meals} water={waterByDay} waterGoal={waterGoal} workouts={workouts} workoutTypes={workoutTypes} sleeps={sleeps} fasts={fasts} supps={supplements} taken={suppTaken} notes={foodNotes} mindful={mindfulSessions} updMeals={updMeals} updSleeps={updSleeps} updWeights={updWeights} updGoal={updGoal} updWater={updWater} updWorkouts={updWorkouts} updWorkoutTypes={updWorkoutTypes} updFasts={updFasts} updProfile={updProfile} updSupps={updSupps} updTaken={updTaken} updNotes={updFoodNotes} />}
         {page==='aggiorna' && <AggiornaPage theme={__theme} loaded={loaded} weights={weights} updWeights={updWeights} supps={supplements} taken={suppTaken} updTaken={updTaken} water={waterByDay} waterGoal={waterGoal} updWater={updWater} workouts={workouts} fasts={fasts} sleeps={sleeps} meals={meals} go={goPage} />}
         {page==='foto' && <FotoPage theme={__theme} loaded={loaded} meals={meals} />}
         {page==='pasti' && <PastiPage profile={profile} seedPhotoInit={photoSeed} clearSeedPhoto={() => setPhotoSeed(null)} user={user} theme={__theme} loaded={loaded} meals={meals} updMeals={updMeals} notes={foodNotes} weights={weights} goal={goal} />}
@@ -1558,7 +1561,7 @@ function CoachPage(props){
       setReady(true);
     })();
     return ()=>{ alive = false; };
-  },[uid]);
+  },[uid, props.refreshKey]);
   useEffect(()=>{ try { endRef.current?.scrollIntoView({ block:'end' }); } catch(_) {} }, [msgs, busy, ready]);
   useEffect(()=>{ if (!confirmNew) return; const id = setTimeout(()=>setConfirmNew(false), 4000); return ()=>clearTimeout(id); }, [confirmNew]);
   async function persist(m){
