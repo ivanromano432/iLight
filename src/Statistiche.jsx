@@ -10,8 +10,11 @@ import { getTheme } from './themes.js';
 // Nota: il tema Q non e' piu' definito a livello modulo (era hardcoded sul tema refettorio
 // e causava problemi di contrasto sui temi chiari). Ora ogni sotto-componente riceve Q come prop
 // da StatistichePage, dove Q = getTheme(profile?.theme).
-const fGaramond = '"Cormorant Garamond", serif';
-const fCinzel = '"Cinzel", serif';
+const fGaramond = "'EB Garamond',serif";
+const fCinzel = "'DM Sans',system-ui,sans-serif";
+const fSans = fCinzel;
+const PAGE_BG = 'linear-gradient(180deg, #4A6A62 0px, #24405A 260px, #0E2240 540px)';
+const CARD = '#142A4C', LINE = '#34506F';
 
 // === Chiamata IA via netlify function (con cache localStorage 24h) ===
 const AI_CACHE_PREFIX = 'quercus_ai_';
@@ -201,20 +204,21 @@ function linearRegression(weights) {
 
 function StatRow({ Q, label, value, sub, color }) {
   return (
-    <div style={{ textAlign: 'center', flex: 1, minWidth: 0 }}>
-      <div style={{ fontFamily: fCinzel, fontSize: 9, letterSpacing: '0.35em', color: Q.goldDim, textTransform: 'uppercase' }}>{label}</div>
-      <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 26, color: color || Q.cream, marginTop: 4, lineHeight: 1 }}>{value}</div>
-      {sub && <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 11, color: Q.goldDim, marginTop: 3 }}>{sub}</div>}
+    <div style={{ textAlign: 'center', flex: 1, minWidth: 0, padding: '0 4px' }}>
+      <div style={{ fontFamily: fGaramond, fontSize: 26, fontWeight: 500, color: color || Q.cream, lineHeight: 1.1 }}>{value}</div>
+      <div style={{ fontFamily: fSans, fontSize: 12, color: Q.goldDim, marginTop: 2 }}>{label}</div>
+      {sub && <div style={{ fontFamily: fSans, fontSize: 11, color: Q.goldDim, marginTop: 2 }}>{sub}</div>}
     </div>
   );
 }
 
 function Section({ Q, title, sub, children }) {
+  const t = String(title || '').toLowerCase();
   return (
-    <div style={{ marginTop: 28, paddingTop: 18, borderTop: `1px solid ${Q.gold}33` }}>
-      <div style={{ textAlign: 'center', marginBottom: 16 }}>
-        <div style={{ fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.4em', color: Q.gold, textTransform: 'uppercase' }}>✦ {title}</div>
-        {sub && <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 12, color: Q.goldDim, marginTop: 4 }}>{sub}</div>}
+    <div style={{ marginTop: 28 }}>
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ fontFamily: fSans, fontSize: 12, letterSpacing: '0.1em', color: Q.gold, fontWeight: 600, textTransform: 'uppercase' }}>{t}</div>
+        {sub && <div style={{ fontFamily: fSans, fontSize: 13, color: Q.goldDim, marginTop: 3, lineHeight: 1.4 }}>{sub}</div>}
       </div>
       {children}
     </div>
@@ -350,20 +354,20 @@ function GoalModal({ Q, existing, alreadyUsed, profileGoal, weights, onClose, on
 
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 }}>
-      <div onClick={e => e.stopPropagation()} style={{ background: Q.bg2, border: `1px solid ${Q.gold}66`, padding: 24, maxWidth: 360, width: '100%' }}>
-        <div style={{ fontFamily: fCinzel, fontSize: 11, letterSpacing: '0.45em', color: Q.gold, textTransform: 'uppercase', textAlign: 'center', marginBottom: 18 }}>
-          {editMode ? 'MODIFICA OBIETTIVO' : '+ NUOVO OBIETTIVO'}
+      <div onClick={e => e.stopPropagation()} style={{ background: Q.bg2, border: `1px solid ${Q.gold}66`, padding: 24, maxWidth: 360, width: '100%', borderRadius: 16 }}>
+        <div style={{ fontFamily: fCinzel, fontSize: 12, letterSpacing: '0.02em', color: Q.gold, textAlign: 'center', marginBottom: 18 }}>
+          {editMode ? 'modifica obiettivo' : '+ NUOVO OBIETTIVO'}
         </div>
         {!type && (
           <>
             {availableTypes.length === 0 ? (
-              <div style={{ textAlign: 'center', fontFamily: fGaramond, fontStyle: 'italic', fontSize: 14, color: Q.goldDim, padding: 12 }}>
+              <div style={{ textAlign: 'center', fontFamily: fSans, fontSize: 14, color: Q.goldDim, padding: 12 }}>
                 Hai già aggiunto tutti gli obiettivi disponibili.
               </div>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                 {availableTypes.map(([k, d]) => (
-                  <button key={k} onClick={() => setType(k)} style={{ background: 'transparent', color: Q.cream, border: `1px solid ${Q.gold}66`, padding: '14px 8px', cursor: 'pointer', fontFamily: fGaramond, fontStyle: 'italic', fontSize: 14, display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
+                  <button key={k} onClick={() => setType(k)} style={{ background: 'transparent', color: Q.cream, border: `1px solid ${Q.gold}66`, padding: '14px 8px', cursor: 'pointer', fontFamily: fSans, fontSize: 14, display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center', borderRadius: 16 }}>
                     <span style={{ fontSize: 18, color: Q.gold }}>{d.icon}</span>
                     <span>{d.label}</span>
                     <span style={{ fontSize: 10, color: Q.goldDim }}>{d.unit}</span>
@@ -372,7 +376,7 @@ function GoalModal({ Q, existing, alreadyUsed, profileGoal, weights, onClose, on
               </div>
             )}
             <div style={{ textAlign: 'center', marginTop: 18 }}>
-              <button onClick={onClose} style={{ background: 'transparent', color: Q.goldDim, border: `1px solid ${Q.goldDim}66`, fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.3em', padding: '8px 14px', cursor: 'pointer' }}>ANNULLA</button>
+              <button onClick={onClose} style={{ background: 'transparent', color: Q.goldDim, border: `1px solid ${Q.goldDim}66`, fontFamily: fCinzel, fontSize: 12, letterSpacing: '0.02em', padding: '8px 14px', cursor: 'pointer', borderRadius: 16 }}>annulla</button>
             </div>
           </>
         )}
@@ -381,27 +385,27 @@ function GoalModal({ Q, existing, alreadyUsed, profileGoal, weights, onClose, on
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14, paddingBottom: 12, borderBottom: `1px solid ${Q.gold}33` }}>
               <span style={{ fontSize: 22, color: Q.gold }}>{def.icon}</span>
               <div style={{ flex: 1 }}>
-                <div style={{ fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.3em', color: Q.gold, textTransform: 'uppercase' }}>{def.label}</div>
-                <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 12, color: Q.goldDim }}>{def.unit}</div>
+                <div style={{ fontFamily: fCinzel, fontSize: 12, letterSpacing: '0.02em', color: Q.gold }}>{def.label}</div>
+                <div style={{ fontFamily: fSans, fontSize: 12, color: Q.goldDim }}>{def.unit}</div>
               </div>
               {!editMode && (
-                <button onClick={() => setType(null)} style={{ background: 'transparent', color: Q.goldDim, border: 'none', fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.2em', cursor: 'pointer' }}>cambia</button>
+                <button onClick={() => setType(null)} style={{ background: 'transparent', color: Q.goldDim, border: 'none', fontFamily: fCinzel, fontSize: 12, letterSpacing: '0.02em', cursor: 'pointer' }}>cambia</button>
               )}
             </div>
             <div style={{ marginBottom: 18 }}>
-              <div style={{ fontFamily: fCinzel, fontSize: 9, letterSpacing: '0.35em', color: Q.goldDim, textTransform: 'uppercase', marginBottom: 6 }}>OBIETTIVO</div>
+              <div style={{ fontFamily: fCinzel, fontSize: 12, letterSpacing: '0.02em', color: Q.goldDim, marginBottom: 6 }}>obiettivo</div>
               <input type="text" inputMode="decimal" value={target} onChange={e => setTarget(e.target.value)}
                 placeholder={String(suggested).replace('.', ',')}
-                style={{ width: '100%', background: 'transparent', border: `1px solid ${Q.gold}66`, color: Q.cream, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 22, padding: '10px 12px', textAlign: 'center', outline: 'none' }} />
-              <div style={{ marginTop: 6, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 11, color: Q.goldDim, textAlign: 'center' }}>{def.unit} · suggerito {String(suggested).replace('.', ',')}</div>
+                style={{ width: '100%', background: 'transparent', border: `1px solid ${Q.gold}66`, color: Q.cream, fontFamily: fGaramond, fontSize: 22, padding: '10px 12px', textAlign: 'center', outline: 'none', borderRadius: 16 }} />
+              <div style={{ marginTop: 6, fontFamily: fSans, fontSize: 12, color: Q.goldDim, textAlign: 'center' }}>{def.unit} · suggerito {String(suggested).replace('.', ',')}</div>
             </div>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 18, flexWrap: 'wrap' }}>
               {editMode && onDelete && (
-                <button onClick={onDelete} style={{ background: 'transparent', color: '#C99A7A', border: `1px solid #C99A7A66`, fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.3em', padding: '10px 14px', cursor: 'pointer' }}>ELIMINA</button>
+                <button onClick={onDelete} style={{ background: 'transparent', color: '#C99A7A', border: `1px solid #C99A7A66`, fontFamily: fCinzel, fontSize: 12, letterSpacing: '0.02em', padding: '10px 14px', cursor: 'pointer', borderRadius: 16 }}>elimina</button>
               )}
-              <button onClick={onClose} style={{ background: 'transparent', color: Q.goldDim, border: `1px solid ${Q.goldDim}66`, fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.3em', padding: '10px 14px', cursor: 'pointer' }}>ANNULLA</button>
+              <button onClick={onClose} style={{ background: 'transparent', color: Q.goldDim, border: `1px solid ${Q.goldDim}66`, fontFamily: fCinzel, fontSize: 12, letterSpacing: '0.02em', padding: '10px 14px', cursor: 'pointer', borderRadius: 16 }}>annulla</button>
               <button disabled={!valid} onClick={() => onSave({ goal_type: type, target_value: targetN, period: def.period })}
-                style={{ background: valid ? Q.gold : '#555', color: valid ? Q.ink : '#999', border: 'none', fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.3em', padding: '10px 18px', cursor: valid ? 'pointer' : 'not-allowed' }}>SALVA</button>
+                style={{ background: valid ? Q.gold : '#555', color: valid ? Q.bg2 : '#999', border: 'none', fontFamily: fCinzel, fontSize: 12, letterSpacing: '0.02em', padding: '10px 18px', cursor: valid ? 'pointer' : 'not-allowed' }}>salva</button>
             </div>
           </>
         )}
@@ -742,29 +746,22 @@ export default function StatistichePage({
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: `radial-gradient(ellipse at top, ${Q.bg1} 0%, ${Q.bg2} 100%)`, color: Q.cream, fontFamily: fGaramond, position: 'relative', overflow: 'hidden' }}>
-      <div aria-hidden style={{ position: 'absolute', inset: 14, border: `1px solid ${Q.gold}40`, borderRadius: 20, pointerEvents: 'none', zIndex: 1 }} />
-      <div aria-hidden style={{ position: 'absolute', inset: 20, border: `1px solid ${Q.gold}1A`, borderRadius: 16, pointerEvents: 'none', zIndex: 1 }} />
-      <div style={{ position: 'relative', zIndex: 2, padding: '24px 22px 60px', maxWidth: 480, margin: '0 auto' }}>
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <button onClick={onClose} style={{ background: 'transparent', color: Q.gold, border: `1px solid ${Q.gold}66`, fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.3em', padding: '8px 14px', cursor: 'pointer' }}>← INDIETRO</button>
-          <div style={{ fontFamily: fCinzel, fontSize: 11, letterSpacing: '0.45em', color: Q.gold, textTransform: 'uppercase' }}>STATISTICHE</div>
-          <div style={{ width: 70 }} />
-        </div>
-
-        {/* Period selector */}
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginTop: 22 }}>
+    <div style={{ minHeight: '100vh', background: PAGE_BG, color: Q.cream, fontFamily: fSans, position: 'relative' }}>
+      <div style={{ padding: '30px 22px 60px', maxWidth: 480, margin: '0 auto', boxSizing: 'border-box' }}>
+        <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: Q.cream, fontFamily: fSans, fontSize: 13, textDecoration: 'underline', textUnderlineOffset: 3, cursor: 'pointer', padding: 0, minHeight: 44 }}>‹ indietro</button>
+        <div style={{ fontSize: 11, letterSpacing: '0.02em', color: Q.gold, fontWeight: 600 }}>{periodObj?.label ? `periodo · ${String(periodObj.label).toLowerCase()}` : 'statistiche'}</div>
+        <h1 style={{ margin: '4px 0 0', fontFamily: fGaramond, fontSize: 36, fontWeight: 500, lineHeight: 1.05, paddingRight: 56 }}>Tutte le statistiche</h1>
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${PERIODS.length}, minmax(0, 1fr))`, gap: 6, marginTop: 18 }}>
           {PERIODS.map(p => (
-            <button key={p.id} onClick={() => setPeriod(p.id)}
-              style={{ background: period === p.id ? Q.gold : 'transparent', color: period === p.id ? Q.ink : Q.goldDim, border: `1px solid ${Q.gold}66`, fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.2em', padding: '7px 12px', cursor: 'pointer', textTransform: 'uppercase' }}>
-              {p.label}
+            <button key={p.id} onClick={() => setPeriod(p.id)} aria-pressed={period === p.id}
+              style={{ minHeight: 44, padding: '0 4px', borderRadius: 22, background: period === p.id ? Q.gold : 'transparent', color: period === p.id ? Q.bg2 : Q.cream, border: `1px solid ${period === p.id ? Q.gold : LINE}`, fontFamily: fSans, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+              {String(p.label).toLowerCase()}
             </button>
           ))}
         </div>
 
         {!stats && (
-          <div style={{ textAlign: 'center', padding: '60px 8px 0', fontFamily: fGaramond, fontStyle: 'italic', fontSize: 16, color: Q.goldDim }}>
+          <div style={{ textAlign: 'center', padding: '60px 8px 0', fontFamily: fGaramond, fontSize: 16, color: Q.goldDim }}>
             Nessuna pesata nel periodo selezionato.<br />Allarga il periodo o registra il primo peso.
           </div>
         )}
@@ -772,7 +769,7 @@ export default function StatistichePage({
         {stats && (
           <>
             {/* Calendario del mese: a colpo d'occhio quali giorni hai registrato qualcosa */}
-            <Section Q={Q} title="CALENDARIO" sub="i giorni con almeno un dato registrato">
+            <Section Q={Q} title="calendario" sub="i giorni con almeno un dato registrato">
               {(() => {
                 const today = new Date();
                 const year = calMonth.getFullYear();
@@ -852,7 +849,7 @@ export default function StatistichePage({
                     {/* Header navigazione mesi */}
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
                       <button type="button" onClick={goPrev} aria-label="mese precedente" style={navBtnStyle(canPrev)}>‹</button>
-                      <div style={{ flex: 1, textAlign: 'center', fontFamily: fGaramond, fontStyle: 'italic', fontSize: 14, color: Q.gold || Q.cream, opacity: 0.85, textTransform: 'capitalize' }}>
+                      <div style={{ flex: 1, textAlign: 'center', fontFamily: fSans, fontSize: 14, color: Q.gold || Q.cream, opacity: 0.85, textTransform: 'capitalize' }}>
                         {monthLabel}
                       </div>
                       <button type="button" onClick={goNext} aria-label="mese successivo" style={navBtnStyle(canNext)}>›</button>
@@ -861,7 +858,7 @@ export default function StatistichePage({
                     {/* Header giorni settimana */}
                     <div style={{ display: 'grid', gridTemplateColumns: `repeat(7, 1fr)`, gap: 4, marginBottom: 6 }}>
                       {dayLabels.map((l, i) => (
-                        <div key={i} style={{ fontFamily: fCinzel, fontSize: 9, letterSpacing: '0.2em', color: Q.cream, opacity: 0.45, textAlign: 'center', textTransform: 'uppercase' }}>
+                        <div key={i} style={{ fontFamily: fCinzel, fontSize: 12, letterSpacing: '0.02em', color: Q.cream, opacity: 0.45, textAlign: 'center' }}>
                           {l}
                         </div>
                       ))}
@@ -890,13 +887,13 @@ export default function StatistichePage({
                               justifyContent: 'center',
                               background: bg,
                               border: isSelected
-                                ? `2px solid ${Q.ink || '#1F140C'}`
+                                ? `2px solid ${Q.bg2 || '#1F140C'}`
                                 : info.isToday ? `2px solid ${Q.gold || '#C9A876'}` : `1px solid ${Q.cream || '#E8D8B8'}15`,
                               borderRadius: 2,
                               fontFamily: fGaramond,
                               fontStyle: info.isFuture ? 'italic' : 'normal',
                               fontSize: 12,
-                              color: info.score >= 2 ? Q.ink || '#1F140C' : (info.isFuture ? Q.cream + '55' : Q.cream),
+                              color: info.score >= 2 ? Q.bg2 || '#1F140C' : (info.isFuture ? Q.cream + '55' : Q.cream),
                               opacity: info.isFuture ? 0.3 : 1,
                               fontWeight: info.isToday || isSelected ? 700 : 400,
                               cursor: info.isFuture ? 'default' : 'pointer',
@@ -909,19 +906,19 @@ export default function StatistichePage({
                     </div>
 
                     {/* Legenda */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 12, color: Q.cream, opacity: 0.7 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16, fontFamily: fSans, fontSize: 12, color: Q.cream, opacity: 0.7 }}>
                       <span>{totalActive}/{totalPast} giorni con dati</span>
                       <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span style={{ display: 'inline-block', width: 14, height: 14, background: `${Q.gold || '#C9A876'}33`, borderRadius: 2 }} />
-                        <span style={{ display: 'inline-block', width: 14, height: 14, background: `${Q.gold || '#C9A876'}88`, borderRadius: 2 }} />
-                        <span style={{ display: 'inline-block', width: 14, height: 14, background: `${Q.gold || '#C9A876'}FF`, borderRadius: 2 }} />
-                        <span style={{ fontSize: 10, letterSpacing: '0.15em', textTransform: 'uppercase', fontFamily: fCinzel, fontStyle: 'normal', opacity: 0.8 }}>poco → molto</span>
+                        <span style={{ display: 'inline-block', width: 14, height: 14, background: `${Q.gold || '#C9A876'}33`, borderRadius: 16 }} />
+                        <span style={{ display: 'inline-block', width: 14, height: 14, background: `${Q.gold || '#C9A876'}88`, borderRadius: 16 }} />
+                        <span style={{ display: 'inline-block', width: 14, height: 14, background: `${Q.gold || '#C9A876'}FF`, borderRadius: 16 }} />
+                        <span style={{ fontSize: 12, letterSpacing: '0.02em', fontFamily: fCinzel, fontStyle: 'normal', opacity: 0.8 }}>poco → molto</span>
                       </span>
                     </div>
 
                     {/* Hint quando non c'è selezione */}
                     {!selectedDay && (
-                      <div style={{ marginTop: 12, textAlign: 'center', fontFamily: fGaramond, fontStyle: 'italic', fontSize: 12, color: Q.cream, opacity: 0.55 }}>
+                      <div style={{ marginTop: 12, textAlign: 'center', fontFamily: fSans, fontSize: 12, color: Q.cream, opacity: 0.55 }}>
                         tocca un giorno per vedere i dettagli
                       </div>
                     )}
@@ -943,16 +940,16 @@ export default function StatistichePage({
                       const rowStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '6px 0', borderBottom: `1px solid ${Q.gold}1A`, fontFamily: fGaramond, fontSize: 14, color: Q.cream };
                       const labelStyle = { fontFamily: fCinzel, fontSize: 9, letterSpacing: '0.3em', color: Q.goldDim, textTransform: 'uppercase' };
                       return (
-                        <div style={{ marginTop: 18, padding: '14px 14px', background: `${Q.gold}10`, border: `1px solid ${Q.gold}33` }}>
+                        <div style={{ marginTop: 18, padding: '14px 14px', background: `${Q.gold}10`, border: `1px solid ${Q.gold}33`, borderRadius: 16 }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                            <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 16, color: Q.gold, textTransform: 'capitalize' }}>
+                            <div style={{ fontFamily: fGaramond, fontSize: 16, color: Q.gold, textTransform: 'capitalize' }}>
                               {day.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                             </div>
                             <button onClick={() => setSelectedDay(null)} aria-label="chiudi"
                               style={{ background: 'transparent', border: 'none', color: Q.goldDim, fontSize: 22, lineHeight: 1, padding: '0 4px', cursor: 'pointer' }}>×</button>
                           </div>
                           {isEmpty ? (
-                            <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 13, color: Q.goldDim, textAlign: 'center', padding: '8px 0' }}>
+                            <div style={{ fontFamily: fSans, fontSize: 13, color: Q.goldDim, textAlign: 'center', padding: '8px 0' }}>
                               nessun dato registrato in questo giorno
                             </div>
                           ) : (
@@ -960,7 +957,7 @@ export default function StatistichePage({
                               {ws.map((w, idx) => (
                                 <div key={`w${idx}`} style={rowStyle}>
                                   <span style={labelStyle}>peso{ws.length > 1 ? ` (${idx + 1})` : ''}</span>
-                                  <span style={{ fontStyle: 'italic' }}>
+                                  <span style={{ }}>
                                     {fmt(w.weight)} kg
                                     {w.bodyFat != null && <span style={{ color: Q.goldDim, fontSize: 12, marginLeft: 8 }}>· {fmt(w.bodyFat)}% grasso</span>}
                                     {w.muscle != null && <span style={{ color: Q.goldDim, fontSize: 12, marginLeft: 8 }}>· {fmt(w.muscle)} muscolo</span>}
@@ -970,44 +967,44 @@ export default function StatistichePage({
                               {ms.length > 0 && (
                                 <div style={rowStyle}>
                                   <span style={labelStyle}>pasti</span>
-                                  <span style={{ fontStyle: 'italic' }}>{ms.length}{ms.some(m => m.photo || m.photo_url) ? ` · ${ms.filter(m => m.photo || m.photo_url).length} con foto` : ''}</span>
+                                  <span style={{ }}>{ms.length}{ms.some(m => m.photo || m.photo_url) ? ` · ${ms.filter(m => m.photo || m.photo_url).length} con foto` : ''}</span>
                                 </div>
                               )}
                               {sl && (
                                 <div style={rowStyle}>
                                   <span style={labelStyle}>sonno</span>
-                                  <span style={{ fontStyle: 'italic' }}>{sl.hours != null ? `${fmt(sl.hours)} ore` : '—'}{sl.quality ? ` · qualità ${sl.quality}/5` : ''}</span>
+                                  <span style={{ }}>{sl.hours != null ? `${fmt(sl.hours)} ore` : '—'}{sl.quality ? ` · qualità ${sl.quality}/5` : ''}</span>
                                 </div>
                               )}
                               {wg > 0 && (
                                 <div style={rowStyle}>
                                   <span style={labelStyle}>acqua</span>
-                                  <span style={{ fontStyle: 'italic' }}>{(wg / 250).toFixed(1).replace('.', ',')} bicchieri ({wg} ml)</span>
+                                  <span style={{ }}>{(wg / 250).toFixed(1).replace('.', ',')} bicchieri ({wg} ml)</span>
                                 </div>
                               )}
                               {wk.length > 0 && (
                                 <div style={rowStyle}>
                                   <span style={labelStyle}>allenamenti</span>
-                                  <span style={{ fontStyle: 'italic' }}>{wk.length}</span>
+                                  <span style={{ }}>{wk.length}</span>
                                 </div>
                               )}
                               {fs.length > 0 && (
                                 <div style={rowStyle}>
                                   <span style={labelStyle}>digiuni</span>
-                                  <span style={{ fontStyle: 'italic' }}>{fs.length} completati</span>
+                                  <span style={{ }}>{fs.length} completati</span>
                                 </div>
                               )}
                               {mn.length > 0 && (
                                 <div style={rowStyle}>
                                   <span style={labelStyle}>mindful</span>
-                                  <span style={{ fontStyle: 'italic' }}>{mn.length} sessioni</span>
+                                  <span style={{ }}>{mn.length} sessioni</span>
                                 </div>
                               )}
                               {dn.length > 0 && (
                                 <div style={{ ...rowStyle, borderBottom: 'none', flexDirection: 'column', alignItems: 'stretch', gap: 6 }}>
                                   <span style={labelStyle}>note diario</span>
                                   {dn.map((n, idx) => (
-                                    <div key={`n${idx}`} style={{ fontStyle: 'italic', fontSize: 13, color: Q.cream, lineHeight: 1.4, opacity: 0.9 }}>
+                                    <div key={`n${idx}`} style={{ fontSize: 13, color: Q.cream, lineHeight: 1.4, opacity: 0.9 }}>
                                       {n.text || n.body || '—'}
                                     </div>
                                   ))}
@@ -1024,7 +1021,7 @@ export default function StatistichePage({
             </Section>
 
             {/* Sezione 1: TREND PESO */}
-            <Section Q={Q} title="TREND PESO" sub={periodObj?.label.toLowerCase() === 'sempre' ? 'da quando hai iniziato' : `ultimi ${periodObj.days} giorni`}>
+            <Section Q={Q} title="trend peso" sub={periodObj?.label.toLowerCase() === 'sempre' ? 'da quando hai iniziato' : `ultimi ${periodObj.days} giorni`}>
               <div style={{ display: 'flex', justifyContent: 'space-around', marginBottom: 16 }}>
                 <StatRow Q={Q} label="peso medio" value={fmt(stats.avgW)} sub="kg" />
                 <StatRow Q={Q} label="delta" value={stats.delta != null ? `${stats.delta < 0 ? '−' : '+'}${fmt(Math.abs(stats.delta))}` : '—'} sub="kg" color={stats.delta != null ? (stats.delta < 0 ? '#A5B889' : '#C99A7A') : Q.cream} />
@@ -1048,23 +1045,23 @@ export default function StatistichePage({
                 })()}
               </svg>
               {/* Min/Max */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 11, color: Q.goldDim }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontFamily: fSans, fontSize: 12, color: Q.goldDim }}>
                 <span>min {fmt(stats.minW)} kg</span>
                 <span>max {fmt(stats.maxW)} kg</span>
               </div>
               {/* Goal ETA */}
               {goalEta && (
-                <div style={{ marginTop: 12, textAlign: 'center', fontFamily: fGaramond, fontStyle: 'italic', fontSize: 12, color: goalEta.color, padding: '8px 12px', background: `${goalEta.color}11`, border: `1px solid ${goalEta.color}33` }}>
+                <div style={{ marginTop: 12, textAlign: 'center', fontFamily: fSans, fontSize: 12, color: goalEta.color, padding: '8px 12px', background: `${goalEta.color}11`, border: `1px solid ${goalEta.color}33`, borderRadius: 16 }}>
                   {goalEta.msg}
                 </div>
               )}
             </Section>
 
             {/* Sezione: OBIETTIVI MULTIPLI */}
-            <Section Q={Q} title="OBIETTIVI" sub="i tuoi traguardi su sonno, idratazione, allenamento…">
+            <Section Q={Q} title="obiettivi" sub="i tuoi traguardi su sonno, idratazione, allenamento…">
               {goalsActive.length === 0 && (
-                <div style={{ textAlign: 'center', fontFamily: fGaramond, fontStyle: 'italic', fontSize: 13, color: Q.goldDim, padding: '8px 8px 14px' }}>
-                  Nessun obiettivo impostato. Tocca <span style={{ color: Q.gold }}>+ NUOVO</span> per iniziare.
+                <div style={{ textAlign: 'center', fontFamily: fSans, fontSize: 13, color: Q.goldDim, padding: '8px 8px 14px' }}>
+                  Nessun obiettivo impostato. Tocca <span style={{ color: Q.gold }}>+ nuovo</span> per iniziare.
                 </div>
               )}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -1093,21 +1090,21 @@ export default function StatistichePage({
                   const barColor = reached ? '#A5B889' : near ? Q.gold : Q.goldDim;
                   return (
                     <div key={g.id} onClick={() => setGoalModal(g)}
-                      style={{ padding: '12px 14px', border: `1px solid ${Q.gold}33`, cursor: 'pointer' }}>
+                      style={{ padding: '12px 14px', border: `1px solid ${Q.gold}33`, cursor: 'pointer', borderRadius: 16 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
                         <span style={{ fontSize: 20, color: Q.gold, minWidth: 22, textAlign: 'center' }}>{def.icon}</span>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.3em', color: Q.gold, textTransform: 'uppercase' }}>{def.label}</div>
-                          <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 11, color: Q.goldDim }}>{def.unit}</div>
+                          <div style={{ fontFamily: fCinzel, fontSize: 12, letterSpacing: '0.02em', color: Q.gold }}>{def.label}</div>
+                          <div style={{ fontFamily: fSans, fontSize: 12, color: Q.goldDim }}>{def.unit}</div>
                         </div>
                         <div style={{ textAlign: 'right' }}>
-                          <span style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 16, color: reached ? '#A5B889' : Q.cream }}>
+                          <span style={{ fontFamily: fGaramond, fontSize: 16, color: reached ? '#A5B889' : Q.cream }}>
                             {cur != null ? fmt(cur, def.step < 1 ? 1 : 0) : '—'}
                           </span>
-                          <span style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 12, color: Q.goldDim }}> / {fmt(target, def.step < 1 ? 1 : 0)}</span>
+                          <span style={{ fontFamily: fSans, fontSize: 12, color: Q.goldDim }}> / {fmt(target, def.step < 1 ? 1 : 0)}</span>
                         </div>
                       </div>
-                      <div style={{ height: 5, background: `${Q.goldDim}33`, borderRadius: 2, overflow: 'hidden' }}>
+                      <div style={{ height: 5, background: `${Q.goldDim}33`, borderRadius: 16, overflow: 'hidden' }}>
                         <div style={{ height: '100%', width: `${pct}%`, background: barColor, transition: 'width 0.3s ease' }} />
                       </div>
                     </div>
@@ -1116,15 +1113,15 @@ export default function StatistichePage({
               </div>
               <div style={{ textAlign: 'center', marginTop: 16 }}>
                 <button onClick={() => setGoalModal('new')}
-                  style={{ background: 'transparent', color: Q.gold, border: `1px solid ${Q.gold}66`, fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.35em', padding: '8px 16px', cursor: 'pointer', textTransform: 'uppercase' }}>
-                  + NUOVO OBIETTIVO
+                  style={{ background: 'transparent', color: Q.gold, border: `1px solid ${Q.gold}66`, fontFamily: fCinzel, fontSize: 12, letterSpacing: '0.02em', padding: '8px 16px', cursor: 'pointer', borderRadius: 16 }}>
+                  + nuovo obiettivo
                 </button>
               </div>
             </Section>
 
             {/* Sezione 2: COMPOSIZIONE CORPOREA */}
             {(compStats.bf || compStats.mu || compStats.wa) && (
-              <Section Q={Q} title="COMPOSIZIONE CORPOREA" sub="grasso · muscolo · acqua">
+              <Section Q={Q} title="composizione corporea" sub="grasso · muscolo · acqua">
                 <div style={{ display: 'flex', justifyContent: 'space-around', gap: 8 }}>
                   {compStats.bf && (
                     <StatRow Q={Q} label="% grasso" value={fmt(compStats.bf.last)}
@@ -1143,7 +1140,7 @@ export default function StatistichePage({
                   )}
                 </div>
                 {compStats.leanMass && (
-                  <div style={{ marginTop: 18, textAlign: 'center', fontFamily: fGaramond, fontStyle: 'italic', fontSize: 14, color: Q.cream }}>
+                  <div style={{ marginTop: 18, textAlign: 'center', fontFamily: fSans, fontSize: 14, color: Q.cream }}>
                     massa magra stimata <span style={{ color: Q.gold }}>{fmt(compStats.leanMass)} kg</span>
                   </div>
                 )}
@@ -1152,14 +1149,14 @@ export default function StatistichePage({
 
             {/* Sezione 3: PATTERN SETTIMANALI */}
             {dowPattern && (
-              <Section Q={Q} title="PATTERN SETTIMANALI" sub="peso medio per giorno della settimana">
+              <Section Q={Q} title="pattern settimanali" sub="peso medio per giorno della settimana">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', height: 100, padding: '0 4px' }}>
                   {dowPattern.avgs.map((avg, i) => {
                     if (avg == null) return (
                       <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, opacity: 0.3 }}>
                         <div style={{ flex: 1 }} />
                         <div style={{ width: '60%', height: 1, background: Q.goldDim }} />
-                        <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 10, color: Q.goldDim }}>{DOW_LABELS[i]}</div>
+                        <div style={{ fontFamily: fSans, fontSize: 12, color: Q.goldDim }}>{DOW_LABELS[i]}</div>
                       </div>
                     );
                     const span = Math.max(dowPattern.max - dowPattern.min, 0.3);
@@ -1169,21 +1166,21 @@ export default function StatistichePage({
                     const color = isBest ? '#A5B889' : isWorst ? '#C99A7A' : Q.gold;
                     return (
                       <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-                        <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 10, color }}>{fmt(avg, 1)}</div>
+                        <div style={{ fontFamily: fSans, fontSize: 12, color }}>{fmt(avg, 1)}</div>
                         <div style={{ width: '55%', height: h, background: color, opacity: 0.85 }} />
-                        <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 10, color: Q.goldDim }}>{DOW_LABELS[i]}</div>
+                        <div style={{ fontFamily: fSans, fontSize: 12, color: Q.goldDim }}>{DOW_LABELS[i]}</div>
                       </div>
                     );
                   })}
                 </div>
-                <div style={{ marginTop: 12, textAlign: 'center', fontFamily: fGaramond, fontStyle: 'italic', fontSize: 12, color: Q.goldDim }}>
+                <div style={{ marginTop: 12, textAlign: 'center', fontFamily: fSans, fontSize: 12, color: Q.goldDim }}>
                   più leggero il <span style={{ color: '#A5B889' }}>{DOW_LABELS[dowPattern.bestIdx]}edì</span> · più pesante il <span style={{ color: '#C99A7A' }}>{DOW_LABELS[dowPattern.worstIdx]}edì</span>
                 </div>
               </Section>
             )}
 
             {/* Sezione 4: ALTRE ABITUDINI */}
-            <Section Q={Q} title="ALTRE ABITUDINI" sub="nel periodo selezionato">
+            <Section Q={Q} title="altre abitudini" sub="nel periodo selezionato">
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                 <StatRow Q={Q} label="pasti registrati" value={otherAgg.mealsCount} sub={otherAgg.photosCount > 0 ? `di cui ${otherAgg.photosCount} con foto` : ''} />
                 <StatRow Q={Q} label="sonno medio" value={otherAgg.avgSleepHours != null ? fmt(otherAgg.avgSleepHours) : '—'} sub={otherAgg.avgSleepHours != null ? 'ore/notte' : ''} />
@@ -1197,54 +1194,54 @@ export default function StatistichePage({
         )}
 
         {/* Sezione: CORRELAZIONI (IA) */}
-        <Section Q={Q} title="CORRELAZIONI" sub="pattern tra le tue abitudini · generati con IA">
+        <Section Q={Q} title="correlazioni" sub="pattern tra le tue abitudini · generati con IA">
           {!insights && !insightsLoading && !insightsError && (
             <div style={{ textAlign: 'center' }}>
               <button onClick={() => generateInsights(false)}
-                style={{ background: 'transparent', color: Q.gold, border: `1px solid ${Q.gold}66`, fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.35em', padding: '10px 18px', cursor: 'pointer', textTransform: 'uppercase' }}>
-                ✦ GENERA INSIGHTS
+                style={{ background: 'transparent', color: Q.gold, border: `1px solid ${Q.gold}66`, fontFamily: fCinzel, fontSize: 12, letterSpacing: '0.02em', padding: '10px 18px', cursor: 'pointer', borderRadius: 16 }}>
+                genera insights
               </button>
-              <div style={{ marginTop: 10, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 11, color: Q.goldDim }}>
+              <div style={{ marginTop: 10, fontFamily: fSans, fontSize: 12, color: Q.goldDim }}>
                 L'IA analizza i dati settimanali per trovare correlazioni
               </div>
             </div>
           )}
           {insightsLoading && (
-            <div style={{ textAlign: 'center', padding: '14px', fontFamily: fGaramond, fontStyle: 'italic', color: Q.goldDim }}>
+            <div style={{ textAlign: 'center', padding: '14px', fontFamily: fGaramond, color: Q.goldDim }}>
               <span style={{ display: 'inline-block', animation: 'pulse 1.4s infinite' }}>✦</span> sto analizzando i tuoi dati…
             </div>
           )}
           {insightsError && (
-            <div style={{ textAlign: 'center', color: '#C99A7A', fontFamily: fGaramond, fontStyle: 'italic', fontSize: 13 }}>
+            <div style={{ textAlign: 'center', color: '#C99A7A', fontFamily: fSans, fontSize: 13 }}>
               errore: {insightsError}
               <div style={{ marginTop: 10 }}>
-                <button onClick={() => generateInsights(true)} style={{ background: 'transparent', color: Q.gold, border: `1px solid ${Q.gold}66`, fontFamily: fCinzel, fontSize: 9, letterSpacing: '0.3em', padding: '6px 14px', cursor: 'pointer' }}>RIPROVA</button>
+                <button onClick={() => generateInsights(true)} style={{ background: 'transparent', color: Q.gold, border: `1px solid ${Q.gold}66`, fontFamily: fCinzel, fontSize: 12, letterSpacing: '0.02em', padding: '6px 14px', cursor: 'pointer', borderRadius: 16 }}>riprova</button>
               </div>
             </div>
           )}
           {insights && (
             <>
               {insights.items.length === 0 && insights.note && (
-                <div style={{ textAlign: 'center', fontFamily: fGaramond, fontStyle: 'italic', fontSize: 13, color: Q.goldDim, padding: '14px' }}>
+                <div style={{ textAlign: 'center', fontFamily: fSans, fontSize: 13, color: Q.goldDim, padding: '14px' }}>
                   {insights.note}
                 </div>
               )}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {insights.items.map((it, i) => (
-                  <div key={i} style={{ padding: '14px 16px', border: `1px solid ${toneColor(it.tone)}44`, background: `${toneColor(it.tone)}0E` }}>
-                    <div style={{ fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.35em', color: toneColor(it.tone), textTransform: 'uppercase', marginBottom: 6 }}>{it.title}</div>
-                    <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 14, color: Q.cream, lineHeight: 1.45 }}>{it.body}</div>
+                  <div key={i} style={{ padding: '14px 16px', border: `1px solid ${toneColor(it.tone)}44`, background: `${toneColor(it.tone)}0E`, borderRadius: 16 }}>
+                    <div style={{ fontFamily: fCinzel, fontSize: 12, letterSpacing: '0.02em', color: toneColor(it.tone), marginBottom: 6 }}>{it.title}</div>
+                    <div style={{ fontFamily: fSans, fontSize: 14, color: Q.cream, lineHeight: 1.45 }}>{it.body}</div>
                   </div>
                 ))}
               </div>
               {insights.note && insights.items.length > 0 && (
-                <div style={{ marginTop: 12, textAlign: 'center', fontFamily: fGaramond, fontStyle: 'italic', fontSize: 11, color: Q.goldDim }}>{insights.note}</div>
+                <div style={{ marginTop: 12, textAlign: 'center', fontFamily: fSans, fontSize: 12, color: Q.goldDim }}>{insights.note}</div>
               )}
               <div style={{ textAlign: 'center', marginTop: 14 }}>
-                <button onClick={() => generateInsights(true)} style={{ background: 'transparent', color: Q.goldDim, border: `1px solid ${Q.goldDim}44`, fontFamily: fCinzel, fontSize: 9, letterSpacing: '0.3em', padding: '6px 14px', cursor: 'pointer' }}>
+                <button onClick={() => generateInsights(true)} style={{ background: 'transparent', color: Q.goldDim, border: `1px solid ${Q.goldDim}44`, fontFamily: fCinzel, fontSize: 12, letterSpacing: '0.02em', padding: '6px 14px', cursor: 'pointer', borderRadius: 16 }}>
                   ↻ RIGENERA
                 </button>
-                {insights.fromCache && <span style={{ marginLeft: 10, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 10, color: Q.goldDim }}>(da cache)</span>}
+                {insights.fromCache && <span style={{ marginLeft: 10, fontFamily: fSans, fontSize: 12, color: Q.goldDim }}>(da cache)</span>}
               </div>
             </>
           )}
@@ -1252,7 +1249,7 @@ export default function StatistichePage({
 
         {/* Sezione: RIASSUNTO MENSILE (IA) */}
         {currentMonth && (
-          <Section Q={Q} title="RIASSUNTO MENSILE" sub={new Date(currentMonth.mese + '-01').toLocaleDateString('it-IT', { month: 'long', year: 'numeric' })}>
+          <Section Q={Q} title="riassunto mensile" sub={new Date(currentMonth.mese + '-01').toLocaleDateString('it-IT', { month: 'long', year: 'numeric' })}>
             {/* Numeri base sempre visibili */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 16 }}>
               {currentMonth.peso_inizio != null && (
@@ -1271,34 +1268,34 @@ export default function StatistichePage({
             {!monthlySummary && !monthlyLoading && !monthlyError && (
               <div style={{ textAlign: 'center' }}>
                 <button onClick={() => generateMonthlySummary(false)}
-                  style={{ background: 'transparent', color: Q.gold, border: `1px solid ${Q.gold}66`, fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.35em', padding: '10px 18px', cursor: 'pointer', textTransform: 'uppercase' }}>
-                  ✦ GENERA RIASSUNTO
+                  style={{ background: 'transparent', color: Q.gold, border: `1px solid ${Q.gold}66`, fontFamily: fCinzel, fontSize: 12, letterSpacing: '0.02em', padding: '10px 18px', cursor: 'pointer', borderRadius: 16 }}>
+                  genera riassunto
                 </button>
-                <div style={{ marginTop: 10, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 11, color: Q.goldDim }}>
+                <div style={{ marginTop: 10, fontFamily: fSans, fontSize: 12, color: Q.goldDim }}>
                   L'IA scrive un riassunto narrativo del mese
                 </div>
               </div>
             )}
             {monthlyLoading && (
-              <div style={{ textAlign: 'center', padding: '14px', fontFamily: fGaramond, fontStyle: 'italic', color: Q.goldDim }}>
+              <div style={{ textAlign: 'center', padding: '14px', fontFamily: fGaramond, color: Q.goldDim }}>
                 <span style={{ display: 'inline-block' }}>✦</span> sto raccontando il tuo mese…
               </div>
             )}
             {monthlyError && (
-              <div style={{ textAlign: 'center', color: '#C99A7A', fontFamily: fGaramond, fontStyle: 'italic', fontSize: 13 }}>
+              <div style={{ textAlign: 'center', color: '#C99A7A', fontFamily: fSans, fontSize: 13 }}>
                 errore: {monthlyError}
                 <div style={{ marginTop: 10 }}>
-                  <button onClick={() => generateMonthlySummary(true)} style={{ background: 'transparent', color: Q.gold, border: `1px solid ${Q.gold}66`, fontFamily: fCinzel, fontSize: 9, letterSpacing: '0.3em', padding: '6px 14px', cursor: 'pointer' }}>RIPROVA</button>
+                  <button onClick={() => generateMonthlySummary(true)} style={{ background: 'transparent', color: Q.gold, border: `1px solid ${Q.gold}66`, fontFamily: fCinzel, fontSize: 12, letterSpacing: '0.02em', padding: '6px 14px', cursor: 'pointer', borderRadius: 16 }}>riprova</button>
                 </div>
               </div>
             )}
             {monthlySummary && (
               <>
-                <div style={{ padding: '14px 18px', border: `1px solid ${Q.gold}44`, background: `${Q.gold}0E`, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 15, color: Q.cream, lineHeight: 1.5, textAlign: 'left' }}>
+                <div style={{ padding: '14px 18px', border: `1px solid ${Q.gold}44`, background: `${Q.gold}0E`, fontFamily: fSans, fontSize: 15, color: Q.cream, lineHeight: 1.5, textAlign: 'left', borderRadius: 16 }}>
                   {monthlySummary}
                 </div>
                 <div style={{ textAlign: 'center', marginTop: 12 }}>
-                  <button onClick={() => generateMonthlySummary(true)} style={{ background: 'transparent', color: Q.goldDim, border: `1px solid ${Q.goldDim}44`, fontFamily: fCinzel, fontSize: 9, letterSpacing: '0.3em', padding: '6px 14px', cursor: 'pointer' }}>↻ RIGENERA</button>
+                  <button onClick={() => generateMonthlySummary(true)} style={{ background: 'transparent', color: Q.goldDim, border: `1px solid ${Q.goldDim}44`, fontFamily: fCinzel, fontSize: 12, letterSpacing: '0.02em', padding: '6px 14px', cursor: 'pointer', borderRadius: 16 }}>↻ RIGENERA</button>
                 </div>
               </>
             )}
@@ -1306,13 +1303,13 @@ export default function StatistichePage({
         )}
 
         {/* Sezione 5: EXPORT */}
-        <Section Q={Q} title="ESPORTA" sub="scarica tutti i tuoi dati in CSV">
+        <Section Q={Q} title="esporta" sub="scarica tutti i tuoi dati in CSV">
           <div style={{ textAlign: 'center' }}>
             <button onClick={() => exportAllCSV({ weights, meals, sleeps, water, workouts, workoutTypes, supplements, suppTaken, mindful, fasts, diaryNotes })}
-              style={{ background: Q.gold, color: Q.ink, border: 'none', fontFamily: fCinzel, fontSize: 11, letterSpacing: '0.35em', padding: '12px 26px', cursor: 'pointer', textTransform: 'uppercase' }}>
-              SCARICA CSV
+              style={{ background: Q.gold, color: Q.bg2, border: 'none', fontFamily: fCinzel, fontSize: 12, letterSpacing: '0.02em', padding: '12px 26px', cursor: 'pointer', borderRadius: 25, minHeight: 50, padding: '0 28px', fontWeight: 700 }}>
+              scarica i dati (csv)
             </button>
-            <div style={{ marginTop: 10, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 11, color: Q.goldDim }}>
+            <div style={{ marginTop: 10, fontFamily: fSans, fontSize: 12, color: Q.goldDim }}>
               riceverai un file per categoria (pesi, pasti, sonno, ecc.)
             </div>
           </div>

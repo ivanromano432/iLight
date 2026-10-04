@@ -1,22 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabase.js';
-
-const W = { bg: '#FFFFFF', ink: '#2A3942', tan: '#9AA5AB', accent: '#3F95A1', gold: '#3F95A1', sage: '#9CC756', cream: '#FAFAFA' };
-const fCardo = "'Inter',system-ui,sans-serif";
-const fCaveat = "'Inter',system-ui,sans-serif";
-const fCinzel = "'Inter',system-ui,sans-serif";
-
-function ensureFonts() {
-  if (document.getElementById('auth-fonts')) return;
-  const link = document.createElement('link');
-  link.id = 'auth-fonts';
-  link.rel = 'stylesheet';
-  link.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap';
-  document.head.appendChild(link);
-}
+import { C, fSerif, page, card, btn, chip, label, input, link, tag, muted, h2, ensureUiFonts } from './ui.js';
 
 export default function AuthScreen() {
-  useEffect(ensureFonts, []);
+  useEffect(ensureUiFonts, []);
 
   const [mode, setMode] = useState('signin');
   const [email, setEmail] = useState('');
@@ -48,7 +35,7 @@ export default function AuthScreen() {
       if (mode === 'signup') {
         const { error: e1 } = await supabase.auth.signUp({ email, password });
         if (e1) throw e1;
-        setInfo('Account creato. Controlla la tua email per confermare e poi torna ad accedere ✿');
+        setInfo('Account creato. Controlla la tua email per confermare e poi torna ad accedere');
         setMode('signin');
         setPassword('');
         setConsentTerms(false);
@@ -75,7 +62,7 @@ export default function AuthScreen() {
     try {
       const { error: e1 } = await supabase.auth.resetPasswordForEmail(email);
       if (e1) throw e1;
-      setInfo('Ti ho inviato un link per reimpostare la password. Controlla la posta ✿');
+      setInfo('Ti ho inviato un link per reimpostare la password. Controlla la posta');
     } catch (err) {
       setError(err?.message || 'Errore');
     } finally {
@@ -84,226 +71,110 @@ export default function AuthScreen() {
   }
 
   const isSignup = mode === 'signup';
+  const switchMode = (m) => { setMode(m); setError(''); setInfo(''); };
+  const check = (on) => ({ width: 22, height: 22, borderRadius: 6, flexShrink: 0, marginTop: 1, background: on ? C.gold : 'transparent', border: `2px solid ${C.gold}`, boxSizing: 'border-box', display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.navy, fontSize: 15, fontWeight: 800, lineHeight: 1 });
+  const section = { maxWidth: 480, margin: '0 auto', padding: '34px 24px 0', boxSizing: 'border-box' };
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: W.bg,
-      color: W.ink,
-      fontFamily: fCardo,
-    }}>
-
-      {/* === BAR TOP === */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 22px', borderBottom: `1px solid ${W.ink}11` }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <img src="/icon-192.png" alt="" style={{ width: 28, height: 28, borderRadius: 8, display: 'block' }} />
-          <div style={{ fontSize: 17, fontWeight: 800, letterSpacing: '-0.01em' }}>
-            <span style={{ color: '#9CC756' }}>Goal</span><span style={{ color: '#2A3942' }}>fit</span>
+    <div style={page}>
+      <section ref={formRef} style={{ ...section, paddingTop: 56 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 22 }}>
+          <span style={{ fontFamily: fSerif, fontSize: 56, fontWeight: 500, lineHeight: 1 }}>GoalFit</span>
+          <h1 style={{ fontFamily: fSerif, fontSize: 26, fontWeight: 400, lineHeight: 1.2, margin: 0 }}>Il diario quotidiano del tuo corpo</h1>
+        </div>
+        <form onSubmit={handleSubmit} style={{ ...card, borderRadius: 24, padding: 22, display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ background: C.navy, border: `1px solid ${C.line}`, borderRadius: 26, padding: 4, display: 'flex', gap: 4 }}>
+            <button type="button" onClick={() => switchMode('signin')} style={{ ...chip(!isSignup), flex: 1, border: 'none' }}>accedi</button>
+            <button type="button" onClick={() => switchMode('signup')} style={{ ...chip(isSignup), flex: 1, border: 'none' }}>crea account</button>
           </div>
-        </div>
-        <button onClick={() => scrollToForm('signin')} style={{ background: 'none', border: `1px solid ${W.accent}66`, color: W.accent, fontFamily: fCardo, fontWeight: 600, fontSize: 14, padding: '7px 16px', borderRadius: 999, cursor: 'pointer' }}>accedi</button>
-      </div>
-
-      {/* === HERO === */}
-      <section style={{ padding: '50px 24px 30px', textAlign: 'center', maxWidth: 720, margin: '0 auto' }}>
-        <img src="/icon-512.png" alt="GoalFit" style={{ width: 128, height: 128, display: 'block', margin: '0 auto 18px' }} />
-        <h1 style={{ fontFamily: fCardo, fontWeight: 400, fontSize: 32, lineHeight: 1.25, margin: '0 0 16px', color: W.ink }}>
-          Il diario quotidiano<br/>
-          <em style={{ color: W.accent }}>del tuo corpo</em>
-        </h1>
-        <p style={{ fontFamily: fCardo, fontStyle: 'italic', fontSize: 17, color: W.tan, maxWidth: 480, margin: '0 auto 28px', lineHeight: 1.55 }}>
-          Dimagrisci con la Dieta a Zona 40/30/30. Foto dei piatti riconosciute dall'IA, calorie e macronutrienti calcolati automaticamente, riflessioni personalizzate sul tuo percorso.
-        </p>
-        <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-          <button onClick={() => scrollToForm('signup')} style={{ background: W.sage, color: W.ink, border: 'none', fontFamily: fCardo, fontWeight: 700, fontSize: 16, padding: '14px 28px', borderRadius: 10, cursor: 'pointer', letterSpacing: 0.2 }}>
-            ✦ inizia gratis (14 giorni)
-          </button>
-          <button onClick={() => scrollToForm('signin')} style={{ background: 'transparent', color: W.accent, border: `1px solid ${W.accent}66`, fontFamily: fCardo, fontWeight: 600, fontSize: 16, padding: '14px 28px', borderRadius: 10, cursor: 'pointer' }}>
-            ho già un account
-          </button>
-        </div>
-        <div style={{ marginTop: 16, fontFamily: fCardo, fontStyle: 'italic', fontSize: 13, color: W.tan, opacity: 0.85 }}>
-          Nessuna carta richiesta per la prova gratuita
-        </div>
-      </section>
-
-      <Divider />
-
-      {/* === FUNZIONALITÀ === */}
-      <section style={{ padding: '40px 24px', maxWidth: 720, margin: '0 auto' }}>
-        <h2 style={{ fontFamily: fCardo, fontWeight: 400, fontSize: 24, textAlign: 'center', marginBottom: 32, color: W.ink }}>
-          <em>Tutto il tuo benessere</em> in un posto solo
-        </h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 24 }}>
-          <Feature icon="✦" title="IA che riconosce i pasti dalle foto"
-            text="Scatta una foto del tuo piatto. L'intelligenza artificiale identifica gli alimenti, stima la porzione e calcola calorie e macronutrienti."/>
-          <Feature icon="◯" title="Dieta a Zona 40/30/30"
-            text="Calorie e macro bilanciati automaticamente: 40% carboidrati, 30% proteine, 30% grassi. Calcolo personalizzato col tuo peso, altezza, età."/>
-          <Feature icon="✿" title="Diario completo del corpo"
-            text="Peso, sonno, allenamenti, idratazione, integratori, digiuno intermittente, sessioni di respiro. Tutto in un'unica app pulita."/>
-          <Feature icon="⚖" title="Suggerimenti che fanno dimagrire"
-            text="L'IA studia le tue abitudini e propone pasti bilanciati con alimenti che favoriscono il dimagrimento, evitando ciò che lo rallenta."/>
-          <Feature icon="∞" title="Statistiche e progressi"
-            text="Grafici di peso, media mobile, calorie consumate vs obiettivo. Vedi i tuoi progressi giorno per giorno, settimana per settimana."/>
-          <Feature icon="⟡" title="100% privato"
-            text="I tuoi dati di salute restano tuoi. Niente pubblicità, niente tracker, niente cookie di profilazione. Cancelli l'account in 1 click e tutto sparisce."/>
-        </div>
-      </section>
-
-      <Divider />
-
-      {/* === COME FUNZIONA === */}
-      <section style={{ padding: '40px 24px', maxWidth: 720, margin: '0 auto', textAlign: 'center' }}>
-        <h2 style={{ fontFamily: fCardo, fontWeight: 400, fontSize: 24, marginBottom: 30, color: W.ink }}>
-          <em>Come funziona</em>
-        </h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 28, textAlign: 'left' }}>
-          <Step n="1" title="Imposta il profilo" text="Età, altezza, peso attuale e obiettivo. L'app calcola il tuo fabbisogno calorico con la formula Mifflin-St Jeor."/>
-          <Step n="2" title="Registra ogni giorno" text="Tocca una foto per il pasto, segna peso e sonno, accumula bicchieri d'acqua. Pochi tap, tutto coerente."/>
-          <Step n="3" title="Segui i suggerimenti" text="L'IA propone menù bilanciati, riflessioni serali e indicazioni concrete su cosa cambiare per dimagrire."/>
-        </div>
-      </section>
-
-      <Divider />
-
-      {/* === PRICING === */}
-      <section style={{ padding: '40px 24px', maxWidth: 460, margin: '0 auto', textAlign: 'center' }}>
-        <h2 style={{ fontFamily: fCardo, fontWeight: 400, fontSize: 24, marginBottom: 8, color: W.ink }}>
-          <em>Prezzo onesto</em>
-        </h2>
-        <p style={{ fontFamily: fCardo, fontStyle: 'italic', fontSize: 15, color: W.tan, marginBottom: 28 }}>
-          Inizia con 14 giorni gratuiti, poi decidi tu.
-        </p>
-        <div style={{ background: W.cream, border: `1px solid ${W.gold}55`, padding: '28px 24px', textAlign: 'left' }}>
-          <div style={{ fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.35em', color: W.tan, textTransform: 'uppercase', marginBottom: 10 }}>PROVA GRATUITA</div>
-          <div style={{ fontFamily: fCardo, fontSize: 36, color: W.ink, lineHeight: 1, marginBottom: 8 }}>
-            14 giorni <span style={{ fontSize: 18, color: W.tan, fontStyle: 'italic' }}>gratis</span>
-          </div>
-          <div style={{ fontFamily: fCardo, fontStyle: 'italic', fontSize: 14, color: W.tan, marginBottom: 18 }}>
-            Tutte le funzioni, senza carta di credito.
-          </div>
-          <div style={{ height: 1, background: `${W.ink}22`, margin: '18px 0' }} />
-          <div style={{ fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.35em', color: W.tan, textTransform: 'uppercase', marginBottom: 10 }}>POI</div>
-          <div style={{ fontFamily: fCardo, fontSize: 16, color: W.ink, lineHeight: 1.6 }}>
-            Abbonamento mensile o annuale. Cancella quando vuoi. Diritto di recesso 14 giorni.
-          </div>
-          <div style={{ marginTop: 22, textAlign: 'center' }}>
-            <button onClick={() => scrollToForm('signup')} style={{ background: W.sage, color: W.ink, border: 'none', fontFamily: fCardo, fontWeight: 700, fontSize: 16, padding: '13px 28px', borderRadius: 10, cursor: 'pointer' }}>
-              inizia ora ✦
-            </button>
-          </div>
-        </div>
-      </section>
-
-      <Divider />
-
-      {/* === FORM === */}
-      <section ref={formRef} style={{ padding: '40px 24px 28px', maxWidth: 420, margin: '0 auto' }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontFamily: fCinzel, fontSize: 11, letterSpacing: '0.35em', color: W.tan, textTransform: 'uppercase', marginBottom: 8 }}>
-            {isSignup ? 'CREA ACCOUNT' : 'BENTORNATO'}
-          </div>
-          <h2 style={{ fontFamily: fCardo, fontWeight: 400, fontSize: 26, marginBottom: 6, color: W.ink }}>
-            {isSignup ? <em>Inizia il tuo percorso</em> : <em>Riprendi da dove eri</em>}
-          </h2>
-          <p style={{ fontFamily: fCardo, fontStyle: 'italic', fontSize: 14, color: W.tan, marginBottom: 28 }}>
-            {isSignup ? '14 giorni gratuiti, niente carta richiesta.' : 'Accedi con la tua email.'}
-          </p>
-        </div>
-
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <input type="email" placeholder="email" value={email} onChange={e => setEmail(e.target.value.trim())} autoComplete="email" style={inputStyle} required />
-          <input type="password" placeholder="password" value={password} onChange={e => setPassword(e.target.value)} autoComplete={isSignup ? 'new-password' : 'current-password'} minLength={6} style={inputStyle} required />
-
-          {error && <div style={{ fontFamily: fCardo, fontStyle: 'italic', fontSize: 14, color: '#A0524C' }}>{error}</div>}
-          {info && <div style={{ fontFamily: fCardo, fontStyle: 'italic', fontSize: 14, color: W.tan }}>{info}</div>}
-
-          {isSignup && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4 }}>
-              <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', fontFamily: fCardo, fontStyle: 'italic', fontSize: 13, color: W.ink, lineHeight: 1.5 }}>
-                <input type="checkbox" checked={consentTerms} onChange={e => setConsentTerms(e.target.checked)} style={{ marginTop: 3, width: 16, height: 16, accentColor: W.ink, flexShrink: 0 }} />
-                <span>Ho letto e accetto i <a href="/termini" target="_blank" rel="noopener noreferrer" style={{ color: W.tan, borderBottom: `1px solid ${W.tan}66`, textDecoration: 'none' }}>Termini di Servizio</a> e l'<a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: W.tan, borderBottom: `1px solid ${W.tan}66`, textDecoration: 'none' }}>Informativa Privacy</a>.</span>
-              </label>
-              <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', fontFamily: fCardo, fontStyle: 'italic', fontSize: 13, color: W.ink, lineHeight: 1.5 }}>
-                <input type="checkbox" checked={consentHealth} onChange={e => setConsentHealth(e.target.checked)} style={{ marginTop: 3, width: 16, height: 16, accentColor: W.ink, flexShrink: 0 }} />
-                <span>Acconsento esplicitamente al trattamento dei miei <b>dati sanitari</b> (peso, alimentazione, sonno, attività fisica) ai sensi dell'art. 9.2.a GDPR.</span>
-              </label>
-              <div style={{ fontFamily: fCardo, fontSize: 11, color: W.tan, fontStyle: 'italic', lineHeight: 1.5, opacity: 0.85 }}>
-                Dichiari di avere 18 anni o più. Puoi revocare i consensi in qualunque momento dal profilo.
-              </div>
-            </div>
-          )}
-
-          <button type="submit" disabled={busy} style={{ marginTop: 6, background: W.sage, color: W.ink, border: 'none', fontFamily: fCardo, fontWeight: 700, fontSize: 17, padding: '14px 28px', borderRadius: 10, cursor: busy ? 'wait' : 'pointer', letterSpacing: 0.2, opacity: busy ? 0.6 : 1 }}>
-            {busy ? '...' : (isSignup ? '✦ registrati' : '✦ accedi')}
-          </button>
+          <label><span style={label}>email</span>
+            <input type="email" value={email} onChange={e => setEmail(e.target.value.trim())} autoComplete="email" required style={input(20)} /></label>
+          <label><span style={label}>password</span>
+            <input type="password" value={password} onChange={e => setPassword(e.target.value)} autoComplete={isSignup ? 'new-password' : 'current-password'} minLength={6} required style={input(20)} /></label>
+          {isSignup && (<>
+            <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', cursor: 'pointer', fontSize: 13, lineHeight: 1.45 }}>
+              <input type="checkbox" checked={consentTerms} onChange={e => setConsentTerms(e.target.checked)} style={{ position: 'absolute', opacity: 0, width: 22, height: 22, margin: 0 }} />
+              <span aria-hidden="true" style={check(consentTerms)}>{consentTerms ? '✓' : ''}</span>
+              <span>Ho letto e accetto i <a href="/termini" target="_blank" rel="noopener noreferrer" style={{ color: C.cream }}>Termini di Servizio</a> e l'<a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: C.cream }}>Informativa Privacy</a>.</span>
+            </label>
+            <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', cursor: 'pointer', fontSize: 13, lineHeight: 1.45 }}>
+              <input type="checkbox" checked={consentHealth} onChange={e => setConsentHealth(e.target.checked)} style={{ position: 'absolute', opacity: 0, width: 22, height: 22, margin: 0 }} />
+              <span aria-hidden="true" style={check(consentHealth)}>{consentHealth ? '✓' : ''}</span>
+              <span>Acconsento esplicitamente al trattamento dei miei <b>dati sanitari</b> (peso, alimentazione, sonno, attività fisica) ai sensi dell'art. 9.2.a GDPR.</span>
+            </label>
+            <span style={{ fontSize: 12, color: C.dim, lineHeight: 1.5 }}>Dichiari di avere 18 anni o più. Puoi revocare i consensi in qualunque momento dal profilo.</span>
+          </>)}
+          {error && <div role="alert" style={{ fontSize: 14, color: C.sal, lineHeight: 1.4 }}>{error}</div>}
+          {info && <div style={{ fontSize: 14, lineHeight: 1.4 }}>{info}</div>}
+          <button type="submit" disabled={busy} style={{ ...btn(), opacity: busy ? 0.6 : 1 }}>{busy ? '…' : (isSignup ? 'inizia la prova gratuita' : 'accedi')}</button>
+          {isSignup && <span style={{ fontSize: 13, color: C.dim, textAlign: 'center' }}>14 giorni gratis · nessuna carta richiesta</span>}
         </form>
-
-        <div style={{ marginTop: 26, fontFamily: fCardo, fontSize: 15, color: W.ink, opacity: 0.7, textAlign: 'center' }}>
-          {isSignup ? 'hai già un account?' : 'nuovo qui?'}
-          {' '}
-          <button type="button" onClick={() => { setMode(isSignup ? 'signin' : 'signup'); setError(''); setInfo(''); }} style={{ background: 'none', border: 'none', fontFamily: fCardo, fontStyle: 'italic', fontSize: 15, color: W.accent, cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 3, padding: 0 }}>
-            {isSignup ? 'accedi' : 'registrati'}
-          </button>
-        </div>
-
         {!isSignup && (
-          <div style={{ marginTop: 14, textAlign: 'center' }}>
-            <button type="button" onClick={handleResetPassword} disabled={busy} style={{ background: 'none', border: 'none', fontFamily: fCardo, fontStyle: 'italic', fontSize: 13, color: W.tan, cursor: 'pointer', padding: 0 }}>
-              password dimenticata?
-            </button>
+          <div style={{ display: 'flex', justifyContent: 'center', marginTop: 16 }}>
+            <button type="button" onClick={handleResetPassword} disabled={busy} style={{ ...link, minHeight: 44 }}>password dimenticata?</button>
           </div>
         )}
       </section>
 
-      {/* === FOOTER === */}
-      <footer style={{ marginTop: 40, padding: '28px 24px 36px', borderTop: `1px solid ${W.ink}22`, textAlign: 'center', fontFamily: fCardo, fontSize: 13, color: W.tan, lineHeight: 1.7 }}>
-        <div style={{ marginBottom: 10 }}>
-          <a href="/privacy" style={{ color: W.tan, marginRight: 16, borderBottom: `1px solid ${W.tan}55`, textDecoration: 'none', paddingBottom: 1 }}>Privacy</a>
-          <a href="/termini" style={{ color: W.tan, borderBottom: `1px solid ${W.tan}55`, textDecoration: 'none', paddingBottom: 1 }}>Termini</a>
+      <section style={section}>
+        <span style={tag}>cosa trovi dentro</span>
+        <div style={{ display: 'flex', flexDirection: 'column', marginTop: 8 }}>
+          <Feature title="L'IA riconosce i pasti dalle foto" text="Scatti una foto del piatto: l'intelligenza artificiale identifica gli alimenti, stima la porzione e calcola calorie e nutrienti." />
+          <Feature title="Dieta a Zona 40/30/30" text="Calorie e nutrienti bilanciati in automatico: 40% carboidrati, 30% proteine, 30% grassi, calcolati su peso, altezza ed età." />
+          <Feature title="Un coach che conosce i tuoi dati" text="Chiedi cosa mangiare stasera o perché il peso è fermo: risponde guardando quello che hai registrato." />
+          <Feature title="Tutto il corpo in un posto" text="Peso, sonno, allenamenti, acqua, integratori, digiuno e respiro, con statistiche semplici da leggere." />
+          <Feature title="100% privato" text="I tuoi dati di salute restano tuoi. Niente pubblicità, niente profilazione. Cancelli l'account in un tocco e tutto sparisce." last />
         </div>
-        <div style={{ fontStyle: 'italic', fontSize: 12 }}>
-          Romano Formazione S.a.s. · P.IVA 02477940999<br/>
-          Via Macaggi 25/10 — 16121 Genova
+      </section>
+
+      <section style={section}>
+        <span style={tag}>come funziona</span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 12 }}>
+          <Step n="1" title="Imposta il profilo" text="Età, altezza, peso attuale e obiettivo: l'app calcola il tuo fabbisogno." />
+          <Step n="2" title="Registra ogni giorno" text="Una foto per il pasto, un tocco per peso, acqua e integratori." />
+          <Step n="3" title="Segui i suggerimenti" text="Menù bilanciati, lettura della giornata e indicazioni concrete per dimagrire." />
         </div>
+      </section>
+
+      <section style={section}>
+        <div style={{ ...card, borderRadius: 24, padding: 22, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <span style={tag}>prova gratuita</span>
+          <span style={{ fontFamily: fSerif, fontSize: 40, fontWeight: 500, lineHeight: 1.1 }}>14 giorni gratis</span>
+          <span style={muted}>Tutte le funzioni, senza carta di credito. Poi abbonamento mensile o annuale: cancelli quando vuoi, con diritto di recesso di 14 giorni.</span>
+          <button onClick={() => scrollToForm('signup')} style={{ ...btn(), marginTop: 8 }}>inizia ora</button>
+          <button onClick={() => scrollToForm('signin')} style={btn(false)}>ho già un account</button>
+        </div>
+      </section>
+
+      <footer style={{ maxWidth: 480, margin: '0 auto', padding: '34px 24px 44px', textAlign: 'center', fontSize: 12, color: C.dim, lineHeight: 1.7 }}>
+        <div style={{ marginBottom: 8 }}>
+          <a href="/privacy" style={{ color: C.cream, marginRight: 18 }}>Privacy</a>
+          <a href="/termini" style={{ color: C.cream }}>Termini</a>
+        </div>
+        Romano Formazione S.a.s. · P.IVA 02477940999<br />
+        Via Macaggi 25/10 — 16121 Genova
       </footer>
     </div>
   );
 }
 
-function Feature({ icon, title, text }) {
+function Feature({ title, text, last }) {
   return (
-    <div style={{ padding: '16px 4px' }}>
-      <div style={{ fontSize: 24, color: W.accent, lineHeight: 1, marginBottom: 10 }}>{icon}</div>
-      <h3 style={{ fontFamily: fCardo, fontWeight: 400, fontSize: 18, color: W.ink, marginBottom: 6, lineHeight: 1.3 }}>{title}</h3>
-      <p style={{ fontFamily: fCardo, fontStyle: 'italic', fontSize: 14, color: W.tan, lineHeight: 1.55, margin: 0 }}>{text}</p>
+    <div style={{ padding: '14px 0', borderBottom: last ? 'none' : `1px solid ${C.line}` }}>
+      <h3 style={{ ...h2, fontSize: 22 }}>{title}</h3>
+      <p style={{ ...muted, margin: '4px 0 0' }}>{text}</p>
     </div>
   );
 }
 
 function Step({ n, title, text }) {
   return (
-    <div>
-      <div style={{ fontFamily: fCardo, fontSize: 42, color: W.accent, opacity: 0.85, lineHeight: 1, marginBottom: 8, fontStyle: 'italic' }}>{n}</div>
-      <h3 style={{ fontFamily: fCardo, fontWeight: 400, fontSize: 18, color: W.ink, marginBottom: 4 }}>{title}</h3>
-      <p style={{ fontFamily: fCardo, fontStyle: 'italic', fontSize: 14, color: W.tan, lineHeight: 1.55, margin: 0 }}>{text}</p>
+    <div style={{ display: 'flex', gap: 14 }}>
+      <span style={{ width: 40, height: 40, borderRadius: '50%', border: `2px solid ${C.gold}`, boxSizing: 'border-box', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: fSerif, fontSize: 22, color: C.gold }}>{n}</span>
+      <div>
+        <h3 style={{ ...h2, fontSize: 22 }}>{title}</h3>
+        <p style={{ ...muted, margin: '2px 0 0' }}>{text}</p>
+      </div>
     </div>
   );
 }
-
-function Divider() {
-  return <div style={{ width: 80, height: 1, background: W.ink, opacity: 0.18, margin: '20px auto' }} />;
-}
-
-const inputStyle = {
-  fontFamily: fCardo,
-  fontSize: 16,
-  padding: '13px 16px',
-  border: `1px solid ${W.accent}40`,
-  background: '#fff',
-  color: W.ink,
-  outline: 'none',
-  borderRadius: 10,
-  width: '100%',
-  boxSizing: 'border-box',
-};

@@ -4,7 +4,7 @@
 
 import { useState } from 'react';
 import { supabase } from './supabase.js';
-import { getTheme } from './themes.js';
+import { C, fSerif, page, column, kicker, h1, muted, card, btn, link, tag } from './ui.js';
 
 // Tema fisso refettorio per modalità paywall (pricing deve essere stabile)
 const REFETTORIO = { bg1: '#3A2818', bg2: '#1F140C', gold: '#C9A876', goldDim: '#8B7355', cream: '#E8D8B8', ink: '#1F140C' };
@@ -25,7 +25,6 @@ function daysUntil(isoDate) {
 export default function SubscriptionPage({ user, profile, onClose, paywallMode = false, onLogout }) {
   // In modalità paywall mantengo lo stile refettorio coerente coi piani/prezzi.
   // In modalità normale (dall'avatar) seguo il tema attivo dell'utente.
-  const Q = paywallMode ? REFETTORIO : getTheme(profile?.theme);
 
   const [loading, setLoading] = useState(null); // 'monthly' | 'yearly' | 'portal' | null
   const [error, setError] = useState(null);
@@ -72,150 +71,64 @@ export default function SubscriptionPage({ user, profile, onClose, paywallMode =
     }
   };
 
+  // --- Render nuovo stile ---
+  const status = (kick, title, text, bar) => (
+    <div style={{ ...card, display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <span style={tag}>{kick}</span>
+      <span style={{ fontFamily: fSerif, fontSize: 30, fontWeight: 500, lineHeight: 1.1 }}>{title}</span>
+      {bar != null && <div style={{ height: 10, borderRadius: 5, background: '#2A4466' }}><div style={{ width: `${Math.round(bar * 100)}%`, height: 10, borderRadius: 5, background: C.gold }} /></div>}
+      {text && <span style={muted}>{text}</span>}
+    </div>
+  );
   return (
-    <div style={{ minHeight: '100vh', background: `radial-gradient(ellipse at top, ${Q.bg1} 0%, ${Q.bg2} 100%)`, color: Q.cream, fontFamily: fGaramond, position: 'relative', overflow: 'hidden' }}>
-      <div aria-hidden style={{ position: 'absolute', inset: 14, border: `1px solid ${Q.gold}40`, borderRadius: 20, pointerEvents: 'none', zIndex: 1 }} />
-      <div aria-hidden style={{ position: 'absolute', inset: 20, border: `1px solid ${Q.gold}1A`, borderRadius: 16, pointerEvents: 'none', zIndex: 1 }} />
-      <div style={{ position: 'relative', zIndex: 2, padding: '24px 22px 60px', maxWidth: 480, margin: '0 auto' }}>
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          {paywallMode ? (
-            <button onClick={onLogout} style={{ background: 'transparent', color: Q.goldDim, border: `1px solid ${Q.goldDim}66`, fontFamily: fCinzel, fontSize: 9, letterSpacing: '0.3em', padding: '8px 12px', cursor: 'pointer' }}>ESCI</button>
-          ) : (
-            <button onClick={onClose} style={{ background: 'transparent', color: Q.gold, border: `1px solid ${Q.gold}66`, fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.3em', padding: '8px 14px', cursor: 'pointer' }}>← INDIETRO</button>
-          )}
-          <div style={{ fontFamily: fCinzel, fontSize: 11, letterSpacing: '0.45em', color: Q.gold, textTransform: 'uppercase' }}>ABBONAMENTO</div>
-          <div style={{ width: 70 }} />
+    <div style={page}>
+      <div style={{ ...column, display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div>
+          {paywallMode
+            ? <button onClick={onLogout} style={{ ...link, minHeight: 44 }}>esci dall'account</button>
+            : <button onClick={onClose} style={{ ...link, minHeight: 44 }}>‹ indietro</button>}
+          <div style={kicker}>GoalFit Premium</div>
+          <h1 style={h1}>Abbonamento</h1>
         </div>
 
-        {/* Hero / stato corrente */}
-        <div style={{ textAlign: 'center', marginTop: 32 }}>
-          <img src="/icon-512.png" alt="GoalFit" style={{ width: 96, height: 96, display: 'block', margin: '0 auto 12px' }} />
-          <div style={{ fontFamily: fCinzel, fontSize: 22, letterSpacing: '0.3em', color: Q.gold, textTransform: 'uppercase' }}>GOALFIT</div>
-          <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 14, color: Q.goldDim, marginTop: 6 }}>Premium</div>
-        </div>
+        {isLifetimeFree && status('accesso a vita', 'Premium per sempre', 'Hai accesso completo a GoalFit, senza addebiti.')}
+        {isTrial && trialDaysLeft > 0 && status('prova gratuita in corso', trialDaysLeft === 1 ? 'Ultimo giorno' : `${trialDaysLeft} giorni rimasti`, null, Math.max(0.04, Math.min(1, (14 - trialDaysLeft) / 14)))}
+        {(paywallMode || (isTrial && trialDaysLeft === 0)) && !isActive && status('prova terminata', 'Scegli un piano', 'Per continuare a usare GoalFit serve un abbonamento. I tuoi dati sono tutti al loro posto.')}
+        {isActive && status('abbonamento attivo', 'Tutto a posto', profile?.current_period_end ? `Rinnovo automatico il ${new Date(profile.current_period_end).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })}.` : '')}
+        {isPastDue && status('pagamento in sospeso', 'C’è un problema', 'Il metodo di pagamento non è andato a buon fine. Sistemalo da "gestisci abbonamento".')}
 
-        {/* Banner stato */}
-        {isLifetimeFree && (
-          <div style={{ marginTop: 28, padding: '14px 18px', textAlign: 'center', border: `1px solid ${Q.gold}66`, background: `${Q.gold}11` }}>
-            <div style={{ fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.35em', color: Q.gold, textTransform: 'uppercase' }}>✦ ACCESSO LIFETIME</div>
-            <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 14, color: Q.cream, marginTop: 6 }}>
-              Hai accesso completo a GoalFit Premium per sempre, senza addebiti.
-            </div>
-          </div>
-        )}
-        {isTrial && trialDaysLeft > 0 && (
-          <div style={{ marginTop: 28, padding: '14px 18px', textAlign: 'center', border: `1px solid #A5B88944`, background: '#A5B8890E' }}>
-            <div style={{ fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.3em', color: '#A5B889', textTransform: 'uppercase' }}>PROVA GRATUITA IN CORSO</div>
-            <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 18, color: Q.cream, marginTop: 6 }}>
-              {trialDaysLeft === 1 ? 'ultimo giorno' : `rimangono ${trialDaysLeft} giorni`}
-            </div>
-          </div>
-        )}
-        {(paywallMode || (isTrial && trialDaysLeft === 0)) && !isActive && (
-          <div style={{ marginTop: 28, padding: '14px 18px', textAlign: 'center', border: `1px solid #C99A7A44`, background: '#C99A7A0E' }}>
-            <div style={{ fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.3em', color: '#C99A7A', textTransform: 'uppercase' }}>PROVA TERMINATA</div>
-            <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 14, color: Q.cream, marginTop: 6 }}>
-              Per continuare a usare GoalFit, scegli un piano
-            </div>
-          </div>
-        )}
-        {isActive && (
-          <div style={{ marginTop: 28, padding: '14px 18px', textAlign: 'center', border: `1px solid #A5B88944`, background: '#A5B8890E' }}>
-            <div style={{ fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.3em', color: '#A5B889', textTransform: 'uppercase' }}>ABBONAMENTO ATTIVO</div>
-            {profile?.current_period_end && (
-              <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 13, color: Q.cream, marginTop: 6 }}>
-                rinnovo automatico il {new Date(profile.current_period_end).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })}
-              </div>
-            )}
-          </div>
-        )}
-        {isPastDue && (
-          <div style={{ marginTop: 28, padding: '14px 18px', textAlign: 'center', border: `1px solid #C99A7A44`, background: '#C99A7A0E' }}>
-            <div style={{ fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.3em', color: '#C99A7A', textTransform: 'uppercase' }}>PAGAMENTO IN SOSPESO</div>
-            <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 13, color: Q.cream, marginTop: 6 }}>
-              C'è un problema col tuo metodo di pagamento. Gestiscilo dal portale.
-            </div>
-          </div>
-        )}
-
-        {/* Cosa include (anche per lifetime, come riepilogo amichevole) */}
-        {(!isActive && !isLifetimeFree) || isLifetimeFree ? (
-          <div style={{ marginTop: 32 }}>
-            <div style={{ fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.4em', color: Q.gold, textTransform: 'uppercase', textAlign: 'center', marginBottom: 16 }}>{isLifetimeFree ? '✦ HAI ACCESSO A' : '✦ INCLUSO'}</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 14, color: Q.cream, paddingLeft: 12 }}>
-              <div>· Diario libero con analisi IA dei tuoi pasti</div>
-              <div>· 9 mondi tematici per peso, sonno, allenamento, mindful, digiuno…</div>
-              <div>· Statistiche avanzate: trend lungo periodo, correlazioni, pattern</div>
-              <div>· Riassunti mensili generati dall'IA</div>
-              <div>· Obiettivi multipli con progress bar</div>
-              <div>· Esportazione CSV di tutti i tuoi dati</div>
-              <div>· Sincronizzazione multi-dispositivo</div>
-            </div>
-          </div>
-        ) : null}
-
-        {/* Cosa include (versione ridotta, sostituita sopra) */}
-        {false && !isActive && !isLifetimeFree && (
-          <div style={{ marginTop: 32 }}>
-            <div style={{ fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.4em', color: Q.gold, textTransform: 'uppercase', textAlign: 'center', marginBottom: 16 }}>✦ INCLUSO</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 14, color: Q.cream, paddingLeft: 12 }}>
-              <div>· Diario libero con analisi IA dei tuoi pasti</div>
-              <div>· 9 mondi tematici per peso, sonno, allenamento, mindful, digiuno…</div>
-              <div>· Statistiche avanzate: trend lungo periodo, correlazioni, pattern</div>
-              <div>· Riassunti mensili generati dall'IA</div>
-              <div>· Obiettivi multipli con progress bar</div>
-              <div>· Esportazione CSV di tutti i tuoi dati</div>
-              <div>· Sincronizzazione multi-dispositivo</div>
-            </div>
-          </div>
-        )}
-
-        {/* Piani */}
-        {!isActive && !isLifetimeFree && (
-          <div style={{ marginTop: 32 }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {PLANS.map(p => (
-                <button key={p.id} onClick={() => checkout(p.id)} disabled={!!loading}
-                  style={{ position: 'relative', background: p.popular ? Q.gold : 'transparent', color: p.popular ? Q.ink : Q.cream, border: `1px solid ${p.popular ? Q.gold : Q.gold + '66'}`, padding: '20px 22px', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading && loading !== p.id ? 0.5 : 1, textAlign: 'left', fontFamily: fGaramond }}>
-                  {p.popular && (
-                    <div style={{ position: 'absolute', top: -10, right: 16, background: '#A5B889', color: Q.ink, fontFamily: fCinzel, fontSize: 9, letterSpacing: '0.25em', padding: '3px 10px', textTransform: 'uppercase' }}>consigliato</div>
-                  )}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                    <span style={{ fontFamily: fCinzel, fontSize: 11, letterSpacing: '0.35em' }}>{p.label}</span>
-                    <span style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 26 }}>{p.price}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontStyle: 'italic', fontSize: 13, opacity: 0.8 }}>
-                    <span>{p.saveLabel || ' '}</span>
-                    <span>{p.period}</span>
-                  </div>
-                  {loading === p.id && <div style={{ marginTop: 8, textAlign: 'center', fontFamily: fGaramond, fontStyle: 'italic', fontSize: 12 }}>apertura checkout…</div>}
-                </button>
-              ))}
-            </div>
-            <div style={{ marginTop: 14, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 11, color: Q.goldDim, textAlign: 'center', lineHeight: 1.5 }}>
-              Pagamento gestito da Stripe. Annulla quando vuoi.<br />
-              Hai un codice sconto? Inseriscilo nella schermata checkout.
-            </div>
-          </div>
-        )}
-
-        {/* Gestisci abbonamento esistente */}
-        {hasStripeCustomer && !isLifetimeFree && (
-          <div style={{ marginTop: 30, textAlign: 'center' }}>
-            <button onClick={openPortal} disabled={!!loading}
-              style={{ background: 'transparent', color: Q.gold, border: `1px solid ${Q.gold}66`, fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.3em', padding: '10px 18px', cursor: loading ? 'not-allowed' : 'pointer', textTransform: 'uppercase' }}>
-              {loading === 'portal' ? 'apertura portale…' : '↗ GESTISCI ABBONAMENTO'}
+        {!isActive && !isLifetimeFree && (<>
+          {[...PLANS].sort((a, b) => (b.popular ? 1 : 0) - (a.popular ? 1 : 0)).map(p => (
+            <button key={p.id} onClick={() => checkout(p.id)} disabled={!!loading}
+              style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: 18, borderRadius: 22, background: C.card, border: p.popular ? `2px solid ${C.gold}` : `1px solid ${C.line}`, color: C.cream, textAlign: 'left', cursor: loading ? 'default' : 'pointer', fontFamily: 'inherit', opacity: loading && loading !== p.id ? 0.6 : 1 }}>
+              <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                <span style={tag}>{p.label.toLowerCase()}</span>
+                {p.popular && <span style={{ background: C.gold, color: C.navy, fontSize: 13, fontWeight: 600, padding: '5px 12px', borderRadius: 14 }}>consigliato</span>}
+              </span>
+              <span style={{ fontFamily: fSerif, fontSize: 40, fontWeight: 500, lineHeight: 1.1 }}>{p.price} <span style={{ fontSize: 20 }}>{p.period}</span></span>
+              <span style={{ fontSize: 13, color: C.dim }}>{loading === p.id ? 'apro il pagamento…' : (p.saveLabel || 'annulli quando vuoi')}</span>
             </button>
-            <div style={{ marginTop: 8, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 11, color: Q.goldDim }}>
-              cambia metodo pagamento, scarica ricevute, annulla
-            </div>
-          </div>
-        )}
+          ))}
+          <span style={{ ...muted, fontSize: 13, textAlign: 'center' }}>Tocca un piano per continuare. Pagamento gestito da Stripe: annulli quando vuoi. Il codice sconto si inserisce nella schermata di pagamento.</span>
+        </>)}
 
-        {error && (
-          <div style={{ marginTop: 20, padding: '10px 14px', border: `1px solid #C99A7A66`, background: '#C99A7A14', color: '#C99A7A', fontFamily: fGaramond, fontStyle: 'italic', fontSize: 13, textAlign: 'center' }}>
-            {error}
+        {error && <div role="alert" style={{ fontSize: 14, color: C.sal, lineHeight: 1.4 }}>{error}</div>}
+
+        {hasStripeCustomer && !isLifetimeFree && (<>
+          <button onClick={openPortal} disabled={!!loading} style={btn(false)}>{loading === 'portal' ? 'apro il portale…' : 'gestisci abbonamento e ricevute'}</button>
+          <span style={{ ...muted, fontSize: 12, textAlign: 'center' }}>Cambia metodo di pagamento, scarica le ricevute o annulla.</span>
+        </>)}
+
+        {(!isActive || isLifetimeFree) && (
+          <div style={{ marginTop: 10 }}>
+            <span style={tag}>cosa include</span>
+            <ul style={{ margin: '8px 0 0', paddingLeft: 20, fontSize: 14, lineHeight: 1.7, color: C.cream }}>
+              <li>Foto dei pasti riconosciute dall'IA, con calorie e nutrienti</li>
+              <li>Coach che risponde guardando i tuoi dati</li>
+              <li>Peso, menù, digiuno, integrazione, allenamenti, respiro, sonno e diario</li>
+              <li>Statistiche complete, obiettivi e riassunti mensili dell'IA</li>
+              <li>Esportazione dei tuoi dati e sincronizzazione tra dispositivi</li>
+            </ul>
           </div>
         )}
       </div>

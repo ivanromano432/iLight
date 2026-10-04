@@ -909,7 +909,7 @@ export default function App({ user, onLogout }){
         {page==='oggi' && <OggiPage theme={__theme} loaded={loaded} profile={profile} weights={weights} goal={goal} meals={meals} notes={foodNotes} water={waterByDay} waterGoal={waterGoal} workouts={workouts} sleeps={sleeps} fasts={fasts} supps={supplements} taken={suppTaken} updWater={updWater} setPage={setPageIdx} />}
         {page==='peso' && <PesoPage theme={__theme} loaded={loaded} weights={weights} goal={goal} updWeights={updWeights} updGoal={updGoal} meals={meals} updMeals={updMeals} openStats={() => setShowStats(true)} profile={profile} openSub={() => setShowSub(true)} />}
         {page==='stats' && <StatsPage theme={__theme} loaded={loaded} weights={weights} goal={goal} meals={meals} profile={profile} openFull={() => { setShowStats(true); try { window.scrollTo(0, 0); } catch (_) {} }} />}
-        {page==='coach' && <CoachPage theme={__theme} loaded={loaded} profile={profile} weights={weights} goal={goal} meals={meals} water={waterByDay} waterGoal={waterGoal} workouts={workouts} workoutTypes={workoutTypes} sleeps={sleeps} fasts={fasts} supps={supplements} taken={suppTaken} notes={foodNotes} mindful={mindfulSessions} />}
+        {page==='coach' && <CoachPage user={user} theme={__theme} loaded={loaded} profile={profile} weights={weights} goal={goal} meals={meals} water={waterByDay} waterGoal={waterGoal} workouts={workouts} workoutTypes={workoutTypes} sleeps={sleeps} fasts={fasts} supps={supplements} taken={suppTaken} notes={foodNotes} mindful={mindfulSessions} />}
         {page==='aggiorna' && <AggiornaPage theme={__theme} loaded={loaded} weights={weights} updWeights={updWeights} supps={supplements} taken={suppTaken} updTaken={updTaken} water={waterByDay} waterGoal={waterGoal} updWater={updWater} workouts={workouts} fasts={fasts} sleeps={sleeps} meals={meals} go={goPage} />}
         {page==='foto' && <FotoPage theme={__theme} loaded={loaded} meals={meals} />}
         {page==='pasti' && <PastiPage profile={profile} seedPhotoInit={photoSeed} clearSeedPhoto={() => setPhotoSeed(null)} user={user} theme={__theme} loaded={loaded} meals={meals} updMeals={updMeals} notes={foodNotes} weights={weights} goal={goal} />}
@@ -1376,45 +1376,89 @@ function buildCoachContext({ profile, weights, goal, meals, water, waterGoal, wo
 }
 function CoachPage(props){
   const T = props.theme;
+  const uid = props.user?.id;
   const [msgs, setMsgs] = useState([]);
+  const [ready, setReady] = useState(false);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const [confirmNew, setConfirmNew] = useState(false);
   const endRef = useRef(null);
-  useEffect(()=>{ try { endRef.current?.scrollIntoView({ block:'end' }); } catch(_) {} }, [msgs, busy]);
+  // La conversazione è salvata nel database (tabella coach_messages) e si ricarica a ogni apertura
+  useEffect(()=>{
+    let alive = true;
+    (async()=>{
+      if (!uid) { setReady(true); return; }
+      const { data, error } = await supabase.from('coach_messages').select('id,role,content,ts').eq('user_id', uid).order('ts', { ascending:false }).limit(200);
+      if (!alive) return;
+      if (error) console.error('[coach] load error', error.message);
+      setMsgs((data||[]).slice().reverse());
+      setReady(true);
+    })();
+    return ()=>{ alive = false; };
+  },[uid]);
+  useEffect(()=>{ try { endRef.current?.scrollIntoView({ block:'end' }); } catch(_) {} }, [msgs, busy, ready]);
+  useEffect(()=>{ if (!confirmNew) return; const id = setTimeout(()=>setConfirmNew(false), 4000); return ()=>clearTimeout(id); }, [confirmNew]);
+  async function persist(m){
+    if (!uid) return;
+    const { error } = await supabase.from('coach_messages').insert({ id:m.id, user_id:uid, role:m.role, content:m.content, ts:m.ts });
+    if (error) console.error('[coach] save error', error.message);
+  }
+  async function newChat(){
+    if (!confirmNew) { setConfirmNew(true); return; }
+    setConfirmNew(false); setMsgs([]); setErr('');
+    if (uid) { const { error } = await supabase.from('coach_messages').delete().eq('user_id', uid); if (error) console.error('[coach] delete error', error.message); }
+  }
   async function send(text){
     const q = (text ?? input).trim();
     if (!q || busy) return;
-    const next = [...msgs, { role:'user', content:q }];
+    const mine = { id:newId(), role:'user', content:q, ts:new Date().toISOString() };
+    const next = [...msgs, mine];
     setMsgs(next); setInput(''); setErr(''); setBusy(true);
+    persist(mine);
     try {
       const system = 'Sei il coach di GoalFit, un\'app italiana per il controllo del peso. Parli in italiano, in modo diretto, caldo e concreto, con risposte brevi (massimo 6-8 frasi, niente elenchi lunghi). '
         + 'Dai consigli generali su alimentazione, peso e abitudini basandoti sui dati reali dell\'utente riportati qui sotto: citali quando servono e non inventare dati che non ci sono. '
         + 'Non fai diagnosi e non sostituisci medico o nutrizionista: per problemi di salute, farmaci, gravidanza o obiettivi di peso estremi invita a rivolgersi a un professionista.\n\n'
         + 'DATI DELL\'UTENTE (ultimi 30 giorni):\n' + buildCoachContext(props);
-      const res = await fetch('/api/anthropic', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ model:'claude-sonnet-4-6', max_tokens:900, system, messages: next.slice(-12) }) });
+      // All'IA vanno solo gli ultimi 12 messaggi: la cronologia completa resta a schermo
+      let recent = next.slice(-12).map(m=>({ role:m.role, content:m.content }));
+      while (recent.length && recent[0].role !== 'user') recent = recent.slice(1);
+      const res = await fetch('/api/anthropic', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ model:'claude-sonnet-4-6', max_tokens:900, system, messages: recent }) });
       if (!res.ok) { let d=''; try { const j=await res.json(); d=j?.error?.message||j?.error||''; } catch(_) {} throw new Error('HTTP '+res.status+(d?' '+(typeof d==='string'?d:JSON.stringify(d)):'')); }
       const data = await res.json();
       const txt = data.content?.find(c=>c.type==='text')?.text || '';
       if (!txt) throw new Error('risposta vuota');
-      setMsgs([...next, { role:'assistant', content:txt }]);
+      const reply = { id:newId(), role:'assistant', content:txt, ts:new Date().toISOString() };
+      setMsgs(cur=>[...cur, reply]);
+      persist(reply);
     } catch (e) {
       setErr('Il coach non ha risposto. Riprova tra poco. (' + (e?.message||'errore') + ')');
     } finally { setBusy(false); }
   }
   const chips = ['Come sta andando il mio peso?', 'Cosa mangio stasera?', 'Dove posso migliorare questa settimana?'];
+  const tk = dayKey(new Date()), yk = dayKey(new Date(Date.now()-86400000));
+  const dayLabel = k => k===tk ? 'oggi' : k===yk ? 'ieri' : parseDayKey(k).toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long'});
+  let lastDay = null;
   return (
     <NavShell T={T} kicker="vede i tuoi dati degli ultimi 30 giorni" title="Coach">
       <div style={{display:'flex',flexDirection:'column',gap:10,paddingBottom:120}}>
-        {msgs.length===0 && (
-          <div style={{...navCard(T),padding:'14px 16px',fontSize:15,lineHeight:1.5}}>Chiedimi del tuo peso, dei pasti o di cosa migliorare. Rispondo guardando quello che hai registrato nell'app. Sono consigli generali: non sostituiscono medico o nutrizionista.</div>
+        {!ready && <Loading color={T.gold} />}
+        {ready && msgs.length>0 && (
+          <button onClick={newChat} style={{alignSelf:'flex-start',minHeight:44,padding:'0 16px',borderRadius:22,background:'transparent',border:`1px solid ${confirmNew?'#F0B9A0':`${T.cream}55`}`,color:confirmNew?'#F0B9A0':T.cream,fontFamily:fDmSans,fontSize:13,cursor:'pointer'}}>{confirmNew ? 'tocca ancora per cancellare la conversazione' : 'nuova conversazione'}</button>
         )}
-        {msgs.map((m,i)=>(
-          <div key={i} style={{alignSelf:m.role==='user'?'flex-end':'flex-start',maxWidth:'86%',padding:'11px 14px',borderRadius:18,background:m.role==='user'?T.gold:`${T.cream}14`,border:m.role==='user'?'none':`1px solid ${T.gold}33`,color:m.role==='user'?T.bg2:T.cream,fontSize:15,lineHeight:1.45,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{m.content}</div>
-        ))}
+        {ready && msgs.length===0 && (
+          <div style={{...navCard(T),padding:'14px 16px',fontSize:15,lineHeight:1.5}}>Chiedimi del tuo peso, dei pasti o di cosa migliorare. Rispondo guardando quello che hai registrato nell'app, e la conversazione resta salvata. Sono consigli generali: non sostituiscono medico o nutrizionista.</div>
+        )}
+        {msgs.map((m,i)=>{ const k = dayKey(new Date(m.ts||Date.now())); const sep = k!==lastDay; lastDay = k; return (
+          <div key={m.id||i} style={{display:'flex',flexDirection:'column',gap:10}}>
+            {sep && <div style={{alignSelf:'center',fontSize:11,letterSpacing:'0.14em',textTransform:'uppercase',opacity:0.7,fontWeight:600,padding:'6px 0 0'}}>{dayLabel(k)}</div>}
+            <div style={{alignSelf:m.role==='user'?'flex-end':'flex-start',maxWidth:'86%',padding:'11px 14px',borderRadius:18,background:m.role==='user'?T.gold:`${T.cream}14`,border:m.role==='user'?'none':`1px solid ${T.gold}33`,color:m.role==='user'?T.bg2:T.cream,fontSize:15,lineHeight:1.45,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{m.content}</div>
+          </div>
+        ); })}
         {busy && <div style={{alignSelf:'flex-start',padding:'11px 14px',borderRadius:18,background:`${T.cream}14`,fontSize:15,opacity:0.8}}>sto guardando i tuoi dati…</div>}
-        {err && <div style={{fontSize:13,color:T.danger||'#C99A7A'}}>{err}</div>}
-        {msgs.length===0 && (
+        {err && <div style={{fontSize:13,color:'#F0B9A0'}}>{err}</div>}
+        {ready && msgs.length===0 && (
           <div style={{display:'flex',flexDirection:'column',gap:8,marginTop:6}}>
             {chips.map(c=>(<button key={c} onClick={()=>send(c)} disabled={busy||!props.loaded} style={{minHeight:46,padding:'0 16px',borderRadius:23,background:'transparent',border:`1px solid ${T.gold}`,color:T.cream,fontFamily:fDmSans,fontSize:14,textAlign:'left',cursor:'pointer'}}>{c}</button>))}
           </div>

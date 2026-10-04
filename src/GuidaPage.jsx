@@ -1,244 +1,112 @@
-// Guida completa di GoalFit. Accessibile dall'avatar utente in alto a destra.
-// Una sezione per ognuno dei 9 mondi + statistiche, obiettivi, abbonamento, FAQ.
-
+// Guida di GoalFit. Si apre dal menu del profilo (foto in alto a destra).
+// Una voce per ogni parte dell'app, a fisarmonica.
 import { useState } from 'react';
-import { getTheme } from './themes.js';
-
-const fGaramond = '"Cormorant Garamond", serif';
-const fCinzel = '"Cinzel", serif';
+import { C, fSerif, page, column, kicker, h1, link } from './ui.js';
 
 const SECTIONS = [
-  {
-    id: 'intro',
-    title: 'Filosofia',
-    short: 'cosa è GoalFit',
-    body: [
-      'GoalFit è ispirata alla quercia. Cresce lenta, ma forte.',
-      'A differenza delle app fitness che ti chiedono di contare calorie e macros ossessivamente, GoalFit ti accompagna in un percorso più lento: ti osserva, ti dà spazio per scrivere a parole come stai, e usa l\'intelligenza artificiale per estrarre i dati invece di chiedertelo.',
-      'L\'idea è che il benessere arrivi dalla costanza, non dal controllo. Registra anche solo 30 secondi al giorno e GoalFit impara.',
-    ],
-  },
-  {
-    id: 'peso',
-    title: 'I · Peso',
-    short: 'pesate e composizione corporea',
-    body: [
-      '·Tap su "REGISTRA PESO" per aggiungere una pesata. Inserisci almeno il peso in kg.',
-      '·Tap su "+ composizione corporea (RENPHO)" per aprire 3 campi opzionali: % grasso, % muscolo, % acqua. Sono quelli tipici che mostra una bilancia smart (Renpho è solo un esempio diffuso). Li copi a mano dalla bilancia, non c\'è sincronizzazione automatica.',
-      '·Tap su "obiettivo" per impostare un peso target. Apparirà come linea tratteggiata bianca sul grafico statistiche.',
-      '·Il grafico mostra gli ultimi 7 giorni con linea oro (peso) e tratteggiata terra (% grasso). Sotto, il banner narrativo ti dice se stai dimagrendo bene o se stai perdendo muscolo.',
-      '·"✦ STATISTICHE COMPLETE" apre l\'analisi avanzata (vedi sezione Statistiche più sotto).',
-    ],
-  },
-  {
-    id: 'diario',
-    title: 'II · Diario',
-    short: 'la magia dell\'IA',
-    body: [
-      'Il diario è il cuore di GoalFit. Scrivi naturale, l\'IA estrae i dati.',
-      'Esempio: scrivi "stamane caffè, panino al prosciutto a pranzo, due bicchieri d\'acqua, dormito 7 ore e mezza"',
-      'Tap "Registra con IA". Dopo qualche secondo, l\'IA ti propone:',
-      '·Pasti riconosciuti (colazione, pranzo, etc.) con kcal stimate',
-      '·Bicchieri d\'acqua del giorno',
-      '·Una notte di sonno con orari approssimati',
-      'Spunti quali vuoi salvare e tap su "Conferma". I dati finiscono nelle pagine giuste.',
-      'Suggerimento: scrivi 1 nota al giorno, anche corta. Più materiale ha l\'IA, migliori sono le correlazioni e i riassunti mensili.',
-    ],
-  },
-  {
-    id: 'pasti',
-    title: 'III · Pasti',
-    short: 'pianificati e fatti',
-    body: [
-      'Tre tab in alto: "consigliati" / "pianificati" / "fatti".',
-      '·CONSIGLIATI: chiedi all\'IA un menù della giornata. Risponde con proposte rispettose dei tuoi obiettivi.',
-      '·PIANIFICATI: pasti che intendi mangiare. Tap su uno per "spostarlo a FATTI" quando l\'hai consumato.',
-      '·FATTI: i pasti effettivamente consumati. Sono quelli che contano per le statistiche.',
-      'Per ogni pasto: tipo (colazione, spuntino, pranzo, merenda, cena, spuntino serale), descrizione testuale, grammi opzionali, kcal/proteine/carb/grassi opzionali, foto opzionale dalla galleria o fotocamera.',
-      'Suggerimento: non devi compilare tutto. Una descrizione testuale + kcal stimate è già ottimo. La foto aiuta a ricordare a posteriori.',
-    ],
-  },
-  {
-    id: 'integra',
-    title: 'IV · Integra',
-    short: 'integratori giornalieri',
-    body: [
-      'Due viste: "lista integratori" e "presi oggi".',
-      '·Tap su "+ NUOVO INTEGRATORE" per aggiungere un integratore alla tua lista personale (es. Vitamina D, Magnesio). Scegli un colore per riconoscerlo a colpo d\'occhio.',
-      '·Nella griglia giornaliera, tap su un integratore per segnarlo come "preso oggi". Tap di nuovo per togliere.',
-      '·Lo storico dei presi è separato per ogni giorno: puoi spostarti tra giorni passati usando le frecce.',
-      'Suggerimento: usa questa pagina come "checklist" della mattina, non come database medico.',
-    ],
-  },
-  {
-    id: 'allena',
-    title: 'V · Allena',
-    short: 'allenamenti e tipi',
-    body: [
-      'Prima di registrare allenamenti, hai una lista di "tipi": corsa, camminata, pesi, yoga (i 4 default), più qualunque tipo tu crei.',
-      '·Tap su "GESTISCI TIPI" per aggiungere, rinominare o eliminare i tipi. Ogni tipo ha un\'unità di misura (km, min, kg, rep, m).',
-      '·Tap su "REGISTRA ALLENAMENTO" per una sessione nuova. Scegli il tipo, inserisci la quantità (es. 5 km, 30 min), aggiungi note opzionali.',
-      '·Lo storico mostra le sessioni in ordine temporale. Tap su una sessione per modificarla o eliminarla.',
-      'Le sessioni contano per gli obiettivi "Allenamenti/settimana" nella pagina statistiche.',
-    ],
-  },
-  {
-    id: 'digiuno',
-    title: 'VI · Digiuno',
-    short: 'digiuno intermittente',
-    body: [
-      'GoalFit supporta i digiuni intermittenti più comuni (16:8, 18:6, 20:4, 24h) o digiuni liberi senza obiettivo.',
-      '·Tap "AVVIA DIGIUNO" → scegli durata target → il timer parte.',
-      '·Vedi il timer in tempo reale: ore trascorse e ore restanti al traguardo. Una barra circolare ti mostra il progresso.',
-      '·Quando vuoi interrompere, tap "INTERROMPI". Il digiuno viene chiuso e contato anche se non hai raggiunto il target.',
-      '·Lo storico mostra tutti i digiuni passati con durata effettiva.',
-      'Suggerimento: non saltare il digiuno se ti senti male. GoalFit celebra anche i "digiuni interrotti consapevolmente" come dati validi.',
-    ],
-  },
-  {
-    id: 'respiro',
-    title: 'VII · Respiro',
-    short: 'sessioni mindful guidate',
-    body: [
-      'Sessioni guidate di respirazione/meditazione, dai 2 ai 20 minuti.',
-      '·Tipi disponibili: respiro 4-7-8, respiro quadrato, meditazione guidata, pausa consapevole.',
-      '·Tap "INIZIA SESSIONE" → scegli tipo e durata → segui il cerchio pulsante e gli inviti vocali.',
-      '·Al termine, la sessione viene salvata. Lo storico mostra quante sessioni hai fatto in settimana.',
-      'Suggerimento: usa una sessione di 5 minuti come pausa nelle giornate stressanti.',
-    ],
-  },
-  {
-    id: 'sonno',
-    title: 'VIII · Sonno',
-    short: 'qualità delle notti',
-    body: [
-      '·Tap "REGISTRA SONNO" la mattina al risveglio. Inserisci orario di "a letto", orario di "sveglia", qualità (1-5 stelle).',
-      'IMPORTANTE: la "data del risveglio" è il giorno della mattinata, non della sera in cui sei andato a letto. Se vai a letto martedì sera e ti svegli mercoledì, la wake date è mercoledì.',
-      '·Note opzionali per ricordare se ti sei svegliato di notte, se hai sognato qualcosa, ecc.',
-      'L\'app considera un solo sonno per notte. Se registri di nuovo per la stessa data, sovrascrivi il precedente.',
-      'Suggerimento: anche solo registrare gli orari basta. Le note le aggiungi quando hai voglia.',
-    ],
-  },
-  {
-    id: 'sera',
-    title: 'IX · Sera',
-    short: 'rituale di chiusura',
-    body: [
-      'Pagina di chiusura della giornata. Un riassunto di quello che hai fatto oggi: pasti consumati, bicchieri d\'acqua, allenamenti, sessioni mindful, integratori presi.',
-      '·Una sezione di "riflessione serale" dove scrivi 2-3 cose: cosa è andato bene oggi, cosa migliorerei, gratitudine.',
-      '·Tap "CHIUDI LA GIORNATA" per archiviare il giorno (puoi sempre riaprire e modificare).',
-      'Suggerimento: usa questa pagina la sera, prima di dormire, anche solo per 2 minuti. È la pratica più sottovalutata ma di maggior impatto sulla costanza.',
-    ],
-  },
-  {
-    id: 'statistiche',
-    title: '✦ Statistiche',
-    short: 'trend, pattern, IA',
-    body: [
-      'Dalla pagina "I peso", tap "✦ STATISTICHE COMPLETE" per accedere al pannello.',
-      '·Selettore periodo: 30 GIORNI / 3 MESI / 1 ANNO / SEMPRE.',
-      '·TREND PESO: grafico ampio con linea peso e (se hai dati) % grasso. Linea obiettivo tratteggiata bianca se hai impostato un target. Banner "obiettivo previsto il …" stimato con regressione lineare.',
-      '·OBIETTIVI: imposta target multipli (sonno ≥ 7h, allenamenti ≥ 3/settimana, idratazione ≥ 8 bicchieri, ecc.). Progress bar colorate: verde se raggiunto, oro se >75%, beige se lontano. Tap su un obiettivo per modificarlo.',
-      '·COMPOSIZIONE: ultimi valori di % grasso, muscolo, acqua. Massa magra stimata calcolata.',
-      '·PATTERN SETTIMANALI: bar chart con peso medio per giorno della settimana. Identifica il giorno più "leggero" e quello più "pesante".',
-      '·CORRELAZIONI (IA): tap su "GENERA INSIGHTS" e l\'IA analizza le tue settimane cercando pattern utili. Es. "le settimane in cui dormi più di 7 ore perdi più peso". Serve avere almeno 2 settimane di dati.',
-      '·RIASSUNTO MENSILE (IA): "GENERA RIASSUNTO" per ottenere una narrazione del mese scritta dall\'IA, tono caldo da coach.',
-      '·ALTRE ABITUDINI: card numeriche con pasti, sonno medio, acqua media, allenamenti, digiuni, mindful del periodo.',
-      '·ESPORTA: scarica tutti i dati in CSV (un file per categoria). Utile per dietologi, medici, o backup personale.',
-    ],
-  },
-  {
-    id: 'abbonamento',
-    title: '◆ Abbonamento',
-    short: 'piani e gestione',
-    body: [
-      'GoalFit ti regala 14 giorni di prova gratuita dal momento della registrazione.',
-      'Durante la prova, hai accesso a TUTTE le funzioni senza limiti.',
-      'Al termine della prova:',
-      '·Mensile: € 4,99/mese',
-      '·Annuale: € 39/anno (risparmi 35%)',
-      'Tap sull\'avatar in alto a destra → "abbonamento" per vedere il tuo stato.',
-      'Pagamento e fatturazione gestiti da Stripe. Puoi annullare quando vuoi dal "↗ GESTISCI ABBONAMENTO" (apre il portale Stripe).',
-      'Se non paghi al termine della prova, l\'app entra in modalità "paywall": vedi solo la pagina abbonamento finché non sottoscrivi.',
-      'I dati restano salvati su cloud anche se non paghi: quando riattivi l\'abbonamento li ritrovi tutti.',
-    ],
-  },
-  {
-    id: 'faq',
-    title: '? FAQ',
-    short: 'domande comuni',
-    body: [
-      'I miei dati sono al sicuro?',
-      'Sì. Tutto è salvato su Supabase (database cloud su server EU) con Row-Level Security: nessun altro utente può vedere i tuoi dati. Anche Anthropic (l\'IA) riceve solo i dati che le mando per analisi e non li conserva.',
-      'Posso usarla offline?',
-      'In parte. Puoi navigare le pagine ma le funzioni IA e il salvataggio richiedono internet. Senza connessione, qualche operazione potrebbe non andare a buon fine.',
-      'Posso esportare i miei dati?',
-      'Sì. Dalle Statistiche, tap "SCARICA CSV". Riceverai un file per ogni categoria (pesi, pasti, sonno, ecc.).',
-      'Cosa succede se cancello l\'app dal telefono?',
-      'I dati restano sul cloud. Basta che riapri il sito web (goalfit.it) da qualsiasi dispositivo e fai login per ritrovarli.',
-      'Posso usarla su più dispositivi?',
-      'Sì. È pensata proprio per essere multi-dispositivo. Login con la stessa email su iPhone, iPad, Mac, Android: ritrovi tutto sincronizzato.',
-      'Come posso annullare l\'abbonamento?',
-      'Tap avatar → abbonamento → "↗ GESTISCI ABBONAMENTO". Si apre il portale Stripe dove puoi annullare in 2 tap. La sub resta attiva fino alla fine del periodo già pagato, poi si chiude.',
-    ],
-  },
+  { id: 'tasti', title: 'I cinque tasti in basso', body: [
+    'In fondo allo schermo trovi sempre cinque tasti: Coach, Aggiorna, la fotocamera al centro, Pasti e Statistiche.',
+    'Sono le cose che usi ogni giorno. Tutto il resto è nel menu del profilo: tocca la tua foto in alto a destra.',
+  ] },
+  { id: 'coach', title: 'Coach', body: [
+    'È una chat con l’intelligenza artificiale. Riceve un riepilogo dei tuoi ultimi 30 giorni: peso, pasti, acqua, sonno, allenamenti, digiuni, integratori e note.',
+    'Chiedigli come sta andando il peso, cosa mangiare stasera o dove puoi migliorare. La conversazione resta salvata: la ritrovi quando torni, anche da un altro dispositivo. Con "nuova conversazione" riparti da zero.',
+    'Dà consigli generali: non fa diagnosi e non sostituisce medico o nutrizionista.',
+  ] },
+  { id: 'aggiorna', title: 'Aggiorna', body: [
+    'È l’elenco delle cose di oggi, diviso per momenti della giornata. Con un tocco registri il peso, spunti un integratore, aggiungi un bicchiere d’acqua.',
+    'Le altre righe (sonno, pasti, allenamento, digiuno, diario) ti portano alla pagina giusta. In alto vedi quante cose hai fatto.',
+  ] },
+  { id: 'foto', title: 'Fotografare un pasto', body: [
+    'Il tasto tondo al centro apre il diario fotografico dei tuoi piatti. Puoi vederlo a griglia oppure come linea del giorno.',
+    'Toccalo una seconda volta: compaiono tre icone per scattare una foto, sceglierla dalla libreria o prenderla da un file.',
+    'Dopo la foto si apre la scheda del pasto: l’IA riconosce il piatto e stima quantità, calorie e nutrienti. Puoi sempre correggere prima di salvare.',
+  ] },
+  { id: 'pasti', title: 'Pasti', body: [
+    'Mostra il piatto del giorno: la foto dell’ultimo pasto, le miniature degli altri, le calorie sul tuo obiettivo e proteine, carboidrati e grassi.',
+    'In alto scegli il giorno tra gli ultimi sette. Tocca un pasto per modificarlo, il "+" per aggiungerne uno con foto, oppure "aggiungi un pasto senza foto".',
+    'Se a un pasto mancano le calorie compare un tasto per farle calcolare all’IA.',
+  ] },
+  { id: 'statistiche', title: 'Statistiche', body: [
+    'In una schermata: il peso con la variazione della settimana, l’andamento degli ultimi 30 giorni, quanto manca all’obiettivo e le calorie giorno per giorno.',
+    'Con "tutte le statistiche" apri l’analisi completa: periodo a scelta, obiettivi personali, calendario, giorni della settimana, le letture dell’IA e l’esportazione dei dati.',
+  ] },
+  { id: 'peso', title: 'Peso e obiettivo', body: [
+    'L’anello si riempie man mano che ti avvicini all’obiettivo. Tocca "obiettivo" sotto il numero per impostarlo o cambiarlo.',
+    'Il percorso a tappe mostra partenza, tappe raggiunte, oggi, prossima tappa e obiettivo con la data stimata. Le tappe sono automatiche, una ogni 2 kg.',
+    'Quando registri il peso puoi aggiungere anche grasso, muscolo e acqua letti dalla bilancia. Tocca una pesata dell’elenco per correggerla o eliminarla.',
+  ] },
+  { id: 'menu', title: 'Menù e dieta a zona', body: [
+    'Il cerchio è il tuo piatto a zona: 40% carboidrati, 30% proteine, 30% grassi. Ogni spicchio si riempie quando copri quel nutriente. Tocca il centro per cambiare gli obiettivi.',
+    'Sotto trovi i pasti di oggi, a schede o come linea del giorno. Quelli "in piano" li segni come mangiati con un tocco.',
+    'Con "chiedi suggerimenti all’IA" ricevi proposte di pasti che completano la giornata: le aggiungi al menù con un tocco.',
+  ] },
+  { id: 'digiuno', title: 'Digiuno', body: [
+    'Scegli un protocollo (intermittente, prolungato o su misura) e il timer parte. L’anello mostra il tempo trascorso e quanto manca; sotto vedi le fasi, con quella in corso spiegata.',
+    'Puoi correggere l’orario di inizio e, a digiuno concluso, modificarlo o eliminarlo dallo storico.',
+    'Il digiuno non è adatto in gravidanza, allattamento, diabete, disturbi del comportamento alimentare, sottopeso o se assumi farmaci. Oltre le 24 ore parla con il tuo medico; oltre le 72 ore sconsigliamo di procedere senza supervisione medica.',
+  ] },
+  { id: 'integrazione', title: 'Integrazione', body: [
+    'Aggiungi i tuoi integratori e spuntali quando li prendi. Il calendario mostra gli ultimi 28 giorni: pieno se li hai presi tutti, bordo oro se solo alcuni.',
+    'Tocca un giorno per correggerlo. La freccia accanto a un integratore serve per rinominarlo o eliminarlo.',
+  ] },
+  { id: 'allenamenti', title: 'Allenamenti', body: [
+    'Ogni attività ha la sua scheda con ultima sessione, totale degli ultimi 30 giorni e tendenza.',
+    '"Registra allenamento" ti fa scegliere l’attività e inserire la sessione. Tocca una scheda per vedere lo storico o modificare l’attività; con "nuova attività" ne crei una e scegli come si misura.',
+  ] },
+  { id: 'respiro', title: 'Respiro', body: [
+    'Respirazione quadrata: inspira, trattieni, espira, riposa, quattro secondi per fase. Scegli 1, 3, 5 o 10 minuti e segui il cerchio.',
+    'A fine tempo la sessione si salva da sola. Puoi anche registrare a mano meditazione, camminata o gratitudine.',
+  ] },
+  { id: 'sonno', title: 'Sonno', body: [
+    'Registra la notte al risveglio: orario in cui sei andato a letto, orario della sveglia e qualità da 1 a 5.',
+    'La data è quella del mattino in cui ti svegli. Trovi le medie a 7 e 30 giorni e le ultime sette notti; tocca una notte per correggerla.',
+  ] },
+  { id: 'diario', title: 'Diario', body: [
+    'È la cronologia automatica della giornata: pesate, pasti, movimento, respiro e note in ordine di orario.',
+    'Puoi aggiungere una nota a mano e far leggere tutto all’IA con "analizza tutto": ti dice a che punto sei, su cosa concentrarti e cosa fare.',
+  ] },
+  { id: 'abbonamento', title: 'Abbonamento', body: [
+    'Hai 14 giorni di prova gratuita con tutte le funzioni, senza carta.',
+    'Poi scegli tra mensile (€ 4,99 al mese) e annuale (€ 39 all’anno). Il pagamento è gestito da Stripe e puoi annullare quando vuoi da "gestisci abbonamento".',
+    'Se la prova scade senza abbonamento l’app mostra solo la pagina dei piani, ma i tuoi dati restano salvati: li ritrovi appena ti abboni.',
+  ] },
+  { id: 'faq', title: 'Domande frequenti', body: [
+    'I miei dati sono al sicuro? Sono salvati nel database dell’app e legati al tuo account: nessun altro utente può vederli. All’IA arrivano solo i dati necessari per risponderti.',
+    'Posso usarla su più dispositivi? Sì: accedi con la stessa email e ritrovi tutto.',
+    'Funziona senza connessione? Solo in parte: per salvare e per le funzioni dell’IA serve internet.',
+    'Posso esportare i miei dati? Sì, da "tutte le statistiche", con "scarica i dati".',
+    'Come elimino l’account? Dal Profilo, in fondo alla pagina. La cancellazione è definitiva.',
+    'Non vedo le ultime novità: chiudi e riapri l’app. Il numero di versione è nel menu del profilo, sotto Abbonamento.',
+  ] },
 ];
 
-export default function GuidaPage({ profile, onClose }) {
-  const Q = getTheme(profile?.theme);
-  const [openSection, setOpenSection] = useState('intro');
-
+export default function GuidaPage({ onClose }) {
+  const [openSection, setOpenSection] = useState('tasti');
   return (
-    <div style={{ minHeight: '100vh', background: `radial-gradient(ellipse at top, ${Q.bg1} 0%, ${Q.bg2} 100%)`, color: Q.cream, fontFamily: fGaramond, position: 'relative', overflow: 'hidden' }}>
-      <div aria-hidden style={{ position: 'absolute', inset: 14, border: `1px solid ${Q.gold}40`, borderRadius: 20, pointerEvents: 'none', zIndex: 1 }} />
-      <div aria-hidden style={{ position: 'absolute', inset: 20, border: `1px solid ${Q.gold}1A`, borderRadius: 16, pointerEvents: 'none', zIndex: 1 }} />
-
-      <div style={{ position: 'relative', zIndex: 2, padding: '24px 22px 60px', maxWidth: 520, margin: '0 auto' }}>
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <button onClick={onClose} style={{ background: 'transparent', color: Q.gold, border: `1px solid ${Q.gold}66`, fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.3em', padding: '8px 14px', cursor: 'pointer' }}>← INDIETRO</button>
-          <div style={{ fontFamily: fCinzel, fontSize: 11, letterSpacing: '0.45em', color: Q.gold, textTransform: 'uppercase' }}>GUIDA</div>
-          <div style={{ width: 70 }} />
-        </div>
-
-        {/* Intro hero */}
-        <div style={{ textAlign: 'center', marginTop: 32 }}>
-          <img src="/icon-512.png" alt="GoalFit" style={{ width: 96, height: 96, display: 'block', margin: '0 auto 12px' }} />
-          <div style={{ fontFamily: fCinzel, fontSize: 22, letterSpacing: '0.3em', color: Q.gold, textTransform: 'uppercase' }}>GOALFIT</div>
-          <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 14, color: Q.goldDim, marginTop: 6 }}>guida completa</div>
-        </div>
-
-        {/* Lista sezioni accordion */}
-        <div style={{ marginTop: 32, display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div style={page}>
+      <div style={column}>
+        <button onClick={onClose} style={{ ...link, minHeight: 44 }}>‹ indietro</button>
+        <div style={kicker}>come usare GoalFit</div>
+        <h1 style={h1}>Guida</h1>
+        <div style={{ marginTop: 14 }}>
           {SECTIONS.map(s => {
             const open = openSection === s.id;
             return (
-              <div key={s.id} style={{ border: `1px solid ${Q.gold}33` }}>
-                <button onClick={() => setOpenSection(open ? null : s.id)}
-                  style={{ width: '100%', background: open ? `${Q.gold}11` : 'transparent', color: Q.cream, border: 'none', padding: '14px 16px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', textAlign: 'left' }}>
-                  <div>
-                    <div style={{ fontFamily: fCinzel, fontSize: 11, letterSpacing: '0.3em', color: Q.gold, textTransform: 'uppercase' }}>{s.title}</div>
-                    <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 13, color: Q.goldDim, marginTop: 3 }}>{s.short}</div>
-                  </div>
-                  <div style={{ fontFamily: fCinzel, fontSize: 14, color: Q.gold }}>{open ? '−' : '+'}</div>
+              <div key={s.id} style={{ borderBottom: `1px solid ${C.line}` }}>
+                <button onClick={() => setOpenSection(open ? null : s.id)} aria-expanded={open}
+                  style={{ width: '100%', minHeight: 54, background: 'transparent', color: C.cream, border: 'none', padding: 0, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, textAlign: 'left' }}>
+                  <span style={{ fontFamily: fSerif, fontSize: 22, fontWeight: 500, lineHeight: 1.15 }}>{s.title}</span>
+                  <span aria-hidden="true" style={{ fontSize: 22, color: C.gold, flexShrink: 0 }}>{open ? '−' : '+'}</span>
                 </button>
                 {open && (
-                  <div style={{ padding: '0 18px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {s.body.map((p, i) => (
-                      <div key={i} style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 14, color: Q.cream, lineHeight: 1.55 }}>
-                        {p}
-                      </div>
-                    ))}
+                  <div style={{ padding: '0 0 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {s.body.map((p, i) => (<p key={i} style={{ margin: 0, fontSize: 15, lineHeight: 1.55, color: C.dim }}>{p}</p>))}
                   </div>
                 )}
               </div>
             );
           })}
-        </div>
-
-        {/* Footer con versione */}
-        <div style={{ textAlign: 'center', marginTop: 40, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 11, color: Q.goldDim }}>
-          GoalFit · una quercia cresce lenta ma forte
         </div>
       </div>
     </div>

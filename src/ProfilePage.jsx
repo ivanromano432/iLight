@@ -3,12 +3,12 @@
 // Salvataggio diretto su profiles.avatar_data (base64) e profiles.display_name.
 
 import { useState, useRef, useEffect } from 'react';
-import { THEMES, THEME_ORDER, DEFAULT_THEME, getTheme } from './themes.js';
+import { DEFAULT_THEME } from './themes.js';
+import { Camera } from 'lucide-react';
+import { C, fSerif, page, column, kicker, h1, h2, muted, btn, btnDanger, chip, label, input, link, tag } from './ui.js';
 import { supabase } from './supabase.js';
 import { pushSupported, getPushStatus, subscribePush, unsubscribePush, registerServiceWorker } from './pushNotifications.js';
 
-const fGaramond = '"Cormorant Garamond", serif';
-const fCinzel = '"Cinzel", serif';
 
 // Ridimensiona e crop-pa centralmente un'immagine in un quadrato size x size, qualità jpeg 0.85
 function resizeAndCropImage(file, size = 200) {
@@ -35,8 +35,6 @@ function resizeAndCropImage(file, size = 200) {
 }
 
 export default function ProfilePage({ user, profile, updProfile, onClose }) {
-  // Tema dinamico — la pagina segue il tema attivo
-  const Q = getTheme(profile?.theme);
 
   const [name, setName] = useState(profile?.display_name || '');
   const [avatar, setAvatar] = useState(profile?.avatar_data || null);
@@ -164,7 +162,7 @@ export default function ProfilePage({ user, profile, updProfile, onClose }) {
       return;
     }
     try {
-      const dataUrl = await resizeAndCropImage(f, 200);
+      const dataUrl = await resizeAndCropImage(f, 400);
       setAvatar(dataUrl);
     } catch (err) {
       setError(err.message || 'Errore durante l\'elaborazione dell\'immagine');
@@ -256,313 +254,118 @@ export default function ProfilePage({ user, profile, updProfile, onClose }) {
     }
   }
 
+  // --- Render nuovo stile ---
+  const hours = Array.from({ length: 24 }, (_, i) => i);
+  const notifRow = (lab, desc, enabled, hour, key) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 60, borderBottom: `1px solid ${C.line}` }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 15, fontWeight: 600 }}>{lab}</div>
+        <div style={{ fontSize: 12, color: C.dim }}>{desc}</div>
+      </div>
+      <select value={hour} onChange={e => updateNotifHour(key, parseInt(e.target.value))} disabled={!enabled} aria-label={`ora del promemoria ${lab}`}
+        style={{ background: C.navy, color: C.cream, border: `1px solid ${C.line}`, borderRadius: 12, fontFamily: 'inherit', fontSize: 14, padding: '8px 6px', opacity: enabled ? 1 : 0.5 }}>
+        {hours.map(h => <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>)}
+      </select>
+      <button onClick={() => toggleNotif(key, enabled)} disabled={pushBusy} role="switch" aria-checked={enabled} aria-label={`promemoria ${lab}`}
+        style={{ width: 52, height: 44, background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+        <span style={{ width: 46, height: 28, borderRadius: 14, background: enabled ? C.gold : '#2A4466', display: 'flex', alignItems: 'center', justifyContent: enabled ? 'flex-end' : 'flex-start', padding: 3, boxSizing: 'border-box' }}>
+          <span style={{ width: 22, height: 22, borderRadius: '50%', background: C.cream }} />
+        </span>
+      </button>
+    </div>
+  );
+  const canDelete = deleteConfirmText.trim().toUpperCase() === 'ELIMINA';
   return (
-    <div style={{ minHeight: '100vh', background: `radial-gradient(ellipse at top, ${Q.bg1} 0%, ${Q.bg2} 100%)`, color: Q.cream, fontFamily: fGaramond, position: 'relative', overflow: 'hidden' }}>
-      <div aria-hidden style={{ position: 'absolute', inset: 14, border: `1px solid ${Q.gold}40`, borderRadius: 20, pointerEvents: 'none', zIndex: 1 }} />
-      <div aria-hidden style={{ position: 'absolute', inset: 20, border: `1px solid ${Q.gold}1A`, borderRadius: 16, pointerEvents: 'none', zIndex: 1 }} />
-
-      <div style={{ position: 'relative', zIndex: 2, padding: '24px 22px 60px', maxWidth: 460, margin: '0 auto' }}>
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <button onClick={onClose} style={{ background: 'transparent', color: Q.gold, border: `1px solid ${Q.gold}66`, fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.3em', padding: '8px 14px', cursor: 'pointer' }}>← INDIETRO</button>
-          <div style={{ fontFamily: fCinzel, fontSize: 11, letterSpacing: '0.45em', color: Q.gold, textTransform: 'uppercase' }}>PROFILO</div>
-          <div style={{ width: 70 }} />
+    <div style={page}>
+      <div style={{ ...column, display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div>
+          <button onClick={onClose} style={{ ...link, minHeight: 44 }}>‹ indietro</button>
+          <div style={kicker}>il tuo account</div>
+          <h1 style={h1}>Profilo</h1>
         </div>
 
-        {/* Avatar grande */}
-        <div style={{ textAlign: 'center', marginTop: 40 }}>
-          <div style={{ display: 'inline-block', position: 'relative' }}>
-            <div style={{ width: 140, height: 140, borderRadius: '50%', overflow: 'hidden', border: `1px solid ${Q.gold}66`, background: `${Q.gold}11`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              {avatar ? (
-                <img src={avatar} alt="profilo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              ) : (
-                <span style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 64, color: Q.gold, lineHeight: 1 }}>{fallbackInitial}</span>
-              )}
-            </div>
-            {avatar && (
-              <button onClick={removeAvatar}
-                style={{ position: 'absolute', bottom: 0, right: 0, width: 32, height: 32, borderRadius: '50%', background: Q.bg2, color: '#C99A7A', border: `1px solid #C99A7A66`, fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                aria-label="rimuovi foto">
-                ✕
-              </button>
-            )}
-          </div>
-          <div style={{ marginTop: 18 }}>
-            <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFile} style={{ display: 'none' }} />
-            <button onClick={() => fileInputRef.current?.click()}
-              style={{ background: 'transparent', color: Q.gold, border: `1px solid ${Q.gold}66`, fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.35em', padding: '10px 18px', cursor: 'pointer', textTransform: 'uppercase' }}>
-              {avatar ? '↻ CAMBIA FOTO' : '+ CARICA FOTO'}
-            </button>
-            <div style={{ marginTop: 8, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 11, color: Q.goldDim }}>
-              dalla galleria o fotocamera
-            </div>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+          <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFile} style={{ display: 'none' }} />
+          <button onClick={() => fileInputRef.current?.click()} aria-label={avatar ? 'cambia foto del profilo' : 'carica foto del profilo'} style={{ position: 'relative', width: 116, height: 116, padding: 0, background: 'transparent', border: 'none', cursor: 'pointer' }}>
+            <span style={{ display: 'flex', width: 116, height: 116, borderRadius: '50%', overflow: 'hidden', border: `2px solid ${C.gold}`, boxSizing: 'border-box', background: '#2A4466', alignItems: 'center', justifyContent: 'center' }}>
+              {avatar ? <img src={avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontFamily: fSerif, fontSize: 54, color: C.cream, lineHeight: 1 }}>{fallbackInitial}</span>}
+            </span>
+            <span aria-hidden="true" style={{ position: 'absolute', right: 0, bottom: 0, width: 38, height: 38, borderRadius: '50%', background: C.gold, border: `3px solid ${C.navy}`, boxSizing: 'border-box', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Camera size={18} strokeWidth={2} color={C.navy} /></span>
+          </button>
+          <div style={{ display: 'flex', gap: 18 }}>
+            <button onClick={() => fileInputRef.current?.click()} style={{ ...link, minHeight: 40 }}>{avatar ? 'cambia foto' : 'carica una foto'}</button>
+            {avatar && <button onClick={removeAvatar} style={{ ...link, minHeight: 40 }}>rimuovi</button>}
           </div>
         </div>
 
-        {/* Nome */}
-        <div style={{ marginTop: 38 }}>
-          <div style={{ fontFamily: fCinzel, fontSize: 9, letterSpacing: '0.35em', color: Q.goldDim, textTransform: 'uppercase', marginBottom: 6, textAlign: 'center' }}>NOME VISUALIZZATO</div>
-          <input type="text" value={name} onChange={e => setName(e.target.value)}
-            placeholder="il tuo nome"
-            maxLength={40}
-            style={{ width: '100%', boxSizing: 'border-box', background: 'transparent', border: `1px solid ${Q.gold}66`, color: Q.cream, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 20, padding: '10px 14px', textAlign: 'center', outline: 'none' }} />
-          <div style={{ marginTop: 6, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 11, color: Q.goldDim, textAlign: 'center' }}>
-            opzionale · viene mostrato nell'app al posto dell'email
-          </div>
+        <label><span style={label}>nome · mostrato nell'app al posto dell'email</span>
+          <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="il tuo nome" maxLength={40} style={input(24)} /></label>
+        <div><span style={label}>email · non modificabile</span>
+          <div style={{ fontFamily: fSerif, fontSize: 19, wordBreak: 'break-all', padding: '2px 0 6px', borderBottom: `1px solid ${C.line}`, color: C.dim }}>{email}</div></div>
+
+        <div style={{ ...tag, marginTop: 8 }}>i miei dati</div>
+        <span style={{ ...muted, fontSize: 13, marginTop: -10 }}>Servono per calcolare il tuo fabbisogno di calorie.</span>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 6 }}>
+          {[['m', 'Uomo'], ['f', 'Donna'], ['other', 'Altro']].map(([id, l]) => (<button key={id} onClick={() => setSex(id)} aria-pressed={sex === id} style={chip(sex === id)}>{l}</button>))}
         </div>
-
-        {/* Email read-only */}
-        <div style={{ marginTop: 26, padding: '14px 18px', border: `1px solid ${Q.gold}22`, background: `${Q.gold}08` }}>
-          <div style={{ fontFamily: fCinzel, fontSize: 9, letterSpacing: '0.3em', color: Q.goldDim, textTransform: 'uppercase', marginBottom: 4 }}>EMAIL ACCOUNT</div>
-          <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 15, color: Q.cream, wordBreak: 'break-all' }}>{email}</div>
-          <div style={{ marginTop: 6, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 11, color: Q.goldDim }}>l'email non si può cambiare per ora</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 14 }}>
+          <label><span style={label}>altezza (cm)</span>
+            <input type="text" inputMode="numeric" value={heightCm} onChange={e => setHeightCm(e.target.value.replace(/[^0-9]/g, '').slice(0, 3))} placeholder="178" style={input(24)} /></label>
+          <label><span style={label}>anno di nascita{birthYear && parseInt(birthYear) > 1900 && parseInt(birthYear) < new Date().getFullYear() ? ` · ${new Date().getFullYear() - parseInt(birthYear)} anni` : ''}</span>
+            <input type="text" inputMode="numeric" value={birthYear} onChange={e => setBirthYear(e.target.value.replace(/[^0-9]/g, '').slice(0, 4))} placeholder="1985" style={input(24)} /></label>
         </div>
+        {error && <div role="alert" style={{ fontSize: 14, color: C.sal }}>{error}</div>}
+        <button onClick={save} disabled={!dirty || saving} style={{ ...btn(), opacity: (!dirty || saving) ? 0.5 : 1 }}>{saving ? 'salvataggio…' : justSaved ? 'salvato' : 'salva'}</button>
 
-        {/* === I MIEI DATI === Servono per calcolare in modo personalizzato calorie e macronutrienti */}
-        <div style={{ marginTop: 30 }}>
-          <div style={{ fontFamily: fCinzel, fontSize: 9, letterSpacing: '0.35em', color: Q.goldDim, textTransform: 'uppercase', marginBottom: 8, textAlign: 'center' }}>I MIEI DATI</div>
-          <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 12, color: Q.goldDim, textAlign: 'center', marginBottom: 18, lineHeight: 1.5 }}>
-            usati per calcolare il fabbisogno calorico personalizzato (formula Mifflin-St Jeor)
-          </div>
-
-          {/* Sesso */}
-          <div style={{ marginBottom: 18 }}>
-            <div style={{ fontFamily: fCinzel, fontSize: 9, letterSpacing: '0.3em', color: Q.goldDim, textTransform: 'uppercase', marginBottom: 8, textAlign: 'center' }}>SESSO BIOLOGICO</div>
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
-              {[
-                { id: 'm', label: 'uomo' },
-                { id: 'f', label: 'donna' },
-                { id: 'other', label: 'altro' },
-              ].map(opt => {
-                const selected = sex === opt.id;
-                return (
-                  <button key={opt.id} onClick={() => setSex(opt.id)}
-                    style={{
-                      flex: 1,
-                      background: selected ? `${Q.gold}1A` : 'transparent',
-                      border: `1px solid ${selected ? Q.gold : Q.gold + '44'}`,
-                      color: selected ? Q.gold : Q.goldDim,
-                      fontFamily: fGaramond,
-                      fontStyle: 'italic',
-                      fontSize: 14,
-                      padding: '10px 8px',
-                      cursor: 'pointer',
-                      textAlign: 'center',
-                    }}>
-                    {opt.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Altezza + Anno di nascita affiancati */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div>
-              <div style={{ fontFamily: fCinzel, fontSize: 9, letterSpacing: '0.3em', color: Q.goldDim, textTransform: 'uppercase', marginBottom: 6, textAlign: 'center' }}>ALTEZZA · CM</div>
-              <input type="text" inputMode="numeric" value={heightCm}
-                onChange={e => setHeightCm(e.target.value.replace(/[^0-9]/g, '').slice(0, 3))}
-                placeholder="178"
-                style={{ width: '100%', boxSizing: 'border-box', background: 'transparent', border: `1px solid ${Q.gold}66`, color: Q.cream, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 18, padding: '10px 14px', textAlign: 'center', outline: 'none' }} />
-            </div>
-            <div>
-              <div style={{ fontFamily: fCinzel, fontSize: 9, letterSpacing: '0.3em', color: Q.goldDim, textTransform: 'uppercase', marginBottom: 6, textAlign: 'center' }}>ANNO DI NASCITA</div>
-              <input type="text" inputMode="numeric" value={birthYear}
-                onChange={e => setBirthYear(e.target.value.replace(/[^0-9]/g, '').slice(0, 4))}
-                placeholder="1985"
-                style={{ width: '100%', boxSizing: 'border-box', background: 'transparent', border: `1px solid ${Q.gold}66`, color: Q.cream, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 18, padding: '10px 14px', textAlign: 'center', outline: 'none' }} />
-            </div>
-          </div>
-          {birthYear && parseInt(birthYear) > 1900 && parseInt(birthYear) < new Date().getFullYear() && (
-            <div style={{ marginTop: 6, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 11, color: Q.goldDim, textAlign: 'center' }}>
-              ({new Date().getFullYear() - parseInt(birthYear)} anni)
-            </div>
-          )}
-        </div>
-
-        {/* Errore */}
-        {error && (
-          <div style={{ marginTop: 18, padding: '10px 14px', border: `1px solid #C99A7A66`, background: '#C99A7A14', color: '#C99A7A', fontFamily: fGaramond, fontStyle: 'italic', fontSize: 13, textAlign: 'center' }}>
-            {error}
+        <div style={{ ...tag, marginTop: 12 }}>promemoria</div>
+        {!pushStatus.supported ? (
+          <span style={{ ...muted, fontSize: 13 }}>Le notifiche non sono supportate da questo browser. Su iPhone serve iOS 16.4 o successivo, con GoalFit aggiunta alla schermata Home.</span>
+        ) : pushStatus.permission === 'denied' ? (
+          <span style={{ fontSize: 13, color: C.sal, lineHeight: 1.5 }}>Hai negato il permesso per le notifiche. Riattivalo dalle impostazioni del telefono o del browser.</span>
+        ) : (
+          <div>
+            {notifRow('Mattina', 'ricordati di pesarti', notifMorning, notifMorningHour, 'morning')}
+            {notifRow('Pomeriggio', 'pausa acqua', notifAfternoon, notifAfternoonHour, 'afternoon')}
+            {notifRow('Sera', 'una nota nel diario', notifEvening, notifEveningHour, 'evening')}
+            {pushError && <div role="alert" style={{ marginTop: 10, fontSize: 13, color: C.sal }}>{pushError}</div>}
+            {pushStatus.subscribed && <button onClick={disablePushCompletely} disabled={pushBusy} style={{ ...link, minHeight: 44, marginTop: 6 }}>spegni tutte le notifiche</button>}
           </div>
         )}
 
-        {/* Salva */}
-        <div style={{ marginTop: 30, textAlign: 'center' }}>
-          <button onClick={save} disabled={!dirty || saving}
-            style={{ background: (dirty && !saving) ? Q.gold : '#555', color: (dirty && !saving) ? Q.ink : '#999', border: 'none', fontFamily: fCinzel, fontSize: 11, letterSpacing: '0.4em', padding: '12px 28px', cursor: (dirty && !saving) ? 'pointer' : 'not-allowed', textTransform: 'uppercase' }}>
-            {saving ? 'salvataggio…' : justSaved ? '✓ salvato' : 'SALVA'}
-          </button>
+        <div style={{ ...tag, marginTop: 12 }}>documenti</div>
+        <div>
+          {[['/privacy', 'Informativa privacy'], ['/termini', 'Termini di servizio']].map(([href, l]) => (
+            <a key={href} href={href} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', minHeight: 48, borderBottom: `1px solid ${C.line}`, color: C.cream, textDecoration: 'none', fontSize: 15 }}><span>{l}</span><span style={{ color: C.dim, fontSize: 18 }}>›</span></a>
+          ))}
         </div>
 
-        {/* === NOTIFICHE === Promemoria push (richiede iOS 16.4+ con PWA installata) */}
-        <div style={{ marginTop: 40, paddingTop: 24, borderTop: `1px solid ${Q.gold}22` }}>
-          <div style={{ fontFamily: fCinzel, fontSize: 9, letterSpacing: '0.35em', color: Q.goldDim, textTransform: 'uppercase', marginBottom: 8, textAlign: 'center' }}>NOTIFICHE PROMEMORIA</div>
-          {!pushStatus.supported ? (
-            <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 12, color: Q.goldDim, textAlign: 'center', padding: '12px', lineHeight: 1.6 }}>
-              Le notifiche push non sono supportate dal tuo browser. Su iPhone serve iOS 16.4+ con la PWA installata sulla schermata Home.
-            </div>
-          ) : pushStatus.permission === 'denied' ? (
-            <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 12, color: '#C99A7A', textAlign: 'center', padding: '12px', lineHeight: 1.6 }}>
-              Hai negato i permessi notifica. Vai nelle impostazioni del browser/iOS per riabilitarli.
-            </div>
-          ) : (
-            <>
-              <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 12, color: Q.goldDim, textAlign: 'center', marginBottom: 16, lineHeight: 1.5 }}>
-                Tre promemoria al giorno, scegli quali e a che ora.
-              </div>
-
-              {/* Toggle Mattina */}
-              <NotifToggleRow Q={Q} fGaramond={fGaramond} fCinzel={fCinzel}
-                label="Mattina · pesata"
-                desc="Buongiorno, ricordati di pesarti"
-                enabled={notifMorning}
-                hour={notifMorningHour}
-                onToggle={() => toggleNotif('morning', notifMorning)}
-                onHourChange={(h) => updateNotifHour('morning', h)}
-                busy={pushBusy}
-              />
-
-              {/* Toggle Pomeriggio */}
-              <NotifToggleRow Q={Q} fGaramond={fGaramond} fCinzel={fCinzel}
-                label="Pomeriggio · acqua"
-                desc="Pausa idratazione"
-                enabled={notifAfternoon}
-                hour={notifAfternoonHour}
-                onToggle={() => toggleNotif('afternoon', notifAfternoon)}
-                onHourChange={(h) => updateNotifHour('afternoon', h)}
-                busy={pushBusy}
-              />
-
-              {/* Toggle Sera */}
-              <NotifToggleRow Q={Q} fGaramond={fGaramond} fCinzel={fCinzel}
-                label="Sera · diario"
-                desc="Una nota per chiudere la giornata"
-                enabled={notifEvening}
-                hour={notifEveningHour}
-                onToggle={() => toggleNotif('evening', notifEvening)}
-                onHourChange={(h) => updateNotifHour('evening', h)}
-                busy={pushBusy}
-              />
-
-              {pushError && (
-                <div style={{ marginTop: 10, padding: '8px 12px', border: `1px solid #C99A7A66`, background: '#C99A7A14', color: '#C99A7A', fontFamily: fGaramond, fontStyle: 'italic', fontSize: 12, textAlign: 'center' }}>
-                  {pushError}
-                </div>
-              )}
-
-              {pushStatus.subscribed && (
-                <div style={{ marginTop: 14, textAlign: 'center' }}>
-                  <button onClick={disablePushCompletely} disabled={pushBusy}
-                    style={{ background: 'transparent', color: Q.goldDim, border: `1px solid ${Q.goldDim}44`, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 11, padding: '6px 14px', cursor: pushBusy ? 'default' : 'pointer' }}>
-                    spegni tutte le notifiche
-                  </button>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-
-        {/* Link legali */}
-        <div style={{ marginTop: 50, paddingTop: 24, borderTop: `1px solid ${Q.gold}22`, textAlign: 'center' }}>
-          <div style={{ fontFamily: fCinzel, fontSize: 9, letterSpacing: '0.35em', color: Q.goldDim, textTransform: 'uppercase', marginBottom: 10 }}>DOCUMENTI LEGALI</div>
-          <div style={{ display: 'flex', justifyContent: 'center', gap: 18 }}>
-            <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 13, color: Q.gold, textDecoration: 'none', borderBottom: `1px solid ${Q.gold}66`, paddingBottom: 2 }}>Privacy Policy</a>
-            <a href="/termini" target="_blank" rel="noopener noreferrer" style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 13, color: Q.gold, textDecoration: 'none', borderBottom: `1px solid ${Q.gold}66`, paddingBottom: 2 }}>Termini di Servizio</a>
-          </div>
-          <div style={{ marginTop: 14, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 11, color: Q.goldDim, lineHeight: 1.5 }}>
-            Romano Formazione S.a.s. · P.IVA 02477940999<br/>Via Macaggi 25/10 — 16121 Genova
-          </div>
-        </div>
-
-        {/* Zona pericolosa: cancellazione account (GDPR art. 17) */}
-        <div style={{ marginTop: 40, paddingTop: 24, borderTop: `1px solid #C99A7A33`, textAlign: 'center' }}>
-          <div style={{ fontFamily: fCinzel, fontSize: 9, letterSpacing: '0.35em', color: '#C99A7A', textTransform: 'uppercase', marginBottom: 12 }}>ZONA RISERVATA</div>
-          <button onClick={() => { setDeleteOpen(true); setDeleteConfirmText(''); setDeleteError(''); }}
-            style={{ background: 'transparent', color: '#C99A7A', border: `1px solid #C99A7A66`, fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.3em', padding: '10px 22px', cursor: 'pointer', textTransform: 'uppercase' }}>
-            elimina il mio account
-          </button>
-          <div style={{ marginTop: 10, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 11, color: Q.goldDim, maxWidth: 320, margin: '10px auto 0', lineHeight: 1.5 }}>
-            Cancella definitivamente account, dati di salute, foto e abbonamento. Operazione irreversibile.
-          </div>
-        </div>
+        <button onClick={() => { setDeleteOpen(true); setDeleteConfirmText(''); setDeleteError(''); }} style={{ ...btnDanger, marginTop: 12 }}>elimina il mio account</button>
+        <span style={{ ...muted, fontSize: 12, textAlign: 'center' }}>Cancella per sempre account, dati di salute, foto e abbonamento.</span>
+        <span style={{ fontSize: 12, color: C.dim, textAlign: 'center', lineHeight: 1.6, marginTop: 6 }}>Romano Formazione S.a.s. · P.IVA 02477940999<br />Via Macaggi 25/10 — 16121 Genova</span>
       </div>
 
-      {/* Modal di conferma cancellazione */}
       {deleteOpen && (
-        <div onClick={() => !deleting && setDeleteOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 16 }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: Q.bg2 || '#1F140C', border: `1px solid #C99A7A`, padding: '24px 22px', maxWidth: 420, width: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
-            <div style={{ fontFamily: fCinzel, fontSize: 12, letterSpacing: '0.4em', color: '#C99A7A', textAlign: 'center', marginBottom: 14, textTransform: 'uppercase' }}>⚠ Conferma cancellazione</div>
-
-            <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 14, color: Q.cream, lineHeight: 1.6, marginBottom: 16 }}>
-              Stai per cancellare <strong style={{ color: '#C99A7A' }}>definitivamente</strong> il tuo account e tutti i dati associati. Saranno eliminati:
-            </div>
-
-            <ul style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 13, color: Q.cream, lineHeight: 1.8, marginBottom: 18, paddingLeft: 22 }}>
-              <li>Profilo, peso, alimentazione, sonno, integratori, allenamenti</li>
-              <li>Foto dei pasti caricate</li>
-              <li>Eventuale abbonamento Stripe attivo</li>
-              <li>Note del diario e obiettivi personali</li>
+        <div onClick={() => !deleting && setDeleteOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(4,12,28,0.72)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9500, padding: 16 }}>
+          <div onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Elimina account" style={{ background: 'linear-gradient(180deg, #4A6A62 0%, #2A4A5C 28%, #16304F 62%, #122849 100%)', border: `1px solid ${C.sal}`, borderRadius: 24, padding: 22, maxWidth: 420, width: '100%', maxHeight: '90vh', overflowY: 'auto', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 12, color: C.cream }}>
+            <h2 style={h2}>Eliminare l'account?</h2>
+            <span style={{ fontSize: 14, lineHeight: 1.5 }}>Stai per cancellare <b>definitivamente</b> il tuo account e tutti i dati associati:</span>
+            <ul style={{ fontSize: 14, lineHeight: 1.6, margin: 0, paddingLeft: 20 }}>
+              <li>profilo, peso, alimentazione, sonno, integratori, allenamenti</li>
+              <li>foto dei pasti caricate</li>
+              <li>eventuale abbonamento attivo</li>
+              <li>note del diario, obiettivi e conversazioni con il coach</li>
             </ul>
-
-            <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 13, color: Q.goldDim, marginBottom: 18, lineHeight: 1.5, padding: '10px 12px', background: `${Q.gold}11`, border: `1px solid ${Q.gold}33` }}>
-              L'operazione è <strong>irreversibile</strong>. Non potrai recuperare i dati né riattivare lo stesso account. Le eventuali fatture emesse saranno conservate per 10 anni come previsto dalla legge fiscale.
-            </div>
-
-            <div style={{ marginBottom: 14 }}>
-              <div style={{ fontFamily: fCinzel, fontSize: 9, letterSpacing: '0.35em', color: Q.goldDim, marginBottom: 6, textTransform: 'uppercase' }}>per confermare, scrivi <span style={{ color: '#C99A7A' }}>ELIMINA</span></div>
-              <input type="text" value={deleteConfirmText} onChange={e => setDeleteConfirmText(e.target.value)} disabled={deleting}
-                placeholder="ELIMINA"
-                style={{ width: '100%', boxSizing: 'border-box', background: 'transparent', border: `1px solid ${Q.gold}66`, color: Q.cream, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 16, padding: '10px 14px', textAlign: 'center', outline: 'none', letterSpacing: '0.2em' }} />
-            </div>
-
-            {deleteError && (
-              <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 13, color: '#C99A7A', textAlign: 'center', marginBottom: 12 }}>{deleteError}</div>
-            )}
-
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'space-between', flexWrap: 'wrap' }}>
-              <button onClick={() => setDeleteOpen(false)} disabled={deleting}
-                style={{ flex: 1, background: 'transparent', color: Q.gold, border: `1px solid ${Q.gold}66`, fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.3em', padding: '11px 16px', cursor: deleting ? 'default' : 'pointer', textTransform: 'uppercase', opacity: deleting ? 0.5 : 1 }}>
-                annulla
-              </button>
-              <button onClick={deleteAccount} disabled={deleting || deleteConfirmText.trim().toUpperCase() !== 'ELIMINA'}
-                style={{ flex: 1, background: (deleting || deleteConfirmText.trim().toUpperCase() !== 'ELIMINA') ? 'transparent' : '#C99A7A', color: (deleting || deleteConfirmText.trim().toUpperCase() !== 'ELIMINA') ? '#C99A7A' : '#1F140C', border: `1px solid #C99A7A`, fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.3em', padding: '11px 16px', cursor: (deleting || deleteConfirmText.trim().toUpperCase() !== 'ELIMINA') ? 'default' : 'pointer', textTransform: 'uppercase', opacity: (deleting || deleteConfirmText.trim().toUpperCase() !== 'ELIMINA') ? 0.5 : 1 }}>
-                {deleting ? '⋯ cancellazione' : 'elimina'}
-              </button>
+            <span style={{ fontSize: 13, lineHeight: 1.5, color: C.dim }}>L'operazione è irreversibile: non potrai recuperare i dati né riattivare lo stesso account. Le eventuali fatture emesse restano conservate per gli obblighi di legge.</span>
+            <label><span style={label}>per confermare scrivi ELIMINA</span>
+              <input type="text" value={deleteConfirmText} onChange={e => setDeleteConfirmText(e.target.value)} disabled={deleting} placeholder="ELIMINA" style={input(22)} /></label>
+            {deleteError && <div role="alert" style={{ fontSize: 13, color: C.sal }}>{deleteError}</div>}
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button onClick={() => setDeleteOpen(false)} disabled={deleting} style={{ ...btn(), flex: 1, minHeight: 46 }}>annulla</button>
+              <button onClick={deleteAccount} disabled={deleting || !canDelete} style={{ ...btnDanger, flex: 1, minHeight: 46, opacity: (deleting || !canDelete) ? 0.5 : 1 }}>{deleting ? 'cancellazione…' : 'elimina'}</button>
             </div>
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-// Riga di un singolo toggle notifica con selettore orario.
-function NotifToggleRow({ Q, fGaramond, fCinzel, label, desc, enabled, hour, onToggle, onHourChange, busy }) {
-  return (
-    <div style={{ marginBottom: 10, padding: '10px 12px', border: `1px solid ${Q.gold}33`, background: `${Q.gold}06`, display: 'flex', alignItems: 'center', gap: 10 }}>
-      {/* Toggle visivo */}
-      <button onClick={onToggle} disabled={busy}
-        style={{ width: 42, height: 22, borderRadius: 11, background: enabled ? Q.gold : `${Q.goldDim}55`, border: 'none', position: 'relative', cursor: busy ? 'default' : 'pointer', flexShrink: 0, transition: 'background 0.2s', opacity: busy ? 0.5 : 1 }}>
-        <span style={{ position: 'absolute', top: 2, left: enabled ? 22 : 2, width: 18, height: 18, borderRadius: '50%', background: Q.bg2 || '#fff', transition: 'left 0.2s' }} />
-      </button>
-
-      {/* Label e descrizione */}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontFamily: fCinzel, fontSize: 10, letterSpacing: '0.25em', color: enabled ? Q.gold : Q.goldDim, textTransform: 'uppercase' }}>{label}</div>
-        <div style={{ fontFamily: fGaramond, fontStyle: 'italic', fontSize: 12, color: Q.goldDim, lineHeight: 1.3, marginTop: 2 }}>{desc}</div>
-      </div>
-
-      {/* Selettore orario */}
-      <select value={hour} onChange={e => onHourChange(parseInt(e.target.value))}
-        disabled={!enabled || busy}
-        style={{ background: 'transparent', border: `1px solid ${Q.gold}44`, color: enabled ? Q.gold : Q.goldDim, fontFamily: fGaramond, fontStyle: 'italic', fontSize: 14, padding: '5px 8px', cursor: enabled ? 'pointer' : 'default', borderRadius: 0, flexShrink: 0 }}>
-        {Array.from({ length: 24 }, (_, i) => (
-          <option key={i} value={i} style={{ background: Q.bg2 || '#1F140C', color: Q.cream }}>
-            {String(i).padStart(2, '0')}:00
-          </option>
-        ))}
-      </select>
     </div>
   );
 }
