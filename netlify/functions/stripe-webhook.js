@@ -46,6 +46,14 @@ export default async (req) => {
       if (error) console.error('[stripe-webhook] update fallito:', error.message);
     };
 
+    // Piano dal prezzo sottoscritto. null = abbonamento di un altro prodotto dello stesso account Stripe: si ignora.
+    const PLAN_BY_PRICE = {
+      price_1UMt5aIbdF4Z4tGLGUaJMizx: 'base', price_1UMt5cIbdF4Z4tGLKMGw5mlu: 'base',
+      price_1UMt5qIbdF4Z4tGLGLsTPGgE: 'premium', price_1UMt5tIbdF4Z4tGLenIm3Rzg: 'premium',
+      price_1TX6HlIbdF4Z4tGLeZWDcIVf: 'base', price_1TX6HrIbdF4Z4tGLDZdSR3K5: 'base',
+    };
+    const planOf = (sub) => PLAN_BY_PRICE[sub?.items?.data?.[0]?.price?.id] || null;
+
     const statusFromStripe = (s) => {
       // Stripe: active, past_due, unpaid, canceled, incomplete, incomplete_expired, trialing, paused
       if (s === 'active' || s === 'trialing') return 'active';
@@ -59,7 +67,9 @@ export default async (req) => {
         const session = event.data.object;
         if (session.mode === 'subscription' && session.subscription) {
           const sub = await stripe.subscriptions.retrieve(session.subscription);
+          if (!planOf(sub)) break;
           await updateByCustomer(session.customer, {
+            plan: planOf(sub),
             stripe_subscription_id: sub.id,
             subscription_status: statusFromStripe(sub.status),
             current_period_end: new Date(sub.current_period_end * 1000).toISOString(),
@@ -70,7 +80,9 @@ export default async (req) => {
       case 'customer.subscription.created':
       case 'customer.subscription.updated': {
         const sub = event.data.object;
+        if (!planOf(sub)) break;
         await updateByCustomer(sub.customer, {
+          plan: planOf(sub),
           stripe_subscription_id: sub.id,
           subscription_status: statusFromStripe(sub.status),
           current_period_end: sub.current_period_end ? new Date(sub.current_period_end * 1000).toISOString() : null,
@@ -79,7 +91,9 @@ export default async (req) => {
       }
       case 'customer.subscription.deleted': {
         const sub = event.data.object;
+        if (!planOf(sub)) break;
         await updateByCustomer(sub.customer, {
+          plan: 'base',
           subscription_status: 'canceled',
           current_period_end: sub.current_period_end ? new Date(sub.current_period_end * 1000).toISOString() : null,
         });

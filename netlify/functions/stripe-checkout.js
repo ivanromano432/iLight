@@ -6,8 +6,11 @@
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 
-const PRICE_MONTHLY = 'price_1TX6HlIbdF4Z4tGLeZWDcIVf';
-const PRICE_YEARLY = 'price_1TX6HrIbdF4Z4tGLDZdSR3K5';
+// Piano base "GoalFit" (6,90 €/mese, 69 €/anno) e "GoalFit Premium" (9,90 €/mese, 99 €/anno)
+const PRICES = {
+  base:    { monthly: 'price_1UMt5aIbdF4Z4tGLGUaJMizx', yearly: 'price_1UMt5cIbdF4Z4tGLKMGw5mlu' },
+  premium: { monthly: 'price_1UMt5qIbdF4Z4tGLGLsTPGgE', yearly: 'price_1UMt5tIbdF4Z4tGLenIm3Rzg' },
+};
 
 export default async (req) => {
   if (req.method === 'OPTIONS') {
@@ -33,14 +36,23 @@ export default async (req) => {
 
   try {
     const body = await req.json();
-    const { plan, userId, userEmail } = body;
-    if (!userId || !userEmail || !plan) {
+    const { plan } = body;
+    const tier = body.tier === 'premium' ? 'premium' : 'base';
+    if (!plan) {
       return new Response(JSON.stringify({ error: 'parametri mancanti' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
     }
-    const price = plan === 'yearly' ? PRICE_YEARLY : PRICE_MONTHLY;
+    const price = PRICES[tier][plan === 'yearly' ? 'yearly' : 'monthly'];
 
     const stripe = new Stripe(stripeKey, { apiVersion: '2024-06-20' });
     const supa = createClient(supaUrl, supaService, { auth: { persistSession: false } });
+
+    // L'utente è quello della sessione, non quello dichiarato nella richiesta
+    const token = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
+    const { data: u, error: uErr } = token ? await supa.auth.getUser(token) : { data: null, error: true };
+    const userId = u?.user?.id; const userEmail = u?.user?.email;
+    if (uErr || !userId || !userEmail) {
+      return new Response(JSON.stringify({ error: 'Sessione scaduta: chiudi e riapri l\'app.' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
+    }
 
     // Recupera o crea customer Stripe
     const { data: profile } = await supa.from('profiles').select('stripe_customer_id').eq('id', userId).single();
@@ -65,7 +77,7 @@ export default async (req) => {
       billing_address_collection: 'auto',
       locale: 'it',
       subscription_data: {
-        metadata: { supabase_user_id: userId },
+        metadata: { supabase_user_id: userId, plan: tier },
       },
     });
 

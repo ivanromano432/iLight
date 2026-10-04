@@ -11,10 +11,18 @@ const REFETTORIO = { bg1: '#3A2818', bg2: '#1F140C', gold: '#C9A876', goldDim: '
 const fGaramond = '"Cormorant Garamond", serif';
 const fCinzel = '"Cinzel", serif';
 
-const PLANS = [
-  { id: 'monthly', label: 'MENSILE', price: '€ 4,99', period: 'al mese', popular: false, saveLabel: null },
-  { id: 'yearly', label: 'ANNUALE', price: '€ 39', period: 'all\'anno', popular: true, saveLabel: 'risparmi 35%' },
-];
+const TIERS = {
+  base: { name: 'GoalFit', plans: [
+    { id: 'yearly', label: 'annuale', price: '€ 69', period: 'all\'anno', popular: true, saveLabel: 'due mesi in omaggio' },
+    { id: 'monthly', label: 'mensile', price: '€ 6,90', period: 'al mese', popular: false, saveLabel: null },
+  ] },
+  premium: { name: 'Premium', plans: [
+    { id: 'yearly', label: 'annuale', price: '€ 99', period: 'all\'anno', popular: true, saveLabel: 'due mesi in omaggio' },
+    { id: 'monthly', label: 'mensile', price: '€ 9,90', period: 'al mese', popular: false, saveLabel: null },
+  ] },
+};
+// Limiti giornalieri dell'IA per piano (gli stessi applicati dal server)
+const AI_LIMITS = { base: { coach: 30, foto: 15, altro: 20 }, premium: { coach: 150, foto: 60, altro: 80 } };
 
 function daysUntil(isoDate) {
   if (!isoDate) return 0;
@@ -28,6 +36,7 @@ export default function SubscriptionPage({ user, profile, onClose, paywallMode =
 
   const [loading, setLoading] = useState(null); // 'monthly' | 'yearly' | 'portal' | null
   const [error, setError] = useState(null);
+  const [tier, setTier] = useState('base');
 
   const isLifetimeFree = !!profile?.is_lifetime_free;
   const isTrial = !isLifetimeFree && profile?.subscription_status === 'trial';
@@ -40,10 +49,11 @@ export default function SubscriptionPage({ user, profile, onClose, paywallMode =
   const checkout = async (plan) => {
     setError(null); setLoading(plan);
     try {
+      const { data: sess } = await supabase.auth.getSession();
       const res = await fetch('/api/stripe-checkout', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan, userId: user.id, userEmail: user.email }),
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (sess?.session?.access_token || '') },
+        body: JSON.stringify({ plan, tier, userId: user.id, userEmail: user.email }),
       });
       const data = await res.json();
       if (!res.ok || !data.url) throw new Error(data.error || 'Errore checkout');
@@ -94,15 +104,21 @@ export default function SubscriptionPage({ user, profile, onClose, paywallMode =
         {isLifetimeFree && status('accesso a vita', 'Premium per sempre', 'Hai accesso completo a GoalFit, senza addebiti.')}
         {isTrial && trialDaysLeft > 0 && status('prova gratuita in corso', trialDaysLeft === 1 ? 'Ultimo giorno' : `${trialDaysLeft} giorni rimasti`, null, Math.max(0.04, Math.min(1, (14 - trialDaysLeft) / 14)))}
         {(paywallMode || (isTrial && trialDaysLeft === 0)) && !isActive && status('prova terminata', 'Scegli un piano', 'Per continuare a usare GoalFit serve un abbonamento. I tuoi dati sono tutti al loro posto.')}
-        {isActive && status('abbonamento attivo', 'Tutto a posto', profile?.current_period_end ? `Rinnovo automatico il ${new Date(profile.current_period_end).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })}.` : '')}
+        {isActive && status(profile?.plan === 'premium' ? 'premium attivo' : 'abbonamento attivo', 'Tutto a posto', profile?.current_period_end ? `Rinnovo automatico il ${new Date(profile.current_period_end).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })}.` : '')}
         {isPastDue && status('pagamento in sospeso', 'C’è un problema', 'Il metodo di pagamento non è andato a buon fine. Sistemalo da "gestisci abbonamento".')}
 
         {!isActive && !isLifetimeFree && (<>
-          {[...PLANS].sort((a, b) => (b.popular ? 1 : 0) - (a.popular ? 1 : 0)).map(p => (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
+            {Object.keys(TIERS).map(k => (
+              <button key={k} onClick={() => setTier(k)} aria-pressed={tier === k} style={{ minHeight: 48, borderRadius: 24, background: tier === k ? C.gold : 'transparent', border: `1px solid ${C.gold}`, color: tier === k ? C.navy : C.cream, fontFamily: 'inherit', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>{TIERS[k].name}</button>
+            ))}
+          </div>
+          <span style={{ ...muted, fontSize: 13 }}>{tier === 'premium' ? 'Tutto GoalFit, con molta più intelligenza artificiale' : 'Tutte le funzioni dell’app'}: ogni giorno {AI_LIMITS[tier].coach} messaggi al coach, {AI_LIMITS[tier].foto} foto di pasti analizzate, {AI_LIMITS[tier].altro} analisi e suggerimenti.</span>
+          {TIERS[tier].plans.map(p => (
             <button key={p.id} onClick={() => checkout(p.id)} disabled={!!loading}
               style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: 18, borderRadius: 22, background: C.card, border: p.popular ? `2px solid ${C.gold}` : `1px solid ${C.line}`, color: C.cream, textAlign: 'left', cursor: loading ? 'default' : 'pointer', fontFamily: 'inherit', opacity: loading && loading !== p.id ? 0.6 : 1 }}>
               <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                <span style={tag}>{p.label.toLowerCase()}</span>
+                <span style={tag}>{TIERS[tier].name} · {p.label}</span>
                 {p.popular && <span style={{ background: C.gold, color: C.navy, fontSize: 13, fontWeight: 600, padding: '5px 12px', borderRadius: 14 }}>consigliato</span>}
               </span>
               <span style={{ fontFamily: fSerif, fontSize: 40, fontWeight: 500, lineHeight: 1.1 }}>{p.price} <span style={{ fontSize: 20 }}>{p.period}</span></span>

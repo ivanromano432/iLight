@@ -70,7 +70,7 @@ const SECTIONS = [
   ] },
   { id: 'abbonamento', title: 'Abbonamento', body: [
     'Hai 14 giorni di prova gratuita con tutte le funzioni, senza carta.',
-    'Poi scegli tra mensile (€ 4,99 al mese) e annuale (€ 39 all’anno). Il pagamento è gestito da Stripe e puoi annullare quando vuoi da "gestisci abbonamento".',
+    'Poi scegli tra due piani. GoalFit: € 6,90 al mese o € 69 all’anno, con tutte le funzioni e ogni giorno 30 messaggi al coach, 15 foto di pasti analizzate e 20 analisi. Premium: € 9,90 al mese o € 99 all’anno, con 150 messaggi al coach, 60 foto e 80 analisi al giorno. Il pagamento è gestito da Stripe e puoi annullare quando vuoi da "gestisci abbonamento".',
     'Se la prova scade senza abbonamento l’app mostra solo la pagina dei piani, ma i tuoi dati restano salvati: li ritrovi appena ti abboni.',
   ] },
   { id: 'faq', title: 'Domande frequenti', body: [
