@@ -11,6 +11,7 @@ const SubscriptionPage = lazy(() => import('./SubscriptionPage.jsx'));
 const ProfileSetup = lazy(() => import('./ProfileSetup.jsx'));
 const GuidaPage = lazy(() => import('./GuidaPage.jsx'));
 const MemoriaPage = lazy(() => import('./MemoriaPage.jsx'));
+const CollegamentiPage = lazy(() => import('./CollegamentiPage.jsx'));
 const ProfilePage = lazy(() => import('./ProfilePage.jsx'));
 // Onboarding componente lazy; le helper sincrone arrivano da un file dedicato (vedi onboardingHelpers.js)
 const Onboarding = lazy(() => import('./Onboarding.jsx'));
@@ -20,6 +21,7 @@ import { getTheme } from './themes.js';
 import ThemeStyles from './ThemeStyles.jsx';
 import { supabase } from './supabase.js';
 import { aiFetch } from './ai.js';
+import { whoopCall, loadWhoopDaily, mergeWhoop } from './whoop.js';
 import { COACH_TOOLS, buildMealRefs, planActions } from './coachActions.js';
 import { loadMemory, addMemory, memoryToText, extractMemoryTags, MEMORY_MAX } from './coachMemory.js';
 
@@ -439,6 +441,7 @@ export default function App({ user, onLogout }){
   const [showSub, setShowSub] = useState(false);
   const [showGuida, setShowGuida] = useState(false);
   const [showMemoria, setShowMemoria] = useState(false);
+  const [showLinks, setShowLinks] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [showAccountMenu, setShowAccountMenu] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -708,6 +711,46 @@ export default function App({ user, onLogout }){
   };
 
   mealsLive.current = meals;
+  // WHOOP: stato del collegamento, dati del giorno per il coach, aggiornamento automatico all'apertura
+  const [whoop, setWhoop] = useState(null);
+  const [whoopDaily, setWhoopDaily] = useState([]);
+  const [linksMsg, setLinksMsg] = useState('');
+  const liveData = useRef({});
+  liveData.current = { sleeps, workouts, workoutTypes };
+  const syncWhoop = async () => {
+    const r = await whoopCall('sync');
+    if (r.error) { if (r.reconnect) setWhoop(w => ({ ...(w || {}), connected: false })); return r.error; }
+    const m = mergeWhoop(r, liveData.current, newId);
+    if (m.workoutTypes) await updWorkoutTypes(m.workoutTypes);
+    if (m.workouts) await updWorkouts(m.workouts);
+    if (m.sleeps) await updSleeps(m.sleeps);
+    setWhoop(w => ({ ...(w || {}), connected: true, last_sync_at: r.last_sync_at }));
+    setWhoopDaily(await loadWhoopDaily());
+    return (m.nights || m.sessions) ? `Aggiunte ${m.nights} ${m.nights === 1 ? 'notte' : 'notti'} e ${m.sessions} ${m.sessions === 1 ? 'allenamento' : 'allenamenti'}.` : 'Tutto aggiornato: niente di nuovo da aggiungere.';
+  };
+  const whoopBoot = useRef(false);
+  useEffect(() => {
+    if (!loaded || !user?.id || whoopBoot.current) return;
+    whoopBoot.current = true;
+    (async () => {
+      let ret = null;
+      try { const q = new URLSearchParams(window.location.search); ret = q.get('whoop'); if (ret) { q.delete('whoop'); window.history.replaceState({}, '', window.location.pathname + (q.toString() ? '?' + q : '')); } } catch (_) {}
+      const st = await whoopCall('status');
+      if (st.error) return;
+      setWhoop(st);
+      if (ret) {
+        setShowLinks(true);
+        if (ret !== 'ok') { setLinksMsg(ret === 'annullato' ? 'Collegamento annullato.' : 'Non sono riuscito a collegare WHOOP. Riprova.'); return; }
+        setLinksMsg('WHOOP collegato. Porto dentro le ultime tre settimane…');
+        setLinksMsg('WHOOP collegato. ' + await syncWhoop());
+        return;
+      }
+      if (!st.connected) return;
+      setWhoopDaily(await loadWhoopDaily());
+      if (!st.last_sync_at || Date.now() - new Date(st.last_sync_at).getTime() > 3 * 3600000) { try { await syncWhoop(); } catch (e) { console.error('[whoop] sync', e); } }
+    })();
+    // eslint-disable-next-line
+  }, [loaded, user?.id]);
   // Il punto della settimana: una volta ogni 7 giorni il coach scrive di sua iniziativa nella chat
   const [coachUnread, setCoachUnread] = useState(() => { try { return localStorage.getItem('goalfit_coach_unread') === '1'; } catch (_) { return false; } });
   const markCoach = (v) => { setCoachUnread(v); try { if (v) localStorage.setItem('goalfit_coach_unread', '1'); else localStorage.removeItem('goalfit_coach_unread'); } catch (_) {} };
@@ -731,7 +774,7 @@ export default function App({ user, onLogout }){
         await updProfile({ coach_checkin_at: new Date().toISOString() });
         const mem = memoryToText(await loadMemory());
         const system = 'Sei il coach di GoalFit, un\'app italiana per il controllo del peso. Parli in italiano, in modo diretto, caldo e concreto. Non fai diagnosi e non sostituisci medico o nutrizionista.\n\n'
-          + 'DATI DELL\'UTENTE (ultimi 30 giorni):\n' + buildCoachContext({ profile, weights, goal, meals, water: waterByDay, waterGoal, workouts, workoutTypes, sleeps, fasts, supps: supplements, taken: suppTaken, notes: foodNotes, mindful: mindfulSessions })
+          + 'DATI DELL\'UTENTE (ultimi 30 giorni):\n' + buildCoachContext({ profile, weights, goal, meals, water: waterByDay, waterGoal, workouts, workoutTypes, sleeps, fasts, supps: supplements, taken: suppTaken, notes: foodNotes, mindful: mindfulSessions, whoopDaily })
           + '\n\nMEMORIA (cose stabili sull\'utente, da rispettare):\n' + (mem || '(vuota)');
         const res = await aiFetch({ model: 'claude-sonnet-4-6', max_tokens: 500, system, messages: [{ role: 'user', content: 'Scrivimi di tua iniziativa il punto della settimana appena passata, guardando solo i dati degli ultimi 7 giorni. Massimo 5 frasi, senza elenchi e senza titolo: una cosa che è andata bene (con il numero), una cosa che hai notato e che forse non ho visto, e una sola proposta concreta per i prossimi giorni. Chiudi con una domanda breve.' }] }, 'coach');
         if (!res.ok) return;
@@ -779,7 +822,7 @@ export default function App({ user, onLogout }){
   useEffect(() => { if (page === 'coach' && coachUnread) markCoach(false); }, [page, coachUnread]);
   // Navigazione per id: chiude le pagine a tutto schermo e apre la pagina richiesta ('stats' = Statistiche)
   const goPage = (id) => {
-    setShowAccountMenu(false); setShowSub(false); setShowGuida(false); setShowMemoria(false); setShowProfile(false);
+    setShowAccountMenu(false); setShowSub(false); setShowGuida(false); setShowMemoria(false); setShowLinks(false); setShowProfile(false);
     setShowStats(false);
     const idx = PAGES.findIndex(p => p.id === id);
     if (idx >= 0) setPageIdx(idx);
@@ -830,6 +873,13 @@ export default function App({ user, onLogout }){
         onDone={() => setShowProfileSetup(false)}
       />
     );
+  }
+
+  if (showLinks) {
+    return <CollegamentiPage whoop={whoop} initialMsg={linksMsg} onClose={() => { setShowLinks(false); setLinksMsg(''); }}
+      onConnect={async () => { const r = await whoopCall('start'); if (r.url) { window.location.href = r.url; return ''; } return r.error || 'Non sono riuscito ad aprire WHOOP.'; }}
+      onSync={() => syncWhoop()}
+      onDisconnect={async () => { await whoopCall('disconnect'); setWhoop(w => ({ ...(w || {}), connected: false, last_sync_at: null })); setWhoopDaily([]); return 'WHOOP scollegato. Notti e allenamenti già importati restano nell’app.'; }} />;
   }
 
   if (showMemoria) {
@@ -922,6 +972,7 @@ export default function App({ user, onLogout }){
                 {[
                   ['Profilo', () => { setShowAccountMenu(false); setShowProfile(true); }],
                   ['Memoria del coach', () => { setShowAccountMenu(false); setShowMemoria(true); }],
+                  ['Collegamenti', () => { setShowAccountMenu(false); setShowLinks(true); }],
                   ['Guida', () => { setShowAccountMenu(false); setShowGuida(true); }],
                   ['Abbonamento', () => { setShowAccountMenu(false); setShowSub(true); }, subState.ctaPrimary],
                   ['__versione__'],
@@ -985,7 +1036,7 @@ export default function App({ user, onLogout }){
         <ThemeStyles theme={__theme} />
         {page==='peso' && <PesoPage theme={__theme} loaded={loaded} weights={weights} goal={goal} updWeights={updWeights} updGoal={updGoal} meals={meals} updMeals={updMeals} openStats={() => setShowStats(true)} profile={profile} openSub={() => setShowSub(true)} />}
         {page==='stats' && <StatsPage theme={__theme} loaded={loaded} weights={weights} goal={goal} meals={meals} profile={profile} openFull={() => { setShowStats(true); try { window.scrollTo(0, 0); } catch (_) {} }} />}
-        {page==='coach' && <CoachPage refreshKey={coachRefresh} user={user} theme={__theme} loaded={loaded} profile={profile} weights={weights} goal={goal} meals={meals} water={waterByDay} waterGoal={waterGoal} workouts={workouts} workoutTypes={workoutTypes} sleeps={sleeps} fasts={fasts} supps={supplements} taken={suppTaken} notes={foodNotes} mindful={mindfulSessions} updMeals={updMeals} updSleeps={updSleeps} updWeights={updWeights} updGoal={updGoal} updWater={updWater} updWorkouts={updWorkouts} updWorkoutTypes={updWorkoutTypes} updFasts={updFasts} updProfile={updProfile} updSupps={updSupps} updTaken={updTaken} updNotes={updFoodNotes} />}
+        {page==='coach' && <CoachPage refreshKey={coachRefresh} whoopDaily={whoopDaily} user={user} theme={__theme} loaded={loaded} profile={profile} weights={weights} goal={goal} meals={meals} water={waterByDay} waterGoal={waterGoal} workouts={workouts} workoutTypes={workoutTypes} sleeps={sleeps} fasts={fasts} supps={supplements} taken={suppTaken} notes={foodNotes} mindful={mindfulSessions} updMeals={updMeals} updSleeps={updSleeps} updWeights={updWeights} updGoal={updGoal} updWater={updWater} updWorkouts={updWorkouts} updWorkoutTypes={updWorkoutTypes} updFasts={updFasts} updProfile={updProfile} updSupps={updSupps} updTaken={updTaken} updNotes={updFoodNotes} />}
         {page==='aggiorna' && <AggiornaPage theme={__theme} loaded={loaded} weights={weights} updWeights={updWeights} supps={supplements} taken={suppTaken} updTaken={updTaken} water={waterByDay} waterGoal={waterGoal} updWater={updWater} workouts={workouts} fasts={fasts} sleeps={sleeps} meals={meals} go={goPage} />}
         {page==='foto' && <FotoPage theme={__theme} loaded={loaded} meals={meals} />}
         {page==='pasti' && <PastiPage profile={profile} seedPhotoInit={photoSeed} clearSeedPhoto={() => setPhotoSeed(null)} user={user} theme={__theme} loaded={loaded} meals={meals} updMeals={updMeals} notes={foodNotes} weights={weights} goal={goal} />}
@@ -1427,7 +1478,7 @@ function StatsPage({ theme, loaded, weights, goal, meals, profile, openFull }){
 }
 
 // ---------- COACH: chat con l'IA che riceve un riepilogo degli ultimi 30 giorni ----------
-function buildCoachContext({ profile, weights, goal, meals, water, waterGoal, workouts, workoutTypes, sleeps, fasts, supps, taken, notes, mindful }){
+function buildCoachContext({ profile, weights, goal, meals, water, waterGoal, workouts, workoutTypes, sleeps, fasts, supps, taken, notes, mindful, whoopDaily }){
   const now = new Date();
   const cutoff = new Date(now.getTime() - 30*86400000);
   const recent = ts => { const d=new Date(ts); return d>=cutoff && d<=now; };
@@ -1459,6 +1510,7 @@ function buildCoachContext({ profile, weights, goal, meals, water, waterGoal, wo
   L.push(`Digiuni: ${fs.map(f=>`${dk(f.started_ts)} ${f.ended_ts ? Math.round((new Date(f.ended_ts)-new Date(f.started_ts))/3600000)+'h' : 'in corso'}${f.planned_hours?' (previste '+f.planned_hours+'h)':''}`).join('; ') || 'nessun dato'}`);
   const suppLine = (supps||[]).map(s=>{ let c=0; Object.keys(taken||{}).forEach(k=>{ if(k>=dayKey(cutoff) && (taken[k]||[]).includes(s.id)) c++; }); return `${s.name} ${c}/30 giorni`; });
   L.push(`Integratori: ${suppLine.join('; ') || 'nessuno'}`);
+  if ((whoopDaily||[]).length) L.push('WHOOP per giorno (recupero % / variabilità cardiaca ms / battito a riposo / sforzo 0-21 / passi): ' + whoopDaily.map(d=>`${d.day} ${d.recovery??'?'}% / ${d.hrv??'?'} / ${d.resting_hr??'?'} / ${d.strain??'?'} / ${d.steps??'?'}`).join('; '));
   const mi = (mindful||[]).filter(m=>recent(m.ts));
   L.push(`Respirazione/mindfulness: ${mi.length} sessioni`);
   const nt = (notes||[]).filter(n=>recent(n.ts)).slice(-10);

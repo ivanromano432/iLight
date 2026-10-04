@@ -69,6 +69,11 @@ const SECTIONS = [
     'È la cronologia automatica della giornata: pesate, pasti, movimento, respiro e note in ordine di orario.',
     'Puoi aggiungere una nota a mano e far leggere tutto all’IA con "analizza tutto": ti dice a che punto sei, su cosa concentrarti e cosa fare.',
   ] },
+  { id: 'collegamenti', title: 'Collegamenti (WHOOP)', body: [
+    'Dal menu del profilo, in "Collegamenti", puoi collegare WHOOP: accedi con il tuo account WHOOP e autorizzi GoalFit a leggere i dati.',
+    'Le notti e gli allenamenti del bracciale entrano da soli in Sonno e Allenamenti, e il coach vede recupero, sforzo e passi di ogni giorno. Quello che hai inserito a mano non viene toccato. L’aggiornamento parte all’apertura dell’app; puoi scollegare quando vuoi.',
+    'Apple Salute (bilance come Renpho, Apple Watch) arriverà con l’app per iPhone.',
+  ] },
   { id: 'abbonamento', title: 'Abbonamento', body: [
     'Hai 14 giorni di prova gratuita con tutte le funzioni, senza carta.',
     'Poi scegli tra due piani. GoalFit: € 6,90 al mese o € 69 all’anno, con tutte le funzioni e ogni giorno 30 messaggi al coach, 15 foto di pasti analizzate e 20 analisi. Premium: € 9,90 al mese o € 99 all’anno, con 150 messaggi al coach, 60 foto e 80 analisi al giorno. Il pagamento è gestito da Stripe e puoi annullare quando vuoi da "gestisci abbonamento".',
