@@ -20,6 +20,7 @@ import { uploadMealPhoto as uploadMealPhotoToStorage, deleteMealPhoto as deleteM
 import { getTheme } from './themes.js';
 import ThemeStyles from './ThemeStyles.jsx';
 import { supabase } from './supabase.js';
+import { COACH_TOOLS, buildMealRefs, planActions } from './coachActions.js';
 import { loadMemory, addMemory, memoryToText, extractMemoryTags, MEMORY_MAX } from './coachMemory.js';
 
 const Q = { bg1: '#3A2818', bg2: '#1F140C', gold: '#C9A876', goldDim: '#8B7355', cream: '#E8D8B8', ink: '#1F140C' };
@@ -927,7 +928,7 @@ export default function App({ user, onLogout }){
         {page==='oggi' && <OggiPage theme={__theme} loaded={loaded} profile={profile} weights={weights} goal={goal} meals={meals} notes={foodNotes} water={waterByDay} waterGoal={waterGoal} workouts={workouts} sleeps={sleeps} fasts={fasts} supps={supplements} taken={suppTaken} updWater={updWater} setPage={setPageIdx} />}
         {page==='peso' && <PesoPage theme={__theme} loaded={loaded} weights={weights} goal={goal} updWeights={updWeights} updGoal={updGoal} meals={meals} updMeals={updMeals} openStats={() => setShowStats(true)} profile={profile} openSub={() => setShowSub(true)} />}
         {page==='stats' && <StatsPage theme={__theme} loaded={loaded} weights={weights} goal={goal} meals={meals} profile={profile} openFull={() => { setShowStats(true); try { window.scrollTo(0, 0); } catch (_) {} }} />}
-        {page==='coach' && <CoachPage user={user} theme={__theme} loaded={loaded} profile={profile} weights={weights} goal={goal} meals={meals} water={waterByDay} waterGoal={waterGoal} workouts={workouts} workoutTypes={workoutTypes} sleeps={sleeps} fasts={fasts} supps={supplements} taken={suppTaken} notes={foodNotes} mindful={mindfulSessions} />}
+        {page==='coach' && <CoachPage user={user} theme={__theme} loaded={loaded} profile={profile} weights={weights} goal={goal} meals={meals} water={waterByDay} waterGoal={waterGoal} workouts={workouts} workoutTypes={workoutTypes} sleeps={sleeps} fasts={fasts} supps={supplements} taken={suppTaken} notes={foodNotes} mindful={mindfulSessions} updMeals={updMeals} updSleeps={updSleeps} updWeights={updWeights} updGoal={updGoal} updWater={updWater} updWorkouts={updWorkouts} updWorkoutTypes={updWorkoutTypes} updFasts={updFasts} updProfile={updProfile} />}
         {page==='aggiorna' && <AggiornaPage theme={__theme} loaded={loaded} weights={weights} updWeights={updWeights} supps={supplements} taken={suppTaken} updTaken={updTaken} water={waterByDay} waterGoal={waterGoal} updWater={updWater} workouts={workouts} fasts={fasts} sleeps={sleeps} meals={meals} go={goPage} />}
         {page==='foto' && <FotoPage theme={__theme} loaded={loaded} meals={meals} />}
         {page==='pasti' && <PastiPage profile={profile} seedPhotoInit={photoSeed} clearSeedPhoto={() => setPhotoSeed(null)} user={user} theme={__theme} loaded={loaded} meals={meals} updMeals={updMeals} notes={foodNotes} weights={weights} goal={goal} />}
@@ -1402,6 +1403,52 @@ function CoachPage(props){
   const [err, setErr] = useState('');
   const [confirmNew, setConfirmNew] = useState(false);
   const endRef = useRef(null);
+  // Modifiche ai dati proposte dal coach: restano in attesa finché l'utente non le approva nel pop-up
+  const [pending, setPending] = useState(null); // { text, cards, next, labels }
+  const [undo, setUndo] = useState(null);       // { msgId, snap, labels }
+  const [applying, setApplying] = useState(false);
+  const propsRef = useRef(props); propsRef.current = props;
+  const mealRefs = useRef({});
+  // Scrive nell'app un insieme di dati (una sola chiamata per tipo di dato)
+  async function writeData(d){
+    const P = propsRef.current;
+    if (d.meals !== undefined) await P.updMeals(d.meals);
+    if (d.sleeps !== undefined) await P.updSleeps(d.sleeps);
+    if (d.weights !== undefined) await P.updWeights(d.weights);
+    if (d.goal !== undefined) await P.updGoal(d.goal);
+    if (d.water !== undefined) await P.updWater(d.water);
+    if (d.workoutTypes !== undefined) await P.updWorkoutTypes(d.workoutTypes);
+    if (d.workouts !== undefined) await P.updWorkouts(d.workouts);
+    if (d.fasts !== undefined) await P.updFasts(d.fasts);
+    if (d.targets !== undefined) await P.updProfile(d.targets);
+  }
+  function addReply(content){
+    const reply = { id:newId(), role:'assistant', content, ts:new Date().toISOString() };
+    setMsgs(cur=>[...cur, reply]); persist(reply);
+    return reply;
+  }
+  async function decide(ok){
+    const pd = pending; if (!pd || applying) return;
+    if (!ok) { setPending(null); addReply(pd.text + '\n\n✗ non applicato: ' + pd.labels.join('; ')); return; }
+    setApplying(true);
+    try {
+      const P = propsRef.current;
+      // fotografia dei dati di prima, per poter annullare
+      const snap = {};
+      Object.keys(pd.next).forEach(k => { snap[k] = k==='targets' ? { daily_kcal_goal:P.profile?.daily_kcal_goal ?? null, daily_protein_g:P.profile?.daily_protein_g ?? null, daily_carbs_g:P.profile?.daily_carbs_g ?? null, daily_fat_g:P.profile?.daily_fat_g ?? null } : P[k]; });
+      await writeData(pd.next);
+      const r = addReply(pd.text + '\n\n✓ modificato: ' + pd.labels.join('; '));
+      setUndo({ msgId:r.id, snap, labels:pd.labels });
+    } catch (e) { setErr('Non sono riuscito ad applicare la modifica. (' + (e?.message||'errore') + ')'); }
+    finally { setApplying(false); setPending(null); }
+  }
+  async function undoLast(){
+    const u = undo; if (!u || applying) return;
+    setApplying(true);
+    try { await writeData(u.snap); addReply('↩ modifica annullata: ' + u.labels.join('; ')); }
+    catch (e) { setErr('Non sono riuscito ad annullare. (' + (e?.message||'errore') + ')'); }
+    finally { setApplying(false); setUndo(null); }
+  }
   // La conversazione è salvata nel database (tabella coach_messages) e si ricarica a ogni apertura
   useEffect(()=>{
     let alive = true;
@@ -1429,7 +1476,8 @@ function CoachPage(props){
   }
   async function send(text){
     const q = (text ?? input).trim();
-    if (!q || busy) return;
+    if (!q || busy || pending) return;
+    setUndo(null);
     const mine = { id:newId(), role:'user', content:q, ts:new Date().toISOString() };
     const next = [...msgs, mine];
     setMsgs(next); setInput(''); setErr(''); setBusy(true);
@@ -1437,10 +1485,14 @@ function CoachPage(props){
     try {
       const learn = props.profile?.coach_learn !== false;
       const memText = memoryToText(await loadMemory());
+      const mr = buildMealRefs(props.meals); mealRefs.current = mr.refs;
       const system = 'Sei il coach di GoalFit, un\'app italiana per il controllo del peso. Parli in italiano, in modo diretto, caldo e concreto, con risposte brevi (massimo 6-8 frasi, niente elenchi lunghi). '
         + 'Dai consigli generali su alimentazione, peso e abitudini basandoti sui dati reali dell\'utente riportati qui sotto: citali quando servono e non inventare dati che non ci sono. '
         + 'Non fai diagnosi e non sostituisci medico o nutrizionista: per problemi di salute, farmaci, gravidanza o obiettivi di peso estremi invita a rivolgersi a un professionista.\n\n'
         + 'DATI DELL\'UTENTE (ultimi 30 giorni):\n' + buildCoachContext(props)
+        + '\n\nPASTI RECENTI CON CODICE (per modificarli o eliminarli):\n' + mr.text
+        + '\n\nMODIFICARE I DATI DELL\'APP: hai strumenti per registrare o correggere pasti, sonno, peso, acqua, allenamenti, digiuno e obiettivi. Usali quando l\'utente ti racconta un dato da registrare ("a pranzo ho mangiato...", "stanotte ho dormito dalle... alle...", "stamattina pesavo...") o ti chiede una modifica. '
+        + 'Ogni modifica viene mostrata all\'utente in una finestra di conferma e si applica solo se approva: quindi scrivi SEMPRE anche una frase breve che dice cosa proponi, senza dire che è già fatto. Non usare gli strumenti per semplici domande o ipotesi, e non inventare dati che l\'utente non ha detto (per i pasti puoi stimare quantità e nutrienti). Se manca un\'informazione indispensabile, chiedila invece di usare lo strumento.'
         + '\n\nMEMORIA (cose stabili che l\'utente ti ha detto di sé; rispettale sempre, quelle a PRIORITÀ ALTA sono vincolanti):\n' + (memText || '(ancora vuota)')
         + (learn ? '\n\nAGGIORNARE LA MEMORIA: se nell\'ultimo messaggio l\'utente ti dice un fatto stabile su di sé che non è già in memoria e che serve per i consigli futuri (cibi esclusi o non graditi, intolleranze, orari, vincoli, infortuni, obiettivi, decisioni prese, come vuole che gli parli), aggiungi IN FONDO alla risposta, su una riga a parte, esattamente: [[MEMORIA: categoria | priorità | testo]]. '
           + 'categoria è una tra: obiettivi, alimentazione, allenamenti, routine, vincoli, coach, altro. priorità è alta (cibi da escludere, intolleranze, vincoli fisici o di salute, cose che non si possono mai ignorare) oppure normale. testo è una frase breve in terza persona, massimo 12 parole (es. "Non mangia latticini"). '
@@ -1448,10 +1500,12 @@ function CoachPage(props){
       // All'IA vanno gli ultimi 30 messaggi: la cronologia completa resta a schermo
       let recent = next.slice(-30).map(m=>({ role:m.role, content:m.content }));
       while (recent.length && recent[0].role !== 'user') recent = recent.slice(1);
-      const res = await fetch('/api/anthropic', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ model:'claude-sonnet-4-6', max_tokens:900, system, messages: recent }) });
+      const res = await fetch('/api/anthropic', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ model:'claude-sonnet-4-6', max_tokens:1200, system, messages: recent, tools: COACH_TOOLS }) });
       if (!res.ok) { let d=''; try { const j=await res.json(); d=j?.error?.message||j?.error||''; } catch(_) {} throw new Error('HTTP '+res.status+(d?' '+(typeof d==='string'?d:JSON.stringify(d)):'')); }
       const data = await res.json();
-      const raw = data.content?.find(c=>c.type==='text')?.text || '';
+      const uses = (data.content||[]).filter(c=>c.type==='tool_use');
+      const plan = uses.length ? planActions(uses, { meals:props.meals||[], sleeps:props.sleeps||[], weights:props.weights||[], goal:props.goal, water:props.water||{}, workouts:props.workouts||[], workoutTypes:props.workoutTypes||[], fasts:props.fasts||[], profile:props.profile, target:computeNutritionTarget(props.profile, props.weights, props.goal) }, mealRefs.current, newId) : null;
+      const raw = (data.content||[]).filter(c=>c.type==='text').map(c=>c.text).join('\n').trim() || (plan?.cards.length ? 'Ecco la modifica che ti propongo.' : (uses.length ? 'Non sono riuscito a preparare la modifica: mi ridici il dato con giorno e valori?' : ''));
       if (!raw) throw new Error('risposta vuota');
       // Il coach può chiudere la risposta con voci da salvare in memoria: le tolgo dal testo e le salvo
       const { clean, found } = extractMemoryTags(raw);
@@ -1465,6 +1519,7 @@ function CoachPage(props){
         }
         if (notes.length) txt += '\n\n' + notes.join('\n');
       }
+      if (plan && plan.cards.length) { setPending({ text:txt, cards:plan.cards, next:plan.next, labels:plan.labels }); return; }
       const reply = { id:newId(), role:'assistant', content:txt, ts:new Date().toISOString() };
       setMsgs(cur=>[...cur, reply]);
       persist(reply);
@@ -1490,6 +1545,7 @@ function CoachPage(props){
           <div key={m.id||i} style={{display:'flex',flexDirection:'column',gap:10}}>
             {sep && <div style={{alignSelf:'center',fontSize:11,letterSpacing:'0.14em',textTransform:'uppercase',opacity:0.7,fontWeight:600,padding:'6px 0 0'}}>{dayLabel(k)}</div>}
             <div style={{alignSelf:m.role==='user'?'flex-end':'flex-start',maxWidth:'86%',padding:'11px 14px',borderRadius:18,background:m.role==='user'?T.gold:`${T.cream}14`,border:m.role==='user'?'none':`1px solid ${T.gold}33`,color:m.role==='user'?T.bg2:T.cream,fontSize:15,lineHeight:1.45,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{m.content}</div>
+            {undo && undo.msgId===m.id && <button onClick={undoLast} disabled={applying} style={{alignSelf:'flex-start',minHeight:44,padding:'0 4px',background:'transparent',border:'none',color:T.gold,fontFamily:fDmSans,fontSize:13,textDecoration:'underline',textUnderlineOffset:3,cursor:'pointer'}}>{applying ? 'annullo…' : 'annulla la modifica'}</button>}
           </div>
         ); })}
         {busy && <div style={{alignSelf:'flex-start',padding:'11px 14px',borderRadius:18,background:`${T.cream}14`,fontSize:15,opacity:0.8}}>sto guardando i tuoi dati…</div>}
@@ -1501,6 +1557,29 @@ function CoachPage(props){
         )}
         <div ref={endRef} />
       </div>
+      {pending && (
+        <NavModal onClose={()=>decide(false)} title={pending.cards.length>1 ? `Applico ${pending.cards.length} modifiche?` : pending.cards[0].title + '?'} sub={pending.cards.length>1 ? 'proposte dal coach' : pending.cards[0].sub}>
+          {pending.cards.map((cd,ci)=>(
+            <div key={ci} style={{display:'flex',flexDirection:'column'}}>
+              {pending.cards.length>1 && <div style={{fontSize:12,letterSpacing:'0.1em',textTransform:'uppercase',color:cd.danger?C_SAL:C_GOLD,fontWeight:600,paddingTop:4}}>{cd.title} · {cd.sub}</div>}
+              {cd.rows.map((r,ri)=>(
+                <div key={ri} style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:12,padding:'11px 0',borderBottom:`1px solid ${C_CREAM}26`}}>
+                  <span style={{fontSize:13,opacity:0.75,flexShrink:0}}>{r.l}</span>
+                  <span style={{display:'flex',alignItems:'baseline',gap:8,flexWrap:'wrap',justifyContent:'flex-end',minWidth:0}}>
+                    {r.a!=null && <span style={{fontSize:14,opacity:0.6,textDecoration:'line-through'}}>{r.a}</span>}
+                    <span style={{fontFamily:fGaramond,fontSize:21,fontWeight:600,lineHeight:1.15,textAlign:'right',wordBreak:'break-word',color:cd.danger?C_SAL:C_CREAM}}>{r.b}</span>
+                  </span>
+                </div>
+              ))}
+              {cd.note && <span style={{fontSize:13,opacity:0.75,lineHeight:1.4,paddingTop:10}}>{cd.note}</span>}
+            </div>
+          ))}
+          <div style={{display:'flex',gap:8,paddingTop:4}}>
+            <button onClick={()=>decide(false)} disabled={applying} style={pillBtn('o')}>annulla</button>
+            <button onClick={()=>decide(true)} disabled={applying} style={{...pillBtn('p'),flex:1}}>{applying ? 'applico…' : 'applica'}</button>
+          </div>
+        </NavModal>
+      )}
       <div style={{position:'fixed',left:0,right:0,bottom:'calc(98px + env(safe-area-inset-bottom, 0px))',zIndex:40,padding:'0 16px'}}>
         <div style={{maxWidth:448,margin:'0 auto',display:'flex',alignItems:'center',gap:8,background:T.bg2,border:`1px solid ${T.gold}80`,borderRadius:26,padding:'4px 4px 4px 18px',boxShadow:'0 4px 16px rgba(0,0,0,0.25)'}}>
           <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{ if(e.key==='Enter') send(); }} placeholder="Scrivi al coach…" aria-label="Scrivi al coach"
