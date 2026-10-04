@@ -102,6 +102,12 @@ export default function MemoriaPage({ onClose, profile, updProfile }) {
             <span style={{ width: 46, height: 28, borderRadius: 14, background: learn ? C.gold : '#2A4466', display: 'flex', alignItems: 'center', justifyContent: learn ? 'flex-end' : 'flex-start', padding: 3, boxSizing: 'border-box', flexShrink: 0 }}><span style={{ width: 22, height: 22, borderRadius: '50%', background: C.cream }} /></span>
           </button>
 
+          <button onClick={() => updProfile && updProfile({ coach_checkin: profile?.coach_checkin === false })} role="switch" aria-checked={profile?.coach_checkin !== false}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, minHeight: 52, background: 'transparent', border: 'none', borderBottom: `1px solid ${C.line}`, padding: 0, color: C.cream, fontFamily: 'inherit', fontSize: 15, cursor: 'pointer', textAlign: 'left' }}>
+            <span>Il punto della settimana<span style={{ display: 'block', fontSize: 12, color: C.dim }}>una volta a settimana il coach ti scrive lui</span></span>
+            <span style={{ width: 46, height: 28, borderRadius: 14, background: profile?.coach_checkin !== false ? C.gold : '#2A4466', display: 'flex', alignItems: 'center', justifyContent: profile?.coach_checkin !== false ? 'flex-end' : 'flex-start', padding: 3, boxSizing: 'border-box', flexShrink: 0 }}><span style={{ width: 22, height: 22, borderRadius: '50%', background: C.cream }} /></span>
+          </button>
+
           {list.length > 0 && <button onClick={clearAll} style={btnDanger}>{confirmClear ? 'tocca ancora per cancellare tutto' : 'cancella tutta la memoria'}</button>}
         </div>
       </div>

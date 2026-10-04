@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, lazy } from 'react';
-import { Home, Scale, Salad, ClipboardList, Hourglass, Pill, Activity, Moon, NotebookPen, MessageCircle, ListChecks, Camera, Utensils, ChartColumn, Send, Check, Image as ImageIcon, FolderOpen } from 'lucide-react';
+import { Home, Scale, Salad, ClipboardList, Hourglass, Pill, Activity, Moon, NotebookPen, MessageCircle, ListChecks, Camera, Utensils, ChartColumn, Send, Check, Image as ImageIcon, FolderOpen, Mic, ImagePlus } from 'lucide-react';
 import {
   weightsRepo, profileRepo, waterRepo, sleepsRepo, diaryRepo, mealsRepo,
   workoutsRepo, workoutTypesRepo, supplementsRepo, suppTakenRepo, mindfulRepo, fastsRepo,
@@ -708,6 +708,40 @@ export default function App({ user, onLogout }){
   };
 
   mealsLive.current = meals;
+  // Il punto della settimana: una volta ogni 7 giorni il coach scrive di sua iniziativa nella chat
+  const [coachUnread, setCoachUnread] = useState(() => { try { return localStorage.getItem('goalfit_coach_unread') === '1'; } catch (_) { return false; } });
+  const markCoach = (v) => { setCoachUnread(v); try { if (v) localStorage.setItem('goalfit_coach_unread', '1'); else localStorage.removeItem('goalfit_coach_unread'); } catch (_) {} };
+  const checkinDone = useRef(false);
+  useEffect(() => {
+    if (!loaded || !user?.id || !profile || checkinDone.current) return;
+    if (profile.coach_checkin === false) return;
+    const last = profile.coach_checkin_at ? new Date(profile.coach_checkin_at).getTime() : 0;
+    if (Date.now() - last < 7 * 86400000) return;
+    const active = profile.subscription_status === 'active' || profile.is_lifetime_free || !profile.trial_ends_at || new Date(profile.trial_ends_at) >= new Date();
+    if (!active) return;
+    const wk = Date.now() - 7 * 86400000;
+    const mealDays = new Set((meals || []).filter(m => m.status !== 'planned' && new Date(m.ts).getTime() >= wk).map(m => dayKey(new Date(m.ts)))).size;
+    const wCount = (weights || []).filter(w => new Date(w.ts).getTime() >= wk).length;
+    if (mealDays < 3 && wCount < 2) return; // troppo pochi dati per dire qualcosa di utile
+    checkinDone.current = true;
+    (async () => {
+      try {
+        await updProfile({ coach_checkin_at: new Date().toISOString() });
+        const mem = memoryToText(await loadMemory());
+        const system = 'Sei il coach di GoalFit, un\'app italiana per il controllo del peso. Parli in italiano, in modo diretto, caldo e concreto. Non fai diagnosi e non sostituisci medico o nutrizionista.\n\n'
+          + 'DATI DELL\'UTENTE (ultimi 30 giorni):\n' + buildCoachContext({ profile, weights, goal, meals, water: waterByDay, waterGoal, workouts, workoutTypes, sleeps, fasts, supps: supplements, taken: suppTaken, notes: foodNotes, mindful: mindfulSessions })
+          + '\n\nMEMORIA (cose stabili sull\'utente, da rispettare):\n' + (mem || '(vuota)');
+        const res = await aiFetch({ model: 'claude-sonnet-4-6', max_tokens: 500, system, messages: [{ role: 'user', content: 'Scrivimi di tua iniziativa il punto della settimana appena passata, guardando solo i dati degli ultimi 7 giorni. Massimo 5 frasi, senza elenchi e senza titolo: una cosa che è andata bene (con il numero), una cosa che hai notato e che forse non ho visto, e una sola proposta concreta per i prossimi giorni. Chiudi con una domanda breve.' }] }, 'coach');
+        if (!res.ok) return;
+        const data = await res.json();
+        const txt = (data.content || []).filter(c => c.type === 'text').map(c => c.text).join('\n').trim();
+        if (!txt) return;
+        const { error } = await supabase.from('coach_messages').insert({ id: newId(), user_id: user.id, role: 'assistant', content: 'Il punto della settimana\n\n' + txt, ts: new Date().toISOString() });
+        if (!error) markCoach(true);
+      } catch (e) { console.error('[coach] punto della settimana', e); }
+    })();
+    // eslint-disable-next-line
+  }, [loaded, user?.id, profile?.coach_checkin_at, profile?.coach_checkin]);
   const shootMeal = async (file) => {
     if (shot?.state === 'busy') return;
     let b64 = null;
@@ -739,6 +773,7 @@ export default function App({ user, onLogout }){
   };
 
   const page = PAGES[pageIdx].id;
+  useEffect(() => { if (page === 'coach' && coachUnread) markCoach(false); }, [page, coachUnread]);
   // Navigazione per id: chiude le pagine a tutto schermo e apre la pagina richiesta ('stats' = Statistiche)
   const goPage = (id) => {
     setShowAccountMenu(false); setShowSub(false); setShowGuida(false); setShowMemoria(false); setShowProfile(false);
@@ -960,7 +995,7 @@ export default function App({ user, onLogout }){
         {page==='sera' && <SeraPage theme={__theme} loaded={loaded} weights={weights} goal={goal} notes={foodNotes} water={waterByDay} waterGoal={waterGoal} meals={meals} workouts={workouts} workoutTypes={workoutTypes} supps={supplements} taken={suppTaken} sleeps={sleeps} mindful={mindfulSessions} updNotes={updFoodNotes} profile={profile} />}
         </>); })()}
       </div>
-      <BottomNav theme={getTheme(profile?.theme)} currentId={page} onGo={goPage} onShoot={shootMeal} />
+      <BottomNav theme={getTheme(profile?.theme)} currentId={page} onGo={goPage} onShoot={shootMeal} coachDot={coachUnread} />
       {shot && (
         <div role="status" aria-live="polite" onClick={() => { if (shot.state !== 'busy') setShot(null); }}
           style={{ position:'fixed', top:'calc(14px + env(safe-area-inset-top, 0px))', left:16, right:16, zIndex:300, display:'flex', justifyContent:'center', pointerEvents: shot.state==='busy' ? 'none' : 'auto' }}>
@@ -975,7 +1010,7 @@ export default function App({ user, onLogout }){
   );
 }
 
-function BottomNav({ theme, currentId, onGo, onShoot }){
+function BottomNav({ theme, currentId, onGo, onShoot, coachDot }){
   // Tema dinamico: bottom nav usa colori del tema attivo
   const NAV = theme ? { bg: theme.bg2, border: theme.border, dim: theme.dim, gold: theme.gold, cream: theme.cream } : { bg: '#1A1108', border: '#3A2818', dim: '#6B5D45', gold: '#C9A876', cream: '#E8D8B8' };
   // Secondo tocco sulla fotocamera: si aprono 3 icone (scatta, libreria, file)
@@ -1009,7 +1044,10 @@ function BottomNav({ theme, currentId, onGo, onShoot }){
         );
         return (
           <button key={p.id} onClick={()=>{ setFan(false); onGo(p.id); }} style={{background:'transparent',border:'none',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:4,padding:'4px 2px',minWidth:58,minHeight:46,flex:'1 1 0'}}>
-            <Ic size={23} strokeWidth={active?2.4:1.7} color={active?NAV.gold:NAV.cream} style={{opacity:active?1:0.7}} />
+            <span style={{position:'relative',display:'flex'}}>
+              <Ic size={23} strokeWidth={active?2.4:1.7} color={active?NAV.gold:NAV.cream} style={{opacity:active?1:0.7}} />
+              {p.id==='coach' && coachDot && !active && <span aria-label="nuovo messaggio del coach" style={{position:'absolute',top:-3,right:-5,width:10,height:10,borderRadius:'50%',background:'#F0B9A0',border:`2px solid ${NAV.bg}`}} />}
+            </span>
             <span style={{fontFamily:fDmSans,fontSize:10.5,fontWeight:active?700:500,color:active?NAV.gold:NAV.cream,opacity:active?1:0.75}}>{p.label}</span>
           </button>
         );
@@ -1439,6 +1477,31 @@ function CoachPage(props){
   const [undo, setUndo] = useState(null);       // { msgId, snap, labels }
   const [applying, setApplying] = useState(false);
   const propsRef = useRef(props); propsRef.current = props;
+  // Foto allegata al messaggio (resta visibile solo in questa sessione) e dettatura vocale
+  const [attach, setAttach] = useState(null);
+  const [imgs, setImgs] = useState({});
+  const photoRef = useRef(null);
+  const SR = typeof window !== 'undefined' ? (window.SpeechRecognition || window.webkitSpeechRecognition) : null;
+  const recRef = useRef(null);
+  const [listening, setListening] = useState(false);
+  async function pickAttach(e){
+    const f = e.target.files?.[0]; e.target.value = '';
+    if (!f) return;
+    try { setAttach(await resizeImage(f, 1024, 0.8)); } catch (_) { setErr('Non sono riuscito a leggere la foto.'); }
+  }
+  function toggleMic(){
+    if (!SR) return;
+    if (listening) { try { recRef.current?.stop(); } catch (_) {} return; }
+    try {
+      const r = new SR(); recRef.current = r;
+      r.lang = 'it-IT'; r.interimResults = false; r.continuous = false;
+      r.onresult = ev => { let t = ''; for (let i = ev.resultIndex; i < ev.results.length; i++) if (ev.results[i].isFinal) t += ev.results[i][0].transcript; if (t) setInput(cur => (cur ? cur.trimEnd() + ' ' : '') + t.trim()); };
+      r.onerror = ev => { setListening(false); if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') setErr('Per dettare serve il permesso di usare il microfono.'); };
+      r.onend = () => setListening(false);
+      setErr(''); setListening(true); r.start();
+    } catch (_) { setListening(false); }
+  }
+  useEffect(() => () => { try { recRef.current?.abort(); } catch (_) {} }, []);
   const mealRefs = useRef({});
   // Scrive nell'app un insieme di dati (una sola chiamata per tipo di dato)
   async function writeData(d){
@@ -1509,12 +1572,15 @@ function CoachPage(props){
     if (uid) { const { error } = await supabase.from('coach_messages').delete().eq('user_id', uid); if (error) console.error('[coach] delete error', error.message); }
   }
   async function send(text){
-    const q = (text ?? input).trim();
+    const photo = text == null ? attach : null;
+    const q = (text ?? input).trim() || (photo ? 'Guarda questa foto: cosa mi consigli?' : '');
     if (!q || busy || pending) return;
     setUndo(null);
-    const mine = { id:newId(), role:'user', content:q, ts:new Date().toISOString() };
+    if (listening) { try { recRef.current?.stop(); } catch (_) {} }
+    const mine = { id:newId(), role:'user', content:(photo ? '📷 ' : '') + q, ts:new Date().toISOString() };
     const next = [...msgs, mine];
-    setMsgs(next); setInput(''); setErr(''); setBusy(true);
+    if (photo) setImgs(cur => ({ ...cur, [mine.id]: photo }));
+    setMsgs(next); setInput(''); setAttach(null); setErr(''); setBusy(true);
     persist(mine);
     try {
       const learn = props.profile?.coach_learn !== false;
@@ -1524,6 +1590,7 @@ function CoachPage(props){
         + 'Dai consigli generali su alimentazione, peso e abitudini basandoti sui dati reali dell\'utente riportati qui sotto: citali quando servono e non inventare dati che non ci sono. '
         + 'Non fai diagnosi e non sostituisci medico o nutrizionista: per problemi di salute, farmaci, gravidanza o obiettivi di peso estremi invita a rivolgersi a un professionista.\n\n'
         + 'DATI DELL\'UTENTE (ultimi 30 giorni):\n' + buildCoachContext(props)
+        + '\n\nFOTO: i messaggi che iniziano con 📷 avevano una foto allegata. Se nell\'ultimo messaggio c\'è una foto (un piatto, il menu di un ristorante, un\'etichetta, la bilancia) guardala e rispondi su quella; se è un pasto che l\'utente dice di aver mangiato, proponi di registrarlo. Delle foto dei messaggi precedenti vedi solo il testo.'
         + '\n\nPASTI RECENTI CON CODICE (per modificarli o eliminarli):\n' + mr.text
         + '\n\nMODIFICARE I DATI DELL\'APP: hai strumenti per registrare o correggere pasti, sonno, peso, acqua, allenamenti, digiuno, integratori, note di diario e obiettivi, e per mettere in piano i pasti nel Menù (oggi e prossimi 7 giorni, rispettando memoria, allergie e obiettivi giornalieri). Usali quando l\'utente ti racconta un dato da registrare ("a pranzo ho mangiato...", "stanotte ho dormito dalle... alle...", "stamattina pesavo...") o ti chiede una modifica. '
         + 'Ogni modifica viene mostrata all\'utente in una finestra di conferma e si applica solo se approva: quindi scrivi SEMPRE anche una frase breve che dice cosa proponi, senza dire che è già fatto. Non usare gli strumenti per semplici domande o ipotesi, e non inventare dati che l\'utente non ha detto (per i pasti puoi stimare quantità e nutrienti). Se manca un\'informazione indispensabile, chiedila invece di usare lo strumento.'
@@ -1534,6 +1601,9 @@ function CoachPage(props){
       // All'IA vanno gli ultimi 30 messaggi: la cronologia completa resta a schermo
       let recent = next.slice(-30).map(m=>({ role:m.role, content:m.content }));
       while (recent.length && recent[0].role !== 'user') recent = recent.slice(1);
+      // La foto va all'IA solo con il messaggio in cui è allegata
+      const pm = photo && photo.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
+      if (pm && recent.length) recent[recent.length-1] = { role:'user', content:[{ type:'image', source:{ type:'base64', media_type:pm[1], data:pm[2] } }, { type:'text', text:q }] };
       const res = await aiFetch({ model:'claude-sonnet-4-6', max_tokens:1200, system, messages: recent, tools: COACH_TOOLS }, 'coach');
       if (!res.ok) { let d=''; try { const j=await res.json(); d=j?.error?.message||j?.error||''; } catch(_) {} if ([401,402,429].includes(res.status) && typeof d==='string' && d) { setErr(d); return; } throw new Error('HTTP '+res.status+(d?' '+(typeof d==='string'?d:JSON.stringify(d)):'')); }
       const data = await res.json();
@@ -1578,7 +1648,7 @@ function CoachPage(props){
         {msgs.map((m,i)=>{ const k = dayKey(new Date(m.ts||Date.now())); const sep = k!==lastDay; lastDay = k; return (
           <div key={m.id||i} style={{display:'flex',flexDirection:'column',gap:10}}>
             {sep && <div style={{alignSelf:'center',fontSize:11,letterSpacing:'0.14em',textTransform:'uppercase',opacity:0.7,fontWeight:600,padding:'6px 0 0'}}>{dayLabel(k)}</div>}
-            <div style={{alignSelf:m.role==='user'?'flex-end':'flex-start',maxWidth:'86%',padding:'11px 14px',borderRadius:18,background:m.role==='user'?T.gold:`${T.cream}14`,border:m.role==='user'?'none':`1px solid ${T.gold}33`,color:m.role==='user'?T.bg2:T.cream,fontSize:15,lineHeight:1.45,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{m.content}</div>
+            <div style={{alignSelf:m.role==='user'?'flex-end':'flex-start',maxWidth:'86%',padding:'11px 14px',borderRadius:18,background:m.role==='user'?T.gold:`${T.cream}14`,border:m.role==='user'?'none':`1px solid ${T.gold}33`,color:m.role==='user'?T.bg2:T.cream,fontSize:15,lineHeight:1.45,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{imgs[m.id] && <img src={imgs[m.id]} alt="foto allegata" style={{display:'block',width:'100%',maxWidth:220,borderRadius:12,marginBottom:8}} />}{m.content}</div>
             {undo && undo.msgId===m.id && <button onClick={undoLast} disabled={applying} style={{alignSelf:'flex-start',minHeight:44,padding:'0 4px',background:'transparent',border:'none',color:T.gold,fontFamily:fDmSans,fontSize:13,textDecoration:'underline',textUnderlineOffset:3,cursor:'pointer'}}>{applying ? 'annullo…' : 'annulla la modifica'}</button>}
           </div>
         ); })}
@@ -1615,10 +1685,24 @@ function CoachPage(props){
         </NavModal>
       )}
       <div style={{position:'fixed',left:0,right:0,bottom:'calc(98px + env(safe-area-inset-bottom, 0px))',zIndex:40,padding:'0 16px'}}>
-        <div style={{maxWidth:448,margin:'0 auto',display:'flex',alignItems:'center',gap:8,background:T.bg2,border:`1px solid ${T.gold}80`,borderRadius:26,padding:'4px 4px 4px 18px',boxShadow:'0 4px 16px rgba(0,0,0,0.25)'}}>
-          <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{ if(e.key==='Enter') send(); }} placeholder="Scrivi al coach…" aria-label="Scrivi al coach"
+        <input ref={photoRef} type="file" accept="image/*" onChange={pickAttach} style={{display:'none'}} />
+        {attach && (
+          <div style={{maxWidth:448,margin:'0 auto 8px',display:'flex',alignItems:'center',gap:10,background:T.bg2,border:`1px solid ${T.gold}80`,borderRadius:18,padding:6}}>
+            <img src={attach} alt="foto da inviare" style={{width:52,height:52,borderRadius:12,objectFit:'cover'}} />
+            <span style={{flex:1,fontSize:13,opacity:0.8}}>foto pronta: scrivi la domanda o invia</span>
+            <button onClick={()=>setAttach(null)} aria-label="togli la foto" style={{width:44,height:44,borderRadius:'50%',background:'transparent',border:'none',color:T.cream,fontSize:20,cursor:'pointer'}}>×</button>
+          </div>
+        )}
+        <div style={{maxWidth:448,margin:'0 auto',display:'flex',alignItems:'center',gap:2,background:T.bg2,border:`1px solid ${T.gold}80`,borderRadius:26,padding:4,boxShadow:'0 4px 16px rgba(0,0,0,0.25)'}}>
+          <button onClick={()=>photoRef.current?.click()} disabled={busy} aria-label="allega una foto" style={{width:44,height:44,borderRadius:'50%',background:'transparent',border:'none',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',flexShrink:0,padding:0}}>
+            <ImagePlus size={21} strokeWidth={1.8} color={T.gold} />
+          </button>
+          <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{ if(e.key==='Enter') send(); }} placeholder={listening ? 'ti ascolto…' : 'Scrivi al coach…'} aria-label="Scrivi al coach"
             style={{flex:1,minWidth:0,border:'none',background:'transparent',fontFamily:fDmSans,fontSize:16,color:T.cream,outline:'none',height:44}} />
-          <button onClick={()=>send()} disabled={busy||!input.trim()||!props.loaded} aria-label="Invia" style={{width:44,height:44,borderRadius:'50%',background:T.gold,border:'none',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',flexShrink:0,opacity:(busy||!input.trim())?0.5:1}}>
+          {SR && <button onClick={toggleMic} disabled={busy} aria-label={listening ? 'ferma la dettatura' : 'detta il messaggio'} aria-pressed={listening} style={{width:44,height:44,borderRadius:'50%',background:listening?'#F0B9A0':'transparent',border:'none',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',flexShrink:0,padding:0}}>
+            <Mic size={20} strokeWidth={1.9} color={listening?T.bg2:T.gold} />
+          </button>}
+          <button onClick={()=>send()} disabled={busy||(!input.trim()&&!attach)||!props.loaded} aria-label="Invia" style={{width:44,height:44,borderRadius:'50%',background:T.gold,border:'none',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',flexShrink:0,opacity:(busy||(!input.trim()&&!attach))?0.5:1}}>
             <Send size={19} strokeWidth={2.2} color={T.bg2} />
           </button>
         </div>
