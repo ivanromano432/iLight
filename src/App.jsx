@@ -411,6 +411,16 @@ const DEF_TYPES = [
   { id:'yoga', name:'Yoga', unit:'min' },
 ];
 const UNITS = ['km','min','kg','reps','m'];
+// Tipo di pasto dedotto dall'ora in cui viene registrato
+function mealTypeFromHour(d){
+  const h = (d || new Date()).getHours();
+  if (h >= 5 && h < 10) return 'colazione';
+  if (h >= 10 && h < 12) return 'spuntino_m';
+  if (h >= 12 && h < 15) return 'pranzo';
+  if (h >= 15 && h < 18) return 'merenda';
+  if (h >= 18 && h < 22) return 'cena';
+  return 'spuntino_s';
+}
 const MEAL_TYPES = [
   { id:'colazione', name:'Colazione', order:1, abbr:'COL' },
   { id:'spuntino_m', name:'Spuntino', order:2, abbr:'SPU' },
@@ -2549,10 +2559,40 @@ function PastiPage({ user, theme, loaded, meals, updMeals, notes, weights, goal,
   // Foto scattata dalla pagina Foto (barra in basso): apre subito il MealModal con la foto pronta
   useEffect(() => {
     if (!seedPhotoInit) return;
-    if (seedPhotoInit !== 'manual') setPhotoIaSeed(seedPhotoInit);
-    setEditing('new');
+    if (seedPhotoInit !== 'manual') quickPhotoMeal(seedPhotoInit);
+    else setEditing('new');
     clearSeedPhoto && clearSeedPhoto();
   }, [seedPhotoInit]);
+  // Pasto da sola foto: l'IA riconosce piatto, quantità e nutrienti, il tipo di pasto viene dall'ora.
+  // Si salva da solo, senza aprire la scheda; resta modificabile toccandolo.
+  const mealsRef = useRef(meals);
+  mealsRef.current = meals;
+  const [quickBusy, setQuickBusy] = useState(false);
+  async function quickPhotoMeal(b64){
+    setQuickBusy(true);
+    try {
+      const now = new Date();
+      setSelectedDay(dayKey(now));
+      const r = await estimateMealNutrition({ description: '', qty_g: null, photo: b64 });
+      if (!r || r.error) {
+        // Analisi non riuscita: apro la scheda con la foto, cosi' si puo' completare a mano
+        setPhotoIaSeed(b64);
+        setEditing('new');
+        return;
+      }
+      const mealId = newId();
+      const meal = { id: mealId, ts: now.toISOString(), status: 'eaten', type: mealTypeFromHour(now),
+        description: r.name || '', qty_g: r.qty_g ?? null, kcal: r.kcal ?? null, p: r.p ?? null, c: r.c ?? null, g: r.g ?? null,
+        photo: b64, photo_url: null };
+      if (user?.id) {
+        try { meal.photo_url = await uploadMealPhotoToStorage(user.id, mealId, b64); meal.photo = null; }
+        catch (err) { console.warn('[quickPhotoMeal] upload Storage fallito, fallback base64', err); }
+      }
+      await updMeals([...mealsRef.current, meal]);
+    } finally {
+      setQuickBusy(false);
+    }
+  }
   // Bulk stima nutrienti
   const [bulkEstimating, setBulkEstimating] = useState(false);
   const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0 });
@@ -2565,8 +2605,8 @@ function PastiPage({ user, theme, loaded, meals, updMeals, notes, weights, goal,
     setPreparingPhoto(true);
     try {
       const b64 = await resizeImage(file, 480, 0.7);
-      setPhotoIaSeed(b64);
-      setEditing('new'); // apre MealModal in modalità "nuovo"
+      setPreparingPhoto(false);
+      await quickPhotoMeal(b64);
     } catch (_) {
       // se la lettura fallisce, apriamo comunque il modal vuoto
       setEditing('new');
@@ -2754,6 +2794,7 @@ function PastiPage({ user, theme, loaded, meals, updMeals, notes, weights, goal,
     <NavShell T={J} kicker={isToday ? 'pasti di oggi' : dateLabel} title="Il tuo piatto">
       <input ref={photoIaRef} type="file" accept="image/*" onChange={onPhotoIaPick} style={{display:'none'}} />
       {!loaded && <Loading color={J.gold} />}
+      {quickBusy && <div style={{marginBottom:14,padding:'14px 18px',borderRadius:18,border:`1px solid ${J.gold}`,background:`${J.cream}0D`,color:J.cream,fontFamily:fDmSans,fontSize:14,textAlign:'center'}}>analizzo la foto e registro il pasto…</div>}
       {loaded && (<div style={{display:'flex',flexDirection:'column',gap:14}}>
         <div style={{display:'flex',justifyContent:'space-between',gap:4}}>
           {last7.map(d=>{ const k=dayKey(d); const on=k===selectedDay; return (
@@ -2772,7 +2813,7 @@ function PastiPage({ user, theme, loaded, meals, updMeals, notes, weights, goal,
             </span>
           </button>
         ) : (
-          <button onClick={()=>photoIaRef.current?.click()} disabled={preparingPhoto} style={{width:'100%',height:200,borderRadius:24,border:`1px dashed ${J.gold}`,background:`${J.cream}0D`,color:J.cream,fontFamily:fDmSans,fontSize:15,cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:10}}>
+          <button onClick={()=>photoIaRef.current?.click()} disabled={preparingPhoto||quickBusy} style={{width:'100%',height:200,borderRadius:24,border:`1px dashed ${J.gold}`,background:`${J.cream}0D`,color:J.cream,fontFamily:fDmSans,fontSize:15,cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:10}}>
             <Camera size={30} strokeWidth={1.8} color={J.gold} />
             {preparingPhoto ? 'preparo la foto…' : 'Fotografa il primo pasto del giorno'}
           </button>
@@ -3136,7 +3177,7 @@ function TargetsModal({ J, target, updProfile, onClose }) {
 }
 
 function MealModal({ existing, onClose, onSave, onDelete, J, seedPhoto }){
-  const [type, setType] = useState(existing?.type || 'colazione');
+  const [type, setType] = useState(existing?.type || mealTypeFromHour(new Date()));
   const [description, setDescription] = useState(existing?.description || '');
   const [qty, setQty] = useState(existing?.qty_g!=null ? String(existing.qty_g) : '');
   // Unita' di misura per la quantita': 'g' (default) o 'ml'. E' cosmetica: il valore va sempre in qty_g.
