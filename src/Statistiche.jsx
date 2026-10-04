@@ -1,6 +1,7 @@
 // Pagina Statistiche dedicata: trend lungo periodo, composizione corporea, pattern settimanali, export CSV.
 // Accessibile dalla pagina Peso tramite bottone "STATISTICHE COMPLETE".
 
+import { aiFetch } from './ai.js';
 import { useState, useMemo, useEffect } from 'react';
 import { getTheme } from './themes.js';
 
@@ -30,16 +31,12 @@ async function callAI({ cacheKey, systemPrompt, userPrompt, maxTokens = 1200 }) 
     }
   } catch (_) { /* ignore */ }
 
-  const res = await fetch('/api/anthropic', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+  const res = await aiFetch({
       model: 'claude-sonnet-4-6',
       max_tokens: maxTokens,
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
-    }),
-  });
+    }, 'altro');
   if (!res.ok) throw new Error(`API ${res.status}`);
   const json = await res.json();
   const txt = json.content?.[0]?.text || '';

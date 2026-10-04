@@ -20,6 +20,7 @@ import { uploadMealPhoto as uploadMealPhotoToStorage, deleteMealPhoto as deleteM
 import { getTheme } from './themes.js';
 import ThemeStyles from './ThemeStyles.jsx';
 import { supabase } from './supabase.js';
+import { aiFetch } from './ai.js';
 import { COACH_TOOLS, buildMealRefs, planActions } from './coachActions.js';
 import { loadMemory, addMemory, memoryToText, extractMemoryTags, MEMORY_MAX } from './coachMemory.js';
 
@@ -134,7 +135,7 @@ Vincoli:
 Abitudini dell'utente:
 ${habitsSummary}${avoidStr}`;
   try {
-    const res = await fetch("/api/anthropic",{ method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:2500, system:"Sei un nutrizionista italiano creativo. Rispondi SEMPRE e SOLO con JSON valido. Proponi sempre pasti vari e diversi tra richieste.", messages:[{role:"user",content:prompt}] })});
+    const res = await aiFetch({ model:"claude-sonnet-4-6", max_tokens:2500, system:"Sei un nutrizionista italiano creativo. Rispondi SEMPRE e SOLO con JSON valido. Proponi sempre pasti vari e diversi tra richieste.", messages:[{role:"user",content:prompt}] }, 'altro');
     if (!res.ok) { let detail=''; try { const j=await res.json(); detail = j?.error?.message || (typeof j?.error === 'string' ? j.error : null) || j?.message || JSON.stringify(j); } catch(_) { detail = await res.text().catch(()=>'') } throw new Error('HTTP '+res.status+' '+(detail||'unknown')); }
     const data = await res.json();
     const txt = data.content?.find(c=>c.type==='text')?.text || '';
@@ -199,16 +200,12 @@ p = proteine in grammi, c = carboidrati in grammi, g = grassi in grammi. Niente 
   }
 
   try {
-    const res = await fetch('/api/anthropic', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    const res = await aiFetch({
         model: 'claude-sonnet-4-6',
         max_tokens: 500,
         system: 'Sei un nutrizionista italiano. Rispondi SEMPRE e SOLO con JSON valido. Niente testo extra.',
         messages: [{ role: 'user', content }],
-      }),
-    });
+      }, 'foto');
     if (!res.ok) {
       let detail = '';
       try { const j = await res.json(); detail = j?.error?.message || j?.message || JSON.stringify(j); } catch(_) { detail = await res.text().catch(()=>'') }
@@ -347,16 +344,12 @@ LINEE GUIDA per le azioni:
 ATTENZIONE: se i dati sono scarsi (es. meno di 3 giorni con dati), nello "stato" segnala che servono più dati per un'analisi affidabile, ma proponi comunque 3 azioni di partenza utili.`;
 
   try {
-    const res = await fetch('/api/anthropic', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    const res = await aiFetch({
         model: 'claude-sonnet-4-6',
         max_tokens: 1200,
         system: 'Sei un coach nutrizionale italiano. Rispondi SEMPRE e SOLO con JSON valido, niente testo prima o dopo.',
         messages: [{ role: 'user', content: prompt }],
-      }),
-    });
+      }, 'altro');
     if (!res.ok) {
       let detail = '';
       try {
@@ -1367,6 +1360,7 @@ function buildCoachContext({ profile, weights, goal, meals, water, waterGoal, wo
   L.push(`Data di oggi: ${dayKey(now)}`);
   const p = profile || {};
   L.push(`Profilo: sesso ${p.sex||'n.d.'}, anno di nascita ${p.birth_year||'n.d.'}, altezza ${p.height_cm||'n.d.'} cm, peso obiettivo ${goal!=null?goal+' kg':'n.d.'}`);
+  L.push(`Stile alimentare: ${p.diet_style||'n.d.'} · Allergie o intolleranze dichiarate: ${p.allergies||'nessuna dichiarata'} · Livello di attività: ${p.activity_level||'n.d.'}`);
   const t = computeNutritionTarget(profile, weights, goal);
   L.push(`Target giornalieri: ${t.kcal} kcal, proteine ${t.protein} g, carboidrati ${t.carbs} g, grassi ${t.fat} g`);
   const ws = (weights||[]).filter(w=>recent(w.ts)).sort((a,b)=>new Date(a.ts)-new Date(b.ts));
@@ -1500,8 +1494,8 @@ function CoachPage(props){
       // All'IA vanno gli ultimi 30 messaggi: la cronologia completa resta a schermo
       let recent = next.slice(-30).map(m=>({ role:m.role, content:m.content }));
       while (recent.length && recent[0].role !== 'user') recent = recent.slice(1);
-      const res = await fetch('/api/anthropic', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ model:'claude-sonnet-4-6', max_tokens:1200, system, messages: recent, tools: COACH_TOOLS }) });
-      if (!res.ok) { let d=''; try { const j=await res.json(); d=j?.error?.message||j?.error||''; } catch(_) {} throw new Error('HTTP '+res.status+(d?' '+(typeof d==='string'?d:JSON.stringify(d)):'')); }
+      const res = await aiFetch({ model:'claude-sonnet-4-6', max_tokens:1200, system, messages: recent, tools: COACH_TOOLS }, 'coach');
+      if (!res.ok) { let d=''; try { const j=await res.json(); d=j?.error?.message||j?.error||''; } catch(_) {} if ([401,402,429].includes(res.status) && typeof d==='string' && d) { setErr(d); return; } throw new Error('HTTP '+res.status+(d?' '+(typeof d==='string'?d:JSON.stringify(d)):'')); }
       const data = await res.json();
       const uses = (data.content||[]).filter(c=>c.type==='tool_use');
       const plan = uses.length ? planActions(uses, { meals:props.meals||[], sleeps:props.sleeps||[], weights:props.weights||[], goal:props.goal, water:props.water||{}, workouts:props.workouts||[], workoutTypes:props.workoutTypes||[], fasts:props.fasts||[], profile:props.profile, target:computeNutritionTarget(props.profile, props.weights, props.goal) }, mealRefs.current, newId) : null;
