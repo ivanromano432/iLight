@@ -1034,6 +1034,53 @@ const navBtn = (T, primary=true) => ({ minHeight:50, borderRadius:25, background
 const navChip = (T, on) => ({ minHeight:44, padding:'0 6px', borderRadius:22, background:on?T.gold:'transparent', border:`1px solid ${on?T.gold:`${T.cream}33`}`, color:on?T.bg2:T.cream, fontFamily:fDmSans, fontSize:14, fontWeight:600, cursor:'pointer' });
 const navKicker = { fontSize:11, letterSpacing:'0.14em', textTransform:'uppercase', opacity:0.7, fontWeight:600, padding:'0 2px 8px' };
 
+// ---------- Finestre (pop-up) nel nuovo stile: sfondo sfumato petrolio → blu notte ----------
+const C_CREAM = '#F4EFE2', C_GOLD = '#C9A55A', C_NAVY = '#0E2240', C_SAL = '#F0B9A0';
+const MODAL_BG = 'linear-gradient(180deg, #4A6A62 0%, #2A4A5C 28%, #16304F 62%, #122849 100%)';
+const MODAL_CARD = { background: MODAL_BG, border: '1px solid #5F8079', borderRadius: 24, boxShadow: '0 12px 32px rgba(0,0,0,0.45)', color: C_CREAM, fontFamily: fDmSans, boxSizing: 'border-box' };
+function NavModal({ title, sub, onClose, children, z=200, wide }){
+  return (
+    <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(4,12,28,0.72)',zIndex:z,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+      <div onClick={e=>e.stopPropagation()} role="dialog" aria-modal="true" aria-label={title} style={{...MODAL_CARD,width:'100%',maxWidth:wide?420:380,maxHeight:'90vh',overflowY:'auto',padding:22,display:'flex',flexDirection:'column',gap:14}}>
+        <div style={{display:'flex',flexDirection:'column',gap:4}}>
+          <h2 style={{fontFamily:fGaramond,fontSize:26,fontWeight:500,lineHeight:1.1,margin:0}}>{title}</h2>
+          {sub && <span style={{fontSize:13,opacity:0.8,lineHeight:1.4}}>{sub}</span>}
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+function NavField({ label, unit, size=24, right, ...inputProps }){
+  return (
+    <label style={{display:'flex',flexDirection:'column',gap:2,minWidth:0}}>
+      <span style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:6,fontSize:12,opacity:0.8,minHeight:18}}><span>{label}</span>{right}</span>
+      <span style={{display:'flex',alignItems:'baseline',gap:6,borderBottom:`2px solid ${C_GOLD}`,padding:'2px 0 4px'}}>
+        <input {...inputProps} style={{flex:1,minWidth:0,width:'100%',background:'transparent',border:'none',outline:'none',color:C_CREAM,fontFamily:fGaramond,fontSize:size,fontWeight:500,lineHeight:1.15,padding:0,colorScheme:'dark'}} />
+        {unit && <span style={{fontSize:13,opacity:0.8}}>{unit}</span>}
+      </span>
+    </label>
+  );
+}
+const pillBtn = (kind) => ({ minHeight:46, padding:'0 18px', borderRadius:23, fontFamily:fDmSans, fontSize:15, cursor:'pointer',
+  ...(kind==='p' ? { background:C_GOLD, border:`1px solid ${C_GOLD}`, color:C_NAVY, fontWeight:700 }
+    : kind==='d' ? { background:'transparent', border:`1px solid ${C_SAL}`, color:C_SAL }
+    : kind==='g' ? { background:'transparent', border:`1px solid ${C_GOLD}`, color:C_CREAM, fontWeight:600 }
+    : { background:'transparent', border:`1px solid ${C_CREAM}88`, color:C_CREAM }) });
+const pillChip = (on) => ({ minHeight:44, padding:'0 8px', borderRadius:22, background:on?C_GOLD:'transparent', border:`1px solid ${on?C_GOLD:`${C_CREAM}55`}`, color:on?C_NAVY:C_CREAM, fontFamily:fDmSans, fontSize:13, fontWeight:600, cursor:'pointer', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' });
+const modalLink = { background:'transparent', border:'none', color:C_CREAM, fontFamily:fDmSans, fontSize:13, textDecoration:'underline', textUnderlineOffset:3, cursor:'pointer', padding:'8px 0', minHeight:36 };
+function NavButtons({ onDelete, onCancel, onSave, saveLabel='salva', deleteLabel='elimina', disabled }){
+  return (
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,flexWrap:'wrap',paddingTop:4}}>
+      {onDelete ? <button onClick={onDelete} style={pillBtn('d')}>{deleteLabel}</button> : <span />}
+      <div style={{display:'flex',gap:8,marginLeft:'auto'}}>
+        <button onClick={onCancel} style={pillBtn('o')}>annulla</button>
+        <button onClick={onSave} disabled={disabled} style={{...pillBtn('p'),opacity:disabled?0.5:1}}>{saveLabel}</button>
+      </div>
+    </div>
+  );
+}
+
 // ---------- AGGIORNA: elenco delle cose da fare oggi, un tocco per registrare ----------
 function AggiornaPage({ theme, loaded, weights, updWeights, supps, taken, updTaken, water, waterGoal, updWater, workouts, fasts, sleeps, meals, go }){
   const T = theme;
@@ -1115,7 +1162,7 @@ function AggiornaPage({ theme, loaded, weights, updWeights, supps, taken, updTak
       </>)}
       {weightOpen && (
         <div onClick={()=>setWeightOpen(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.65)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
-          <div onClick={e=>e.stopPropagation()} style={{background:T.bg2,border:`1px solid ${T.gold}`,borderRadius:20,padding:22,width:'100%',maxWidth:320,color:T.cream,fontFamily:fDmSans}}>
+          <div onClick={e=>e.stopPropagation()} style={{...MODAL_CARD,padding:22,width:'100%',maxWidth:320}}>
             <div style={{fontFamily:T.fontText||fGaramond,fontSize:24,marginBottom:12}}>Il tuo peso adesso</div>
             <div style={{display:'flex',alignItems:'baseline',gap:8}}>
               <input autoFocus inputMode="decimal" value={weightVal} onChange={e=>setWeightVal(e.target.value)} onKeyDown={e=>{ if(e.key==='Enter') saveWeight(); }} placeholder="0,0" aria-label="peso in kg"
@@ -2394,20 +2441,13 @@ function PesoPage({ theme, loaded, weights, goal, updWeights, updGoal, meals, up
       {editing && (
         <ModalQ Q={Q} onClose={()=>setEditing(null)} title={editing==='new'?'REGISTRA PESO':'MODIFICA PESO'} subtitle={editing==='new'?new Date().toLocaleString('it-IT',{weekday:'long',day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'}):'aggiorna o elimina'}>
           <InputBig value={draft.w} onChange={v=>{setDraft({...draft,w:v}); setError('');}} onEnter={save} placeholder="74,2" unit="CHILOGRAMMI" Q={Q} />
-          {error && <div style={{color:'#C99A7A',fontStyle:'italic',fontSize:13,marginTop:10,textAlign:'center'}}>{error}</div>}
-          <button onClick={()=>setExpanded(!expanded)} style={{marginTop:18,minHeight:44,background:'transparent',border:'none',color:Q.gold,fontFamily:fDmSans,fontSize:14,fontWeight:600,cursor:'pointer',width:'100%',textAlign:'left',padding:0}}>
-            {expanded?'− composizione corporea':'+ aggiungi grasso, muscolo e acqua'}
-          </button>
-          {expanded && (
-            <div style={{marginTop:10,padding:'12px 0',borderTop:`1px solid ${Q.gold}22`,borderBottom:`1px solid ${Q.gold}22`}}>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10}}>
-                <DarkField label="% grasso" value={draft.bf} onChange={v=>setDraft({...draft,bf:v})} placeholder="22,5" Q={Q} />
-                <DarkField label="% muscolo" value={draft.mu} onChange={v=>setDraft({...draft,mu:v})} placeholder="38,1" Q={Q} />
-                <DarkField label="% acqua" value={draft.wa} onChange={v=>setDraft({...draft,wa:v})} placeholder="56,3" Q={Q} />
-              </div>
-              <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:11,color:Q.goldDim,marginTop:8,textAlign:'center'}}>opzionali — copia dalla bilancia</div>
-            </div>
-          )}
+          {error && <span style={{color:C_SAL,fontSize:13}}>{error}</span>}
+          <span style={{fontSize:12,color:C_GOLD,fontWeight:600,letterSpacing:'0.1em',textTransform:'uppercase'}}>dalla bilancia · facoltativi</span>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(3, minmax(0, 1fr))',gap:12}}>
+            <NavField label="grasso" unit="%" size={22} type="text" inputMode="decimal" value={draft.bf} onChange={e=>setDraft({...draft,bf:e.target.value})} placeholder="22,5" />
+            <NavField label="muscolo" unit="%" size={22} type="text" inputMode="decimal" value={draft.mu} onChange={e=>setDraft({...draft,mu:e.target.value})} placeholder="38,1" />
+            <NavField label="acqua" unit="%" size={22} type="text" inputMode="decimal" value={draft.wa} onChange={e=>setDraft({...draft,wa:e.target.value})} placeholder="56,3" />
+          </div>
           <EditButtons onCancel={()=>setEditing(null)} onSave={save} onDelete={editing!=='new'?del:null} Q={Q} />
         </ModalQ>
       )}
@@ -3028,50 +3068,21 @@ function TargetsModal({ J, target, updProfile, onClose }) {
   const balanced = Math.abs(diffPct) <= 5;
 
   return (
-    <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.65)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:200,padding:16}}>
-      <div onClick={e=>e.stopPropagation()} style={{background:'#142A4C',border:'1px solid #34506F',borderRadius:24,padding:'24px 22px',maxWidth:380,width:'100%',maxHeight:'90vh',overflowY:'auto',boxSizing:'border-box',boxShadow:'0 12px 32px rgba(0,0,0,0.45)'}}>
-        <div style={{fontFamily:J.fontText||fGaramond,fontSize:26,color:J.cream,marginBottom:6}}>Obiettivo del giorno</div>
-        <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:12,color:J.sage,textAlign:'center',marginBottom:18,lineHeight:1.4}}>Dieta a Zona 40/30/30 per dimagrimento: <b>40% carboidrati · 30% proteine · 30% grassi</b>.</div>
-
-        <div style={{marginBottom:14}}>
-          <div style={{fontFamily:fMarcellus,fontSize:9,letterSpacing:'0.4em',color:J.sage,textTransform:'uppercase',marginBottom:4}}>calorie / giorno</div>
-          <input type="text" inputMode="numeric" value={kcalStr} onChange={e=>setKcalStr(e.target.value.replace(/[^0-9]/g,''))} style={fieldInput(J)} />
-        </div>
-
-        <div style={{textAlign:'center',marginBottom:14}}>
-          <button onClick={applyZone} style={{background:'transparent',color:J.sage,border:`1px solid ${J.sage}66`,fontFamily:fMarcellus,fontSize:9,letterSpacing:'0.3em',padding:'7px 14px',cursor:'pointer',textTransform:'uppercase'}}>↻ ricalcola macro da kcal (zona 40/30/30)</button>
-        </div>
-
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10,marginBottom:10}}>
-          <div>
-            <div style={{fontFamily:fMarcellus,fontSize:9,letterSpacing:'0.3em',color:J.sage,textTransform:'uppercase',marginBottom:4}}>prot · g</div>
-            <input type="text" inputMode="numeric" value={pStr} onChange={e=>setPStr(e.target.value.replace(/[^0-9]/g,''))} style={fieldInput(J)} />
-          </div>
-          <div>
-            <div style={{fontFamily:fMarcellus,fontSize:9,letterSpacing:'0.3em',color:J.sage,textTransform:'uppercase',marginBottom:4}}>carb · g</div>
-            <input type="text" inputMode="numeric" value={cStr} onChange={e=>setCStr(e.target.value.replace(/[^0-9]/g,''))} style={fieldInput(J)} />
-          </div>
-          <div>
-            <div style={{fontFamily:fMarcellus,fontSize:9,letterSpacing:'0.3em',color:J.sage,textTransform:'uppercase',marginBottom:4}}>gras · g</div>
-            <input type="text" inputMode="numeric" value={gStr} onChange={e=>setGStr(e.target.value.replace(/[^0-9]/g,''))} style={fieldInput(J)} />
-          </div>
-        </div>
-
-        <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:11,textAlign:'center',marginBottom:14,color:balanced?'#6B8060':'#C8763C',padding:'6px 10px',background:`${balanced?'#A5B889':'#C8763C'}11`,border:`1px solid ${balanced?'#A5B889':'#C8763C'}33`}}>
-          kcal da macro: {fmt0(kcalFromMacros)} ({diff>0?'+':''}{fmt0(diff)} dal target {diffPct>0?'+':''}{Math.round(diffPct)}%){balanced?' · ok':''}
-        </div>
-
-        {err && <div style={{fontFamily:fGaramond,fontStyle:'italic',fontSize:12,color:'#A04848',textAlign:'center',marginBottom:10}}>{err}</div>}
-
-        <div style={{display:'flex',gap:8,justifyContent:'space-between',flexWrap:'wrap'}}>
-          <button onClick={resetToZone} disabled={saving} style={{background:'transparent',color:J.sage,border:`1px solid ${J.sage}66`,fontFamily:fMarcellus,fontSize:9,letterSpacing:'0.3em',padding:'8px 12px',cursor:saving?'default':'pointer',textTransform:'uppercase'}}>auto (da peso)</button>
-          <div style={{display:'flex',gap:8}}>
-            <button onClick={onClose} disabled={saving} style={{background:'transparent',color:J.sage,border:`1px solid ${J.sage}66`,fontFamily:fMarcellus,fontSize:9,letterSpacing:'0.3em',padding:'8px 14px',cursor:saving?'default':'pointer',textTransform:'uppercase'}}>annulla</button>
-            <button onClick={save} disabled={saving} style={{background:J.dark,color:J.bg,border:`1px solid ${J.dark}`,fontFamily:fMarcellus,fontSize:9,letterSpacing:'0.3em',padding:'8px 18px',cursor:saving?'default':'pointer',textTransform:'uppercase',opacity:saving?0.6:1}}>{saving?'⋯':'salva'}</button>
-          </div>
-        </div>
+    <NavModal onClose={onClose} title="Obiettivo del giorno" sub="Dieta a zona: 40% carboidrati, 30% proteine, 30% grassi">
+      <NavField label="calorie al giorno" unit="kcal" size={40} type="text" inputMode="numeric" value={kcalStr} onChange={e=>setKcalStr(e.target.value.replace(/[^0-9]/g,''))} />
+      <button onClick={applyZone} style={pillBtn('g')}>ricalcola i nutrienti in zona</button>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(3, minmax(0, 1fr))',gap:12}}>
+        <NavField label="proteine" unit="g" size={22} type="text" inputMode="numeric" value={pStr} onChange={e=>setPStr(e.target.value.replace(/[^0-9]/g,''))} />
+        <NavField label="carboidrati" unit="g" size={22} type="text" inputMode="numeric" value={cStr} onChange={e=>setCStr(e.target.value.replace(/[^0-9]/g,''))} />
+        <NavField label="grassi" unit="g" size={22} type="text" inputMode="numeric" value={gStr} onChange={e=>setGStr(e.target.value.replace(/[^0-9]/g,''))} />
       </div>
-    </div>
+      <span style={{fontSize:13,lineHeight:1.4,color:balanced?C_CREAM:C_SAL,opacity:balanced?0.8:1}}>
+        {balanced ? 'I nutrienti corrispondono alle calorie.' : `I nutrienti danno ${fmt0(kcalFromMacros)} kcal: ${diff>0?'+':''}${fmt0(diff)} rispetto al totale.`}
+      </span>
+      {err && <span style={{fontSize:13,color:C_SAL}}>{err}</span>}
+      <button onClick={resetToZone} disabled={saving} style={{...modalLink,textAlign:'left'}}>torna al calcolo automatico</button>
+      <NavButtons onCancel={onClose} onSave={save} disabled={saving} saveLabel={saving?'…':'salva'} />
+    </NavModal>
   );
 }
 
@@ -3187,83 +3198,49 @@ function MealModal({ existing, onClose, onSave, onDelete, J, seedPhoto }){
   const canEstimate = !estimating && (description.trim().length > 0 || !!displayPhoto);
 
   return (
-    <SimpleModal onClose={onClose} bg={J.bg} border={J.dark} wide>
-      <h2 style={{fontFamily:fMarcellus,fontSize:16,letterSpacing:'0.3em',color:J.dark,textAlign:'center',margin:0}}>{existing?'MODIFICA PASTO':'NUOVO PASTO'}</h2>
-      <div style={{marginTop:16,textAlign:'center'}}>
-        <input ref={fileRef} type="file" accept="image/*" onChange={pickPhoto} style={{display:'none'}} />
-        {displayPhoto ? (
-          <button onClick={()=>fileRef.current?.click()} style={{background:'transparent',border:'none',cursor:'pointer',padding:0}}>
-            <img src={displayPhoto} alt="" loading="lazy" style={{width:100,height:100,objectFit:'cover',borderRadius:'50%',border:`2px solid ${J.sage}`}} />
-          </button>
-        ) : (
-          <button onClick={()=>fileRef.current?.click()} disabled={busy} style={{width:100,height:100,borderRadius:'50%',background:`${J.sage}1F`,border:`2px dashed ${J.sage}`,cursor:'pointer',fontFamily:fGaramond,fontStyle:'italic',fontSize:13,color:J.sage}}>{busy?'…':'+ foto'}</button>
-        )}
-        {displayPhoto && <div><button onClick={removePhoto} style={{background:'transparent',border:'none',color:J.sage,fontFamily:fGaramond,fontStyle:'italic',fontSize:12,cursor:'pointer',marginTop:4}}>rimuovi foto</button></div>}
-      </div>
-      <div style={{marginTop:18}}>
-        <FieldLabel>tipo di pasto</FieldLabel>
-        <div style={{display:'flex',flexWrap:'wrap',gap:6,marginTop:6}}>
-          {MEAL_TYPES.map(t=><button key={t.id} onClick={()=>setType(t.id)} style={{padding:'6px 12px',fontFamily:fMarcellus,fontSize:10,letterSpacing:'0.2em',textTransform:'uppercase',background:type===t.id?J.dark:'transparent',color:type===t.id?J.bg:J.dark,border:`1px solid ${J.dark}`,cursor:'pointer',borderRadius:0}}>{t.name}</button>)}
+    <NavModal onClose={onClose} title={existing ? 'Modifica pasto' : 'Nuovo pasto'} sub={existing?.ts ? new Date(existing.ts).toLocaleString('it-IT',{weekday:'long',hour:'2-digit',minute:'2-digit'}) : ''} wide>
+      <input ref={fileRef} type="file" accept="image/*" onChange={pickPhoto} style={{display:'none'}} />
+      {displayPhoto ? (<>
+        <img src={displayPhoto} alt="foto del piatto" loading="lazy" style={{width:'100%',height:150,objectFit:'cover',borderRadius:18,display:'block'}} />
+        <div style={{display:'flex',justifyContent:'space-between',marginTop:-8}}>
+          <button onClick={()=>fileRef.current?.click()} style={modalLink}>cambia foto</button>
+          <button onClick={removePhoto} style={modalLink}>rimuovi foto</button>
         </div>
+      </>) : (
+        <button onClick={()=>fileRef.current?.click()} disabled={busy} style={{height:96,borderRadius:18,background:`${C_CREAM}0D`,border:`1px dashed ${C_GOLD}`,color:C_CREAM,fontFamily:fDmSans,fontSize:14,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:10}}>
+          <Camera size={22} strokeWidth={1.9} color={C_GOLD} /> {busy ? 'preparo la foto…' : 'aggiungi una foto'}
+        </button>
+      )}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(3, minmax(0, 1fr))',gap:6}}>
+        {MEAL_TYPES.map(t=>(<button key={t.id} onClick={()=>setType(t.id)} style={pillChip(type===t.id)}>{t.id==='spuntino_s' ? 'Serale' : t.name}</button>))}
       </div>
-      <div style={{marginTop:14}}>
-        <FieldLabel>descrizione</FieldLabel>
-        <input type="text" value={description} onChange={e=>setDescription(e.target.value)} placeholder="es. pasta al pomodoro" autoFocus style={fieldInput(J)} />
+      <NavField label="descrizione" type="text" value={description} onChange={e=>setDescription(e.target.value)} placeholder="es. pasta al pomodoro" size={22} />
+      <div style={{display:'grid',gridTemplateColumns:'repeat(2, minmax(0, 1fr))',gap:12}}>
+        <NavField label="quantità" unit={qtyUnit} type="text" inputMode="numeric" value={qty} onChange={e=>setQty(e.target.value)} placeholder={qtyUnit==='ml'?'330':'250'}
+          right={<button type="button" onClick={e=>{ e.preventDefault(); setQtyUnit(qtyUnit==='g'?'ml':'g'); }} style={{background:'transparent',border:`1px solid ${C_CREAM}55`,borderRadius:10,color:C_CREAM,fontFamily:fDmSans,fontSize:11,padding:'1px 8px',cursor:'pointer'}}>usa {qtyUnit==='g'?'ml':'g'}</button>} />
+        <NavField label="calorie" unit="kcal" type="text" inputMode="numeric" value={kcal} onChange={e=>setKcal(e.target.value)} placeholder="450" />
       </div>
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginTop:14}}>
-        <div>
-          <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',marginBottom:4}}>
-            <FieldLabel>quantità</FieldLabel>
-            <div style={{display:'flex',gap:0}}>
-              <button type="button" onClick={()=>setQtyUnit('g')} style={{padding:'2px 8px',fontFamily:fMarcellus,fontSize:9,letterSpacing:'0.15em',background:qtyUnit==='g'?J.dark:'transparent',color:qtyUnit==='g'?J.bg:J.sage,border:`1px solid ${J.dark}66`,cursor:'pointer',borderRadius:0}}>G</button>
-              <button type="button" onClick={()=>setQtyUnit('ml')} style={{padding:'2px 8px',fontFamily:fMarcellus,fontSize:9,letterSpacing:'0.15em',background:qtyUnit==='ml'?J.dark:'transparent',color:qtyUnit==='ml'?J.bg:J.sage,border:`1px solid ${J.dark}66`,borderLeft:'none',cursor:'pointer',borderRadius:0}}>ML</button>
-            </div>
-          </div>
-          <input type="text" inputMode="numeric" value={qty} onChange={e=>setQty(e.target.value)} placeholder={qtyUnit==='ml'?'330':'250'} style={fieldInput(J)} />
-        </div>
-        <div><FieldLabel>kcal</FieldLabel><input type="text" inputMode="numeric" value={kcal} onChange={e=>setKcal(e.target.value)} placeholder="450" style={fieldInput(J)} /></div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(3, minmax(0, 1fr))',gap:12}}>
+        <NavField label="proteine" unit="g" size={20} type="text" inputMode="decimal" value={p} onChange={e=>setP(e.target.value)} placeholder="20" />
+        <NavField label="carboidrati" unit="g" size={20} type="text" inputMode="decimal" value={c} onChange={e=>setC(e.target.value)} placeholder="60" />
+        <NavField label="grassi" unit="g" size={20} type="text" inputMode="decimal" value={g} onChange={e=>setG(e.target.value)} placeholder="12" />
       </div>
-
-      {/* Selettore data: solo per modifica di pasto esistente di oggi o ieri */}
       {existing && (isExistingToday || isExistingYesterday) && (
-        <div style={{marginTop:14}}>
-          <FieldLabel>data</FieldLabel>
-          <div style={{display:'flex',gap:6,marginTop:6}}>
-            <button type="button" onClick={()=>setDateChoice('oggi')} style={{flex:1,padding:'8px 12px',fontFamily:fMarcellus,fontSize:10,letterSpacing:'0.2em',textTransform:'uppercase',background:dateChoice==='oggi'?J.dark:'transparent',color:dateChoice==='oggi'?J.bg:J.dark,border:`1px solid ${J.dark}`,cursor:'pointer',borderRadius:0}}>OGGI</button>
-            <button type="button" onClick={()=>setDateChoice('ieri')} style={{flex:1,padding:'8px 12px',fontFamily:fMarcellus,fontSize:10,letterSpacing:'0.2em',textTransform:'uppercase',background:dateChoice==='ieri'?J.dark:'transparent',color:dateChoice==='ieri'?J.bg:J.dark,border:`1px solid ${J.dark}`,cursor:'pointer',borderRadius:0}}>IERI</button>
-          </div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(2, minmax(0, 1fr))',gap:6}}>
+          <button type="button" onClick={()=>setDateChoice('oggi')} style={pillChip(dateChoice==='oggi')}>oggi</button>
+          <button type="button" onClick={()=>setDateChoice('ieri')} style={pillChip(dateChoice==='ieri')}>ieri</button>
         </div>
       )}
-
-      {/* Stima nutrienti con IA */}
-      <div style={{marginTop:14,padding:'12px 14px',border:`1px dashed ${J.sage}66`,background:`${J.sage}0A`}}>
-        <button onClick={estimateNutrition} disabled={!canEstimate} style={{width:'100%',background:canEstimate?J.sage:'transparent',color:canEstimate?J.bg:J.sage,border:`1px solid ${J.sage}`,fontFamily:fMarcellus,fontSize:10,letterSpacing:'0.3em',padding:'10px 14px',cursor:canEstimate?'pointer':'not-allowed',textTransform:'uppercase',opacity:canEstimate?1:0.5}}>
-          {estimating ? '⋯ ANALIZZO' : (!!displayPhoto && !description.trim() ? '✦ IDENTIFICA DALLA FOTO' : '✦ STIMA NUTRIENTI CON IA')}
-        </button>
-        <div style={{marginTop:8,fontFamily:fGaramond,fontStyle:'italic',fontSize:12,color:J.sage,textAlign:'center',lineHeight:1.4}}>
-          {!description.trim() && !displayPhoto
-            ? 'scrivi la descrizione (o aggiungi una foto) per attivare la stima'
-            : (!!displayPhoto && !description.trim()
-              ? 'l\'IA riconosce il piatto dalla foto, ne stima quantità e macronutrienti · puoi sempre correggere'
-              : 'l\'IA stima kcal, proteine, carboidrati e grassi da descrizione e quantità · puoi sempre correggere')}
-        </div>
-        {estimateNote && <div style={{marginTop:6,fontFamily:fGaramond,fontStyle:'italic',fontSize:12,color:J.dark,textAlign:'center'}}>✓ {estimateNote}</div>}
-        {estimateError && <div style={{marginTop:6,fontFamily:fGaramond,fontStyle:'italic',fontSize:12,color:'#A04848',textAlign:'center'}}>{estimateError}</div>}
-      </div>
-
-      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginTop:14}}>
-        <div><FieldLabel>prot. (g)</FieldLabel><input type="text" inputMode="decimal" value={p} onChange={e=>setP(e.target.value)} placeholder="20" style={fieldInput(J)} /></div>
-        <div><FieldLabel>carb. (g)</FieldLabel><input type="text" inputMode="decimal" value={c} onChange={e=>setC(e.target.value)} placeholder="60" style={fieldInput(J)} /></div>
-        <div><FieldLabel>gras. (g)</FieldLabel><input type="text" inputMode="decimal" value={g} onChange={e=>setG(e.target.value)} placeholder="12" style={fieldInput(J)} /></div>
-      </div>
-      <div style={{display:'flex',gap:8,marginTop:22,justifyContent:'space-between',alignItems:'center'}}>
-        {onDelete ? <button onClick={onDelete} style={{background:'transparent',color:'#A04848',border:`1px solid #A0484866`,fontFamily:fMarcellus,fontSize:10,letterSpacing:'0.2em',padding:'10px 16px',cursor:'pointer'}}>ELIMINA</button> : <span />}
-        <div style={{display:'flex',gap:8}}>
-          <button onClick={onClose} style={btnOutlineMini(J.sage,fMarcellus)}>annulla</button>
-          <button onClick={save} style={{background:J.dark,color:J.bg,border:'none',fontFamily:fMarcellus,fontSize:10,letterSpacing:'0.3em',padding:'10px 22px',cursor:'pointer'}}>SALVA</button>
-        </div>
-      </div>
-    </SimpleModal>
+      <button onClick={estimateNutrition} disabled={!canEstimate} style={{...pillBtn('g'),opacity:canEstimate?1:0.5}}>
+        {estimating ? 'sto analizzando…' : (!!displayPhoto && !description.trim() ? 'riconosci il piatto dalla foto' : 'calcola i nutrienti con l’ia')}
+      </button>
+      <span style={{fontSize:12,opacity:0.75,lineHeight:1.4,marginTop:-6}}>
+        {!description.trim() && !displayPhoto ? 'Scrivi la descrizione o aggiungi una foto per attivare il calcolo.' : 'L’IA stima quantità, calorie e nutrienti: puoi sempre correggerli.'}
+      </span>
+      {estimateNote && <span style={{fontSize:13,lineHeight:1.4}}>{estimateNote}</span>}
+      {estimateError && <span style={{fontSize:13,color:C_SAL}}>{estimateError}</span>}
+      <NavButtons onDelete={onDelete} onCancel={onClose} onSave={save} />
+    </NavModal>
   );
 }
 
@@ -3374,38 +3351,33 @@ function TypeDetailModal({ type, workouts, onClose, updWorkouts, onEditType }){
   const editingW = editing && editing!=='new' ? workouts.find(w=>w.id===editing) : null;
 
   return (
-    <SimpleModal onClose={onClose} bg={A.bg1} border={A.ink} wide>
-      <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',marginBottom:4}}>
-        <h2 style={{fontFamily:fBodoni,fontStyle:'italic',fontWeight:500,fontSize:26,color:A.ink,margin:0}}>{type.name}</h2>
-        <button onClick={onEditType} style={{background:'transparent',border:'none',color:A.sage,fontFamily:fBodoni,fontStyle:'italic',fontSize:12,cursor:'pointer'}}>modifica tipo ›</button>
+    <NavModal onClose={onClose} title={type.name} sub={`30 giorni · ${last30.length} ${last30.length===1?'sessione':'sessioni'}`} wide>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-end',gap:10}}>
+        <span style={{fontFamily:fGaramond,fontSize:46,fontWeight:500,lineHeight:1}}>{fmt0(totalQty)} <span style={{fontSize:22}}>{type.unit}</span></span>
+        <button onClick={onEditType} style={modalLink}>modifica attività</button>
       </div>
-      <div style={{fontFamily:fDmSans,fontSize:9,letterSpacing:'0.35em',color:A.sage,textTransform:'uppercase'}}>30 giorni · totale</div>
-      <div style={{fontFamily:fBodoni,fontWeight:500,fontSize:36,letterSpacing:'-0.03em',lineHeight:1,marginTop:4}}>{fmt0(totalQty)}<span style={{fontFamily:fDmSans,fontSize:11,letterSpacing:'0.2em',color:A.sage,marginLeft:4}}>{type.unit}</span></div>
-      <div style={{fontFamily:fBodoni,fontStyle:'italic',fontSize:13,color:A.sage,marginTop:2}}>{last30.length} sessioni</div>
-      <svg viewBox="0 0 280 70" width="100%" height={70} style={{display:'block',marginTop:14}}>
-        <defs><linearGradient id="ad" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor={A.sage} stopOpacity="0.18"/><stop offset="100%" stopColor={A.sage} stopOpacity="0"/></linearGradient></defs>
-        {points.length>1 && <path d={area} fill="url(#ad)" />}
-        {points.length>1 && <path d={path} stroke={A.sage} strokeWidth="1.2" fill="none" />}
-        {points.map((p,i)=><circle key={i} cx={p.x} cy={p.y} r={i===points.length-1?3:1.8} fill={A.sage} />)}
-      </svg>
-      <div style={{marginTop:10,maxHeight:180,overflowY:'auto'}}>
-        {tw.length===0 ? (
-          <div style={{textAlign:'center',padding:'12px 0',fontFamily:fBodoni,fontStyle:'italic',fontSize:13,color:A.sage}}>Nessuna sessione.</div>
-        ) : tw.slice().reverse().slice(0,15).map(w=>{const d=new Date(w.ts); return (
-          <button key={w.id} onClick={()=>setEditing(w.id)} style={{width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',padding:'9px 0',background:'transparent',border:'none',borderBottom:`1px solid ${A.ink}11`,cursor:'pointer',textAlign:'left'}}>
-            <div style={{flex:1,minWidth:0}}>
-              <div style={{fontFamily:fBodoni,fontStyle:'italic',fontSize:15,color:A.ink}}>{fmt(w.qty)} <span style={{fontFamily:fDmSans,fontStyle:'normal',fontSize:10,letterSpacing:'0.2em',color:A.sage}}>{type.unit}</span></div>
-              <div style={{fontFamily:fDmSans,fontSize:10,letterSpacing:'0.15em',color:A.sage,marginTop:1}}>{d.toLocaleDateString('it-IT',{day:'numeric',month:'short'})}{w.notes?` · ${w.notes}`:''}</div>
-            </div>
-            <span style={{color:A.sage,fontSize:13}}>›</span>
+      {points.length>1 ? (
+        <svg viewBox="0 0 280 70" role="img" aria-label="Andamento degli ultimi 30 giorni" style={{width:'100%',height:'auto',display:'block'}}>
+          <path d={area} fill={C_GOLD} fillOpacity="0.12" />
+          <path d={path} stroke={C_GOLD} strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+          <circle cx={points[points.length-1].x} cy={points[points.length-1].y} r="4.5" fill={C_CREAM} />
+        </svg>
+      ) : null}
+      <div style={{maxHeight:200,overflowY:'auto'}}>
+        {tw.length===0 ? <div style={{fontSize:14,opacity:0.8,padding:'8px 0'}}>Nessuna sessione registrata.</div> : tw.slice().reverse().slice(0,15).map(w=>{ const d=new Date(w.ts); return (
+          <button key={w.id} onClick={()=>setEditing(w.id)} style={{display:'flex',alignItems:'baseline',gap:12,padding:'11px 2px',minHeight:44,width:'100%',background:'transparent',border:'none',borderBottom:`1px solid ${C_CREAM}33`,color:C_CREAM,fontFamily:fDmSans,cursor:'pointer',textAlign:'left'}}>
+            <span style={{fontSize:13,fontWeight:700,width:64,flexShrink:0}}>{sameDay(d,new Date()) ? 'oggi' : d.toLocaleDateString('it-IT',{day:'numeric',month:'short'})}</span>
+            <span style={{flex:1,minWidth:0,fontSize:15,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{fmt(w.qty)} {type.unit}{w.notes ? ` · ${w.notes}` : ''}</span>
+            <span style={{fontSize:13,opacity:0.8}}>›</span>
           </button>
-        );})}
+        ); })}
       </div>
-      <div style={{textAlign:'center',marginTop:16}}>
-        <button onClick={()=>setEditing('new')} style={{background:A.ink,color:A.bg1,border:'none',fontFamily:fDmSans,fontSize:10,letterSpacing:'0.35em',padding:'11px 26px',cursor:'pointer',textTransform:'uppercase'}}>+ nuova sessione</button>
+      <div style={{display:'flex',gap:8}}>
+        <button onClick={onClose} style={pillBtn('o')}>chiudi</button>
+        <button onClick={()=>setEditing('new')} style={{...pillBtn('p'),flex:1}}>nuova sessione</button>
       </div>
       {editing && <WorkoutModal existing={editingW} unit={type.unit} typeName={type.name} onClose={()=>setEditing(null)} onSave={saveWorkout} onDelete={editing!=='new'?delWorkout:null} />}
-    </SimpleModal>
+    </NavModal>
   );
 }
 
@@ -3415,26 +3387,12 @@ function WorkoutModal({ existing, unit, typeName, onClose, onSave, onDelete }){
   const [err, setErr] = useState('');
   function save(){ const q=parseNum(qty,0,100000); if(q==null){setErr('quantità non valida'); return;} onSave({qty:q,notes:notes.trim()}); }
   return (
-    <SimpleModal onClose={onClose} bg={A.bg1} border={A.ink}>
-      <h2 style={{fontFamily:fDmSans,fontSize:10,letterSpacing:'0.4em',color:A.sage,textAlign:'center',margin:0,textTransform:'uppercase'}}>{typeName}</h2>
-      <div style={{fontFamily:fBodoni,fontStyle:'italic',fontSize:14,color:A.ink,textAlign:'center',marginTop:4}}>{existing?'modifica sessione':'nuova sessione'}</div>
-      <div style={{marginTop:18}}>
-        <FieldLabel>quantità ({unit})</FieldLabel>
-        <input type="text" inputMode="decimal" value={qty} onChange={e=>{setQty(e.target.value); setErr('');}} onKeyDown={e=>{if(e.key==='Enter')save();}} autoFocus placeholder={unit==='km'?'5,2':'30'} style={fieldInput(A)} />
-        {err && <div style={{color:'#A04848',fontFamily:fBodoni,fontStyle:'italic',fontSize:12,marginTop:4}}>{err}</div>}
-      </div>
-      <div style={{marginTop:14}}>
-        <FieldLabel>note (opzionale)</FieldLabel>
-        <input type="text" value={notes} onChange={e=>setNotes(e.target.value)} placeholder="parco del castello" style={fieldInput(A)} />
-      </div>
-      <div style={{display:'flex',gap:8,marginTop:22,justifyContent:'space-between',alignItems:'center'}}>
-        {onDelete ? <button onClick={onDelete} style={{background:'transparent',color:'#A04848',border:`1px solid #A0484866`,fontFamily:fDmSans,fontSize:9,letterSpacing:'0.3em',padding:'10px 14px',cursor:'pointer',textTransform:'uppercase'}}>elimina</button> : <span />}
-        <div style={{display:'flex',gap:8}}>
-          <button onClick={onClose} style={btnOutlineMini(A.sage,fDmSans)}>annulla</button>
-          <button onClick={save} style={{background:A.ink,color:A.bg1,border:'none',fontFamily:fDmSans,fontSize:10,letterSpacing:'0.35em',padding:'10px 22px',cursor:'pointer'}}>SALVA</button>
-        </div>
-      </div>
-    </SimpleModal>
+    <NavModal onClose={onClose} z={220} title={typeName} sub={existing ? 'modifica sessione' : 'nuova sessione'}>
+      <NavField label="quantità" unit={unit} size={44} type="text" inputMode="decimal" value={qty} onChange={e=>{setQty(e.target.value); setErr('');}} onKeyDown={e=>{if(e.key==='Enter')save();}} autoFocus placeholder={unit==='km'?'5,0':'30'} />
+      {err && <span style={{fontSize:13,color:C_SAL}}>{err}</span>}
+      <NavField label="note (facoltative)" size={18} type="text" value={notes} onChange={e=>setNotes(e.target.value)} placeholder="parco del castello" />
+      <NavButtons onDelete={onDelete} onCancel={onClose} onSave={save} />
+    </NavModal>
   );
 }
 
@@ -3443,26 +3401,16 @@ function TypeModal({ existing, onClose, onSave, onDelete }){
   const [unit, setUnit] = useState(existing?.unit || 'min');
   function save(){ const n=name.trim(); if(!n)return; onSave({name:n,unit}); }
   return (
-    <SimpleModal onClose={onClose} bg={A.bg1} border={A.ink}>
-      <h2 style={{fontFamily:fDmSans,fontSize:10,letterSpacing:'0.4em',color:A.sage,textAlign:'center',margin:0,textTransform:'uppercase'}}>{existing?'modifica tipo':'nuovo tipo'}</h2>
-      <div style={{marginTop:18}}>
-        <FieldLabel>nome</FieldLabel>
-        <input type="text" value={name} onChange={e=>setName(e.target.value)} placeholder="es. Bicicletta" autoFocus style={fieldInput(A)} />
-      </div>
-      <div style={{marginTop:14}}>
-        <FieldLabel>unità di misura</FieldLabel>
-        <div style={{display:'flex',flexWrap:'wrap',gap:6,marginTop:6}}>
-          {UNITS.map(u=><button key={u} onClick={()=>setUnit(u)} style={{padding:'8px 14px',fontFamily:fDmSans,fontSize:11,letterSpacing:'0.15em',background:u===unit?A.ink:'transparent',color:u===unit?A.bg1:A.ink,border:`1px solid ${A.ink}`,cursor:'pointer',textTransform:'uppercase'}}>{u}</button>)}
+    <NavModal onClose={onClose} z={220} title={existing ? 'Modifica attività' : 'Nuova attività'}>
+      <NavField label="nome" type="text" value={name} onChange={e=>setName(e.target.value)} placeholder="es. Bicicletta" autoFocus />
+      <div style={{display:'flex',flexDirection:'column',gap:8}}>
+        <span style={{fontSize:12,opacity:0.8}}>si misura in</span>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(5, minmax(0, 1fr))',gap:6}}>
+          {UNITS.map(u=>(<button key={u} onClick={()=>setUnit(u)} style={pillChip(u===unit)}>{u}</button>))}
         </div>
       </div>
-      <div style={{display:'flex',gap:8,marginTop:22,justifyContent:'space-between'}}>
-        {onDelete ? <button onClick={onDelete} style={{background:'transparent',color:'#A04848',border:`1px solid #A0484866`,fontFamily:fDmSans,fontSize:9,letterSpacing:'0.3em',padding:'10px 14px',cursor:'pointer',textTransform:'uppercase'}}>elimina</button> : <span />}
-        <div style={{display:'flex',gap:8}}>
-          <button onClick={onClose} style={btnOutlineMini(A.sage,fDmSans)}>annulla</button>
-          <button onClick={save} style={{background:A.ink,color:A.bg1,border:'none',fontFamily:fDmSans,fontSize:10,letterSpacing:'0.35em',padding:'10px 22px',cursor:'pointer'}}>SALVA</button>
-        </div>
-      </div>
-    </SimpleModal>
+      <NavButtons onDelete={onDelete} onCancel={onClose} onSave={save} />
+    </NavModal>
   );
 }
 
@@ -3694,37 +3642,25 @@ function SleepModal({ existing, todayK, onClose, onSave, onDelete }){
   const dur = durHours(bedtime, waketime);
 
   return (
-    <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',backdropFilter:'blur(4px)',WebkitBackdropFilter:'blur(4px)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
-      <div onClick={e=>e.stopPropagation()} style={{background:'#142A4C',border:`1px solid ${S.gold}55`,maxWidth:360,width:'100%',padding:'28px 24px',borderRadius:24,maxHeight:'88vh',overflowY:'auto'}}>
-        <h2 style={{fontFamily:fFraunces,fontStyle:'italic',fontWeight:300,fontSize:24,color:S.pale,textAlign:'center',margin:0}}>{existing?'Modifica notte':'Nuova notte'}</h2>
-        <div style={{marginTop:18}}>
-          <FieldLabel light>data del risveglio</FieldLabel>
-          <input type="date" value={wakeDateISO} onChange={e=>{const [y,m,d]=e.target.value.split('-').map(Number); setWakeDate(dayKey(new Date(y,m-1,d)));}} style={{...fieldInputDark(S),colorScheme:'dark'}} />
-        </div>
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginTop:14}}>
-          <div><FieldLabel light>a letto alle</FieldLabel><input type="time" value={bedtime} onChange={e=>setBedtime(e.target.value)} style={{...fieldInputDark(S),colorScheme:'dark'}} /></div>
-          <div><FieldLabel light>sveglia alle</FieldLabel><input type="time" value={waketime} onChange={e=>setWaketime(e.target.value)} style={{...fieldInputDark(S),colorScheme:'dark'}} /></div>
-        </div>
-        <div style={{marginTop:14,textAlign:'center',fontFamily:fFraunces,fontStyle:'italic',fontSize:18,color:S.gold}}>durata: {fmtDur(dur)}</div>
-        <div style={{marginTop:14}}>
-          <FieldLabel light>qualità</FieldLabel>
-          <div style={{display:'flex',justifyContent:'center',gap:8,marginTop:8}}>
-            {[1,2,3,4,5].map(n=><button key={n} onClick={()=>setQuality(n)} style={{background:'transparent',border:'none',cursor:'pointer',padding:4,fontSize:28,color:n<=quality?S.gold:S.dim}}>★</button>)}
-          </div>
-        </div>
-        <div style={{marginTop:14}}>
-          <FieldLabel light>note (opzionale)</FieldLabel>
-          <input type="text" value={notes} onChange={e=>setNotes(e.target.value)} placeholder="risvegli, sogni..." style={fieldInputDark(S)} />
-        </div>
-        <div style={{display:'flex',gap:8,marginTop:22,justifyContent:'space-between',alignItems:'center'}}>
-          {onDelete ? <button onClick={onDelete} style={{background:'transparent',color:'#C99A7A',border:`1px solid #C99A7A66`,fontFamily:fFraunces,fontSize:11,letterSpacing:'0.2em',padding:'10px 14px',cursor:'pointer',textTransform:'uppercase'}}>elimina</button> : <span />}
-          <div style={{display:'flex',gap:8}}>
-            <button onClick={onClose} style={{background:'transparent',color:S.dim,border:`1px solid ${S.dim}66`,fontFamily:fFraunces,fontSize:11,letterSpacing:'0.25em',padding:'10px 16px',cursor:'pointer',textTransform:'uppercase'}}>annulla</button>
-            <button onClick={save} style={{background:S.gold,color:S.bg2,border:'none',fontFamily:fFraunces,fontSize:11,letterSpacing:'0.35em',padding:'10px 22px',cursor:'pointer',textTransform:'uppercase'}}>SALVA</button>
-          </div>
+    <NavModal onClose={onClose} title={existing ? 'Modifica notte' : 'La tua notte'}>
+      <NavField label="data del risveglio" size={20} type="date" value={wakeDateISO} onChange={e=>{ if(!e.target.value) return; const [y,m,d]=e.target.value.split('-').map(Number); setWakeDate(dayKey(new Date(y,m-1,d))); }} />
+      <div style={{display:'grid',gridTemplateColumns:'repeat(2, minmax(0, 1fr))',gap:12}}>
+        <NavField label="a letto alle" type="time" value={bedtime} onChange={e=>setBedtime(e.target.value)} />
+        <NavField label="sveglia alle" type="time" value={waketime} onChange={e=>setWaketime(e.target.value)} />
+      </div>
+      <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:2,padding:'4px 0'}}>
+        <span style={{fontFamily:fGaramond,fontSize:44,fontWeight:500,lineHeight:1}}>{fmtDur(dur)}</span>
+        <span style={{fontSize:13,opacity:0.8}}>di sonno</span>
+      </div>
+      <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:8}}>
+        <span style={{fontSize:12,opacity:0.8}}>qualità · {quality} su 5</span>
+        <div style={{display:'flex',gap:8}}>
+          {[1,2,3,4,5].map(n=>(<button key={n} onClick={()=>setQuality(n)} aria-label={`qualità ${n} su 5`} aria-pressed={n===quality} style={{width:44,height:44,borderRadius:'50%',background:'transparent',border:'none',cursor:'pointer',padding:4}}><span style={{display:'block',width:'100%',height:'100%',borderRadius:'50%',background:n<=quality?C_GOLD:'transparent',border:`2px solid ${C_GOLD}`,boxSizing:'border-box'}} /></button>))}
         </div>
       </div>
-    </div>
+      <NavField label="note (facoltative)" size={18} type="text" value={notes} onChange={e=>setNotes(e.target.value)} placeholder="risvegli, sogni…" />
+      <NavButtons onDelete={onDelete} onCancel={onClose} onSave={save} />
+    </NavModal>
   );
 }
 
@@ -4150,22 +4086,15 @@ function DigiunoPage({ theme, loaded, fasts, updFasts }){
         const h = pendingFast.hoursOverride ?? pendingFast.preset.hours;
         const info = fastRiskInfo('danger');
         return (
-          <div onClick={()=>setPendingFast(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.75)',backdropFilter:'blur(4px)',WebkitBackdropFilter:'blur(4px)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
-            <div onClick={e=>e.stopPropagation()} style={{background:'#142A4C',borderRadius:24,border:`1px solid ${info.color}88`,maxWidth:380,width:'100%',padding:'24px 22px',color:D.cream}}>
-              <div style={{fontFamily:fDmSans,fontSize:10,letterSpacing:'0.4em',color:info.color,textAlign:'center',textTransform:'uppercase',marginBottom:8}}>{info.label}</div>
-              <h2 style={{fontFamily:fBodoni,fontStyle:'italic',fontWeight:400,fontSize:22,color:D.cream,textAlign:'center',margin:'0 0 14px'}}>Digiuno di {h} ore</h2>
-              <div style={{fontFamily:fBodoni,fontStyle:'italic',fontSize:13,color:D.cream,lineHeight:1.6,marginBottom:16}}>
-                {info.text}
-              </div>
-              <div style={{padding:'12px 14px',background:`${info.color}14`,border:`1px solid ${info.color}55`,marginBottom:18,fontFamily:fBodoni,fontStyle:'italic',fontSize:12,color:D.dim,lineHeight:1.5}}>
-                Procedi solo se hai consultato un medico, sei consapevole dei rischi e ti assumi la responsabilità di questa scelta.
-              </div>
-              <div style={{display:'flex',gap:8}}>
-                <button onClick={()=>setPendingFast(null)} style={{flex:1,background:'transparent',color:D.cream,border:`1px solid ${D.cream}55`,fontFamily:fDmSans,fontSize:10,letterSpacing:'0.3em',padding:'12px 14px',cursor:'pointer',textTransform:'uppercase'}}>annulla</button>
-                <button onClick={()=>startFast(pendingFast.preset, pendingFast.hoursOverride)} style={{flex:1,background:info.color,color:D.bg2,border:'none',fontFamily:fDmSans,fontSize:10,letterSpacing:'0.3em',padding:'12px 14px',cursor:'pointer',textTransform:'uppercase'}}>procedo comunque</button>
-              </div>
+          <NavModal onClose={()=>setPendingFast(null)} title={`Digiuno di ${h} ore`} sub="">
+            <span style={{fontSize:12,letterSpacing:'0.1em',color:info.color,textTransform:'uppercase',fontWeight:700}}>{info.label}</span>
+            <span style={{fontSize:14,lineHeight:1.5}}>{info.text}</span>
+            <div style={{padding:'12px 14px',background:`${info.color}26`,border:`1px solid ${info.color}`,borderRadius:16,fontSize:14,lineHeight:1.5}}>Procedi solo se hai consultato un medico, sei consapevole dei rischi e ti assumi la responsabilità di questa scelta.</div>
+            <div style={{display:'flex',gap:8,justifyContent:'flex-end',flexWrap:'wrap'}}>
+              <button onClick={()=>setPendingFast(null)} style={pillBtn('p')}>annulla</button>
+              <button onClick={()=>startFast(pendingFast.preset, pendingFast.hoursOverride)} style={pillBtn('d')}>procedo comunque</button>
             </div>
-          </div>
+          </NavModal>
         );
       })()}
 
@@ -4245,81 +4174,32 @@ function FastEditModal({ fast, isActive, D, onClose, onSave, onDelete }){
   const inputStyle = { width:'100%', background:'transparent', border:`1px solid ${(D.accent||D.gold)}55`, fontFamily:fBodoni, fontStyle:'italic', fontSize:16, color:D.cream, padding:'10px 12px', outline:'none', borderRadius:0, colorScheme:'dark' };
 
   return (
-    <div onClick={onClose} style={overlayStyle}>
-      <div onClick={e=>e.stopPropagation()} style={cardStyle}>
-        <h2 style={{fontFamily:fBodoni, fontStyle:'italic', fontWeight:400, fontSize:22, color:D.cream, textAlign:'center', margin:0}}>
-          {isActive ? 'Modifica digiuno attivo' : 'Modifica digiuno'}
-        </h2>
-        {isActive && (
-          <div style={{fontFamily:fBodoni, fontStyle:'italic', fontSize:12, color:D.dim, textAlign:'center', marginTop:4, marginBottom:6}}>
-            Sul digiuno in corso puoi correggere solo l'orario di inizio.
-          </div>
-        )}
-
-        <div style={{marginTop:18}}>
-          <div style={labelStyle}>inizio</div>
-          <input type="datetime-local" value={startedInput} onChange={e=>setStartedInput(e.target.value)} style={inputStyle} />
+    <NavModal onClose={onClose} title={isActive ? 'Digiuno in corso' : 'Modifica digiuno'} sub={isActive ? 'Sul digiuno in corso puoi correggere solo l’orario di inizio.' : ''}>
+      <NavField label="inizio" size={19} type="datetime-local" value={startedInput} onChange={e=>setStartedInput(e.target.value)} />
+      {!isActive && <NavField label="fine" size={19} type="datetime-local" value={endedInput} onChange={e=>setEndedInput(e.target.value)} />}
+      {!isActive && (
+        <div style={{display:'grid',gridTemplateColumns:'repeat(2, minmax(0, 1fr))',gap:12}}>
+          <NavField label="obiettivo" unit="ore" type="text" inputMode="numeric" value={plannedHours} onChange={e=>setPlannedHours(e.target.value.replace(/[^0-9]/g,''))} />
+          <NavField label="nome" type="text" value={label} onChange={e=>setLabel(e.target.value)} placeholder="es. 16:8" />
         </div>
-
-        {!isActive && (
-          <div style={{marginTop:14}}>
-            <div style={labelStyle}>fine</div>
-            <input type="datetime-local" value={endedInput} onChange={e=>setEndedInput(e.target.value)} style={inputStyle} />
+      )}
+      {effectiveDurH != null && (
+        <span style={{fontSize:14,lineHeight:1.4}}>Durata effettiva: <b>{Math.floor(effectiveDurH)}h {String(Math.round((effectiveDurH%1)*60)).padStart(2,'0')}m</b>{phNum > 0 ? ` · ${Math.round((effectiveDurH/phNum)*100)}% dell’obiettivo` : ''}</span>
+      )}
+      {errors.length > 0 && <span style={{fontSize:13,color:C_SAL}}>{errors[0]}</span>}
+      {!confirmDel ? (
+        <NavButtons onDelete={!isActive ? ()=>setConfirmDel(true) : null} onCancel={onClose} onSave={handleSave} disabled={!canSave} />
+      ) : (
+        <div style={{border:`1px solid ${C_SAL}`,borderRadius:18,padding:14,display:'flex',flexDirection:'column',gap:10}}>
+          <span style={{fontFamily:fGaramond,fontSize:22}}>Eliminare questo digiuno?</span>
+          <span style={{fontSize:13,opacity:0.8}}>L’operazione non è reversibile.</span>
+          <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
+            <button onClick={()=>setConfirmDel(false)} style={pillBtn('o')}>annulla</button>
+            <button onClick={()=>onDelete(fast.id)} style={{...pillBtn('d'),background:C_SAL,color:C_NAVY,fontWeight:700}}>sì, elimina</button>
           </div>
-        )}
-
-        {!isActive && (
-          <div style={{display:'grid', gridTemplateColumns:'1fr 1.5fr', gap:10, marginTop:14}}>
-            <div>
-              <div style={labelStyle}>obiettivo (h)</div>
-              <input type="text" inputMode="numeric" value={plannedHours} onChange={e=>setPlannedHours(e.target.value.replace(/[^0-9]/g,''))} style={{...inputStyle, textAlign:'center'}} />
-            </div>
-            <div>
-              <div style={labelStyle}>etichetta</div>
-              <input type="text" value={label} onChange={e=>setLabel(e.target.value)} placeholder="es. 16:8" style={inputStyle} />
-            </div>
-          </div>
-        )}
-
-        {effectiveDurH != null && (
-          <div style={{marginTop:14, textAlign:'center', fontFamily:fBodoni, fontStyle:'italic', fontSize:14, color:D.amber}}>
-            durata effettiva: {Math.floor(effectiveDurH)}h {String(Math.round((effectiveDurH%1)*60)).padStart(2,'0')}m
-            {phNum > 0 && (
-              <span style={{color:D.dim, fontSize:12}}> · {Math.round((effectiveDurH/phNum)*100)}% obiettivo</span>
-            )}
-          </div>
-        )}
-
-        {errors.length > 0 && (
-          <div style={{marginTop:14, padding:'10px 12px', background:`${D.danger}1A`, border:`1px solid ${D.danger}55`, fontFamily:fBodoni, fontStyle:'italic', fontSize:13, color:D.danger}}>
-            {errors[0]}
-          </div>
-        )}
-
-        <div style={{display:'flex', gap:8, marginTop:20, justifyContent:'space-between', alignItems:'center'}}>
-          <button onClick={onClose} style={{background:'transparent', color:D.dim, border:`1px solid ${D.dim}66`, fontFamily:fDmSans, fontSize:10, letterSpacing:'0.3em', padding:'10px 16px', cursor:'pointer', textTransform:'uppercase'}}>annulla</button>
-          <button onClick={handleSave} disabled={!canSave} style={{background:canSave?(D.amber||D.gold):`${D.dim}55`, color:canSave?D.bg2:D.dim, border:'none', fontFamily:fDmSans, fontSize:10, letterSpacing:'0.35em', padding:'10px 22px', cursor:canSave?'pointer':'not-allowed', textTransform:'uppercase'}}>salva</button>
         </div>
-
-        {/* Sezione elimina — solo per digiuni terminati, con conferma esplicita */}
-        {!isActive && (
-          <div style={{marginTop:22, paddingTop:18, borderTop:`1px solid ${D.accent||D.gold}1F`}}>
-            {!confirmDel ? (
-              <button onClick={()=>setConfirmDel(true)} style={{width:'100%', background:'transparent', color:D.danger, border:`1px solid ${D.danger}66`, fontFamily:fDmSans, fontSize:10, letterSpacing:'0.35em', padding:'10px 14px', cursor:'pointer', textTransform:'uppercase'}}>elimina digiuno</button>
-            ) : (
-              <div style={{padding:'14px', background:`${D.danger}1A`, border:`1px solid ${D.danger}55`}}>
-                <div style={{fontFamily:fBodoni, fontStyle:'italic', fontSize:14, color:D.cream, textAlign:'center', marginBottom:4}}>Eliminare questo digiuno?</div>
-                <div style={{fontFamily:fBodoni, fontStyle:'italic', fontSize:12, color:D.dim, textAlign:'center', marginBottom:12}}>L'operazione non è reversibile.</div>
-                <div style={{display:'flex', gap:8, justifyContent:'center'}}>
-                  <button onClick={()=>setConfirmDel(false)} style={{flex:1, background:'transparent', color:D.dim, border:`1px solid ${D.dim}66`, fontFamily:fDmSans, fontSize:10, letterSpacing:'0.3em', padding:'10px 14px', cursor:'pointer', textTransform:'uppercase'}}>annulla</button>
-                  <button onClick={()=>onDelete(fast.id)} style={{flex:1, background:D.danger, color:D.bg2, border:'none', fontFamily:fDmSans, fontSize:10, letterSpacing:'0.3em', padding:'10px 14px', cursor:'pointer', textTransform:'uppercase'}}>sì, elimina</button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
+      )}
+    </NavModal>
   );
 }
 
@@ -4590,42 +4470,20 @@ function DayStrip({ selectedKey, onSelect, ink, tan, count, fontA, fontB }){
 function SimpleModal({ children, onClose, bg, border, wide }){
   return (
     <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.55)',backdropFilter:'blur(3px)',WebkitBackdropFilter:'blur(3px)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
-      <div onClick={e=>e.stopPropagation()} style={{background:'#142A4C',border:'1px solid #34506F',maxWidth:wide?400:340,width:'100%',padding:'24px 22px',position:'relative',borderRadius:24,maxHeight:'88vh',overflowY:'auto',boxSizing:'border-box',boxShadow:'0 12px 32px rgba(0,0,0,0.45)'}}>{children}</div>
+      <div onClick={e=>e.stopPropagation()} style={{...MODAL_CARD,maxWidth:wide?400:340,width:'100%',padding:'24px 22px',position:'relative',maxHeight:'88vh',overflowY:'auto'}}>{children}</div>
     </div>
   );
 }
 
-function ModalQ({ children, onClose, title, subtitle, Q }){
+function ModalQ({ children, onClose, title, subtitle }){
   const t = String(title||'').toLowerCase();
-  return (
-    <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(4,12,28,0.7)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
-      <div onClick={e=>e.stopPropagation()} style={{background:'#142A4C',border:'1px solid #34506F',maxWidth:380,width:'100%',padding:'24px 22px',borderRadius:24,maxHeight:'90vh',overflowY:'auto',boxShadow:'0 12px 32px rgba(0,0,0,0.45)',color:Q.cream,fontFamily:fDmSans,boxSizing:'border-box'}}>
-        <h2 style={{fontFamily:Q.fontText||fGaramond,fontSize:26,fontWeight:500,margin:0,lineHeight:1.1}}>{t.charAt(0).toUpperCase()+t.slice(1)}</h2>
-        {subtitle && <div style={{fontSize:13,opacity:0.75,marginTop:6}}>{subtitle}</div>}
-        {children}
-      </div>
-    </div>
-  );
+  return <NavModal onClose={onClose} title={t.charAt(0).toUpperCase()+t.slice(1)} sub={subtitle}>{children}</NavModal>;
 }
 
-function InputBig({ value, onChange, onEnter, placeholder, unit, Q }){
-  return (
-    <div style={{marginTop:20,display:'flex',alignItems:'baseline',gap:8}}>
-      <input type="text" inputMode="decimal" value={value} onChange={e=>onChange(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')onEnter();}} autoFocus placeholder={placeholder} aria-label={String(unit||'valore').toLowerCase()} style={{flex:1,minWidth:0,background:'transparent',border:'none',borderBottom:`2px solid ${Q.gold}`,color:Q.cream,fontFamily:Q.fontText||fGaramond,fontSize:48,outline:'none',padding:'4px 0'}} />
-      <span style={{fontSize:14,opacity:0.8}}>{String(unit||'').toLowerCase()}</span>
-    </div>
-  );
+function InputBig({ value, onChange, onEnter, placeholder, unit }){
+  return <NavField label="" unit={String(unit||'').toLowerCase()} size={48} type="text" inputMode="decimal" value={value} onChange={e=>onChange(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')onEnter();}} autoFocus placeholder={placeholder} aria-label={String(unit||'valore').toLowerCase()} />;
 }
 
-function EditButtons({ onCancel, onSave, onDelete, Q }){
-  const b = { minHeight:46, borderRadius:23, fontFamily:fDmSans, fontSize:15, cursor:'pointer', padding:'0 18px' };
-  return (
-    <div style={{display:'flex',gap:10,marginTop:26,justifyContent:'space-between',alignItems:'center',flexWrap:'wrap'}}>
-      {onDelete ? <button onClick={onDelete} style={{...b,background:'transparent',color:'#F0B9A0',border:'1px solid #F0B9A088'}}>elimina</button> : <span />}
-      <div style={{display:'flex',gap:10}}>
-        <button onClick={onCancel} style={{...b,background:'transparent',color:Q.cream,border:`1px solid ${Q.cream}66`}}>annulla</button>
-        <button onClick={onSave} style={{...b,background:Q.gold,color:Q.bg2,border:`1px solid ${Q.gold}`,fontWeight:700}}>salva</button>
-      </div>
-    </div>
-  );
+function EditButtons({ onCancel, onSave, onDelete }){
+  return <NavButtons onDelete={onDelete} onCancel={onCancel} onSave={onSave} />;
 }
